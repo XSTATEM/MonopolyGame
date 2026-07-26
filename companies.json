@@ -1,0 +1,321 @@
+{
+  "sectors": [
+    "Технологии",
+    "Интернет и медиа",
+    "Потребительские товары",
+    "Промышленность и транспорт",
+    "Финансы и сырьё"
+  ],
+  "tiers": {
+    "A": {
+      "label": "Голубые фишки",
+      "startPrice": 40000
+    },
+    "B": {
+      "label": "Средние",
+      "startPrice": 20000
+    },
+    "C": {
+      "label": "Малые",
+      "startPrice": 8000
+    }
+  },
+  "companies": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple",
+      "sector": "Технологии",
+      "tier": "A"
+    },
+    {
+      "ticker": "MSFT",
+      "name": "Microsoft",
+      "sector": "Технологии",
+      "tier": "A"
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "Google",
+      "sector": "Технологии",
+      "tier": "A"
+    },
+    {
+      "ticker": "NVDA",
+      "name": "NVIDIA",
+      "sector": "Технологии",
+      "tier": "B"
+    },
+    {
+      "ticker": "IBM",
+      "name": "IBM",
+      "sector": "Технологии",
+      "tier": "B"
+    },
+    {
+      "ticker": "AMZN",
+      "name": "Amazon",
+      "sector": "Интернет и медиа",
+      "tier": "B"
+    },
+    {
+      "ticker": "DIS",
+      "name": "Disney",
+      "sector": "Интернет и медиа",
+      "tier": "A"
+    },
+    {
+      "ticker": "YDEX",
+      "name": "Яндекс",
+      "sector": "Интернет и медиа",
+      "tier": "C"
+    },
+    {
+      "ticker": "VKCO",
+      "name": "VK",
+      "sector": "Интернет и медиа",
+      "tier": "C"
+    },
+    {
+      "ticker": "MCD",
+      "name": "McDonald's",
+      "sector": "Потребительские товары",
+      "tier": "A"
+    },
+    {
+      "ticker": "NKE",
+      "name": "Nike",
+      "sector": "Потребительские товары",
+      "tier": "B"
+    },
+    {
+      "ticker": "KO",
+      "name": "Coca-Cola",
+      "sector": "Потребительские товары",
+      "tier": "B"
+    },
+    {
+      "ticker": "WMT",
+      "name": "Walmart",
+      "sector": "Потребительские товары",
+      "tier": "B"
+    },
+    {
+      "ticker": "RKT",
+      "name": "Durex",
+      "sector": "Потребительские товары",
+      "tier": "C"
+    },
+    {
+      "ticker": "BA",
+      "name": "Boeing",
+      "sector": "Промышленность и транспорт",
+      "tier": "A"
+    },
+    {
+      "ticker": "MMM",
+      "name": "3M",
+      "sector": "Промышленность и транспорт",
+      "tier": "B"
+    },
+    {
+      "ticker": "AFLT",
+      "name": "Аэрофлот",
+      "sector": "Промышленность и транспорт",
+      "tier": "C"
+    },
+    {
+      "ticker": "SBER",
+      "name": "Сбербанк",
+      "sector": "Финансы и сырьё",
+      "tier": "B"
+    },
+    {
+      "ticker": "GAZP",
+      "name": "Газпром",
+      "sector": "Финансы и сырьё",
+      "tier": "C"
+    },
+    {
+      "ticker": "MGNT",
+      "name": "Магнит",
+      "sector": "Финансы и сырьё",
+      "tier": "C"
+    },
+    {
+      "ticker": "MTSS",
+      "name": "МТС",
+      "sector": "Финансы и сырьё",
+      "tier": "C"
+    }
+  ],
+  "board": [
+    [
+      "AAPL",
+      "AMZN",
+      "MMM",
+      "MTSS",
+      "KO",
+      "YDEX",
+      "RKT",
+      "YDEX",
+      "NKE",
+      "AMZN",
+      "MMM",
+      "BA"
+    ],
+    [
+      "MGNT",
+      "GOOGL",
+      "NKE",
+      "AAPL",
+      "BA",
+      "GOOGL",
+      "AAPL",
+      "SBER",
+      "NVDA",
+      "AAPL",
+      "KO",
+      "MSFT"
+    ],
+    [
+      "MTSS",
+      "NKE",
+      "MSFT",
+      "RKT",
+      "IBM",
+      "NVDA",
+      "KO",
+      "GOOGL",
+      "WMT",
+      "IBM",
+      "MCD",
+      "DIS"
+    ],
+    [
+      "NVDA",
+      "NVDA",
+      "WMT",
+      "SBER",
+      "NKE",
+      "MGNT",
+      "AMZN",
+      "VKCO",
+      "AFLT",
+      "GAZP",
+      "MTSS",
+      "MGNT"
+    ],
+    [
+      "MGNT",
+      "GAZP",
+      "IBM",
+      "KO",
+      "AMZN",
+      "GOOGL",
+      "MSFT",
+      "IBM",
+      "AMZN",
+      "NVDA",
+      "MMM",
+      "GOOGL"
+    ],
+    [
+      "GAZP",
+      "SBER",
+      "VKCO",
+      "MTSS",
+      "BA",
+      "IBM",
+      "BA",
+      "KO",
+      "IBM",
+      "NKE",
+      "BA",
+      "AAPL"
+    ],
+    [
+      "MCD",
+      "MSFT",
+      "AMZN",
+      "RKT",
+      "MSFT",
+      "YDEX",
+      "AAPL",
+      "KO",
+      "MSFT",
+      "GOOGL",
+      "WMT",
+      "KO"
+    ],
+    [
+      "AAPL",
+      "KO",
+      "GOOGL",
+      "NKE",
+      "AFLT",
+      "MMM",
+      "YDEX",
+      "GOOGL",
+      "RKT",
+      "AMZN",
+      "NVDA",
+      "GOOGL"
+    ],
+    [
+      "MCD",
+      "MGNT",
+      "MSFT",
+      "MCD",
+      "AMZN",
+      "AAPL",
+      "IBM",
+      "MSFT",
+      "AAPL",
+      "MMM",
+      "IBM",
+      "RKT"
+    ],
+    [
+      "WMT",
+      "BA",
+      "GAZP",
+      "IBM",
+      "MGNT",
+      "NVDA",
+      "KO",
+      "RKT",
+      "SBER",
+      "VKCO",
+      "NVDA",
+      "BA"
+    ],
+    [
+      "GAZP",
+      "AFLT",
+      "MCD",
+      "GOOGL",
+      "KO",
+      "WMT",
+      "SBER",
+      "AFLT",
+      "IBM",
+      "SBER",
+      "KO",
+      "MSFT"
+    ],
+    [
+      "MCD",
+      "AAPL",
+      "MSFT",
+      "YDEX",
+      "MCD",
+      "NVDA",
+      "MMM",
+      "SBER",
+      "NVDA",
+      "GOOGL",
+      "YDEX",
+      "AAPL"
+    ]
+  ]
+}

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Биржа — онлайн</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#182430; --panel2:#1f2e3c; --line:#2b3a4a;
+    --text:#e8eef4; --muted:#8ea3b5; --green:#3ecf8e; --red:#ef5b5b; --amber:#e8b339; --accent:#4f8cff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  header h1{font-size:18px;margin:0;font-weight:700;}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:13px;color:var(--muted);}
+  .pill b{color:var(--text);}
+  .pill.phase-roll{border-color:var(--accent);color:var(--text);}
+  .pill.phase-trade{border-color:var(--amber);color:var(--amber);}
+  .pill.phase-ended{border-color:var(--green);color:var(--green);}
+  button{cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;transition:opacity .15s;}
+  button:hover{opacity:.85;}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
+  button.danger{background:var(--red);}
+  button.small{padding:4px 9px;font-size:12px;border-radius:6px;}
+  select,input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:13px;}
+  main{max-width:1300px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
+  @media(max-width:1000px){main{grid-template-columns:1fr;}}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;}
+  h2{font-size:15px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);}
+  td{padding:6px 8px;border-bottom:1px solid var(--line);}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .sector-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--panel2);color:var(--muted);white-space:nowrap;}
+  .price{font-weight:700;}
+  .up{color:var(--green);} .down{color:var(--red);}
+  .owned-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;}
+  .owned-fill{height:100%;background:var(--accent);}
+  .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+  .player-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+  .player-card.bankrupt{opacity:.4;}
+  .player-card.you{border-color:var(--accent);}
+  .player-card.turn{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber);}
+  .player-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .player-head b{font-size:14px;}
+  .holdings{font-size:12px;color:var(--muted);margin-top:4px;}
+  .holdings span{display:inline-block;margin-right:10px;}
+  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:6px;}
+  .log-entry{padding:6px 8px;border-radius:6px;background:var(--panel2);}
+  .log-entry .tag{font-size:10.5px;color:var(--muted);}
+  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:8px;margin-left:6px;}
+  .badge.control{background:var(--amber);color:#332400;}
+  .badge.offline{background:var(--red);color:#fff;}
+  .net{font-weight:700;}
+  .muted{color:var(--muted);}
+  .event-banner{background:linear-gradient(90deg,#3a2a55,#2a3a55);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;}
+  .footer-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px;}
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .join-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:340px;max-width:90vw;}
+  .join-box h1{font-size:20px;margin:0 0 6px;}
+  .join-box p{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
+  .join-box label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
+  .join-box input{width:100%;}
+  .join-box .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:1em;}
+  .trade-offer{background:var(--panel);border:1px solid var(--amber);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12.5px;}
+  #app{display:none;}
+</style>
+</head>
+<body>
+
+<div class="center-screen" id="joinScreen">
+  <div class="join-box">
+    <h1>📈 Биржа — онлайн</h1>
+    <p>Введите комнату и ник, чтобы подключиться к общей партии через интернет.</p>
+    <label>Комната</label>
+    <input id="joinRoom" placeholder="например MAIN" maxlength="20">
+    <label>Ваш ник</label>
+    <input id="joinName" placeholder="например Игрок1" maxlength="20">
+    <div class="row-inline" style="margin-top:16px;">
+      <button style="width:100%;" id="btnJoin">Войти в игру</button>
+    </div>
+    <div class="err" id="joinErr"></div>
+  </div>
+</div>
+
+<div id="app">
+<header>
+  <h1>📈 Биржа — онлайн</h1>
+  <span class="pill">Комната: <b id="roomLabel">—</b></span>
+  <span class="pill">Ход в раунде: <b id="turnCounter">1</b> / 3</span>
+  <span class="pill">Событий: <b id="eventCounter">0</b></span>
+  <span class="pill">Карт в колоде: <b id="deckCounter">68</b></span>
+  <span class="pill" id="phasePill">—</span>
+  <button id="btnEvent" class="secondary">🎲 Событие сейчас</button>
+  <button id="btnNewGame" class="danger" style="margin-left:auto;">Новая партия</button>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>Рынок компаний</h2>
+      <table id="marketTable">
+        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th>Δ</th><th>В руках игроков</th></tr></thead>
+        <tbody id="marketBody"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Лента событий</h2>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>Игроки</h2>
+      <div id="playersList"></div>
+      <button class="small secondary" id="btnBankrupt">Объявить своё банкротство</button>
+    </section>
+
+    <section id="actionSection">
+      <h2>Действие</h2>
+      <div id="actionBody"></div>
+    </section>
+
+    <section>
+      <h2>Подсказки</h2>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+        <b style="color:var(--text);">Как ходить:</b> когда наступает ваш ход, нажмите «Бросить 2×d12» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.<br>
+        <b style="color:var(--text);">Фаза торгов</b> открывается всем игрокам одновременно каждый 3-й ход (90 секунд) — можно покупать/продавать банку без очереди и предлагать сделки другим игрокам по договорной цене.<br>
+        <b style="color:var(--text);">Контрольный пакет</b> (&gt;50%) даёт право на спецдействия компании — см. §7 правил (в этой онлайн-версии спецдействия проводятся по договорённости вне приложения).<br>
+        <b style="color:var(--text);">Банкротство</b> наступает, если вы не можете оплатить обязательный платёж, даже продав все акции банку — сервер сделает это автоматически.
+      </div>
+    </section>
+  </div>
+</main>
+<div class="footer-note">Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.</div>
+</div>
+
+<script>
+let ws = null;
+let you = null;
+let latest = null;
+let myName = "";
+let roomCode = "";
+
+function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
+function wsUrl(){
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${location.host}`;
+}
+
+function connect(room, name){
+  roomCode = room; myName = name;
+  ws = new WebSocket(wsUrl());
+  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name})); };
+  ws.onmessage = (ev)=>{
+    const msg = JSON.parse(ev.data);
+    if(msg.type === "joined"){
+      you = msg.playerId;
+      document.getElementById("joinScreen").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      document.getElementById("roomLabel").textContent = msg.room;
+    } else if(msg.type === "state"){
+      you = msg.you;
+      latest = msg;
+      render();
+    } else if(msg.type === "error"){
+      if(document.getElementById("joinScreen").style.display !== "none"){
+        document.getElementById("joinErr").textContent = msg.message;
+      } else {
+        flashError(msg.message);
+      }
+    }
+  };
+  ws.onclose = ()=>{ flashError("Соединение с сервером потеряно. Обновите страницу для переподключения."); };
+}
+
+function flashError(text){
+  const log = document.getElementById("log");
+  if(!log) return;
+  const div = document.createElement("div");
+  div.className = "log-entry";
+  div.style.borderLeft = "3px solid var(--red)";
+  div.innerHTML = `<div class="tag">Ошибка</div>${text}`;
+  log.prepend(div);
+}
+
+document.getElementById("btnJoin").onclick = ()=>{
+  const room = document.getElementById("joinRoom").value.trim() || "MAIN";
+  const name = document.getElementById("joinName").value.trim();
+  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
+  document.getElementById("joinErr").textContent = "";
+  connect(room, name);
+};
+document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnJoin").click(); });
+
+function send(obj){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
+
+document.getElementById("btnEvent").onclick = ()=> send({type:"forceEvent"});
+document.getElementById("btnNewGame").onclick = ()=>{
+  if(confirm("Начать новую партию? Все данные текущей партии будут потеряны.")) send({type:"newGame"});
+};
+document.getElementById("btnBankrupt").onclick = ()=>{
+  if(confirm("Объявить своё банкротство? Все ваши акции вернутся в банк.")) send({type:"declareBankruptcy"});
+};
+
+let countdownTimer = null;
+function render(){
+  if(!latest) return;
+  const s = latest;
+  document.getElementById("turnCounter").textContent = s.turn;
+  document.getElementById("eventCounter").textContent = s.eventCount;
+  document.getElementById("deckCounter").textContent = s.deckRemaining;
+
+  const phasePill = document.getElementById("phasePill");
+  phasePill.className = "pill phase-" + s.phase;
+  if(s.phase === "roll"){
+    const cp = s.players.find(p=>p.id===s.currentPlayerId);
+    phasePill.innerHTML = `Ход: <b>${cp ? cp.name : "—"}</b>`;
+  } else if(s.phase === "trade"){
+    phasePill.innerHTML = `Фаза торгов <b id="tradeCountdown"></b>`;
+  } else {
+    phasePill.innerHTML = `Игра окончена`;
+  }
+
+  if(countdownTimer) clearInterval(countdownTimer);
+  if(s.phase === "trade" && s.tradeWindowEndsAt){
+    const tick = ()=>{
+      const el = document.getElementById("tradeCountdown");
+      if(!el) return;
+      const left = Math.max(0, Math.round((s.tradeWindowEndsAt - Date.now())/1000));
+      el.textContent = `(${left}с)`;
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  // market table
+  const body = document.getElementById("marketBody");
+  body.innerHTML = "";
+  s.companies.forEach(c=>{
+    const delta = c.price - c.prevPrice;
+    const deltaPct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
+    const controller = s.players.find(p=>p.id===c.controllerId);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</td>
+      <td><span class="sector-tag">${c.sector}</span></td>
+      <td class="price">${fmt(c.price)}</td>
+      <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
+      <td><span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="muted">${c.owned.toFixed(0)}%</span></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  // players
+  const playersList = document.getElementById("playersList");
+  playersList.innerHTML = "";
+  s.players.forEach(p=>{
+    const div = document.createElement("div");
+    div.className = "player-card" + (p.bankrupt?" bankrupt":"") + (p.id===you?" you":"") + (p.id===s.currentPlayerId && s.phase==="roll" ?" turn":"");
+    const holdingsStr = Object.entries(p.holdings).filter(([,v])=>v>0)
+      .map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`;
+    div.innerHTML = `
+      <div class="player-head">
+        <b>${p.name}${p.bankrupt?" 💀":""}${p.id===you?" (вы)":""}</b>
+        <span class="net">${fmt(p.netWorth)}</span>
+      </div>
+      <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span> ${p.connected?"":'<span class="badge offline">офлайн</span>'}</div>
+      <div class="holdings">${holdingsStr}</div>
+    `;
+    playersList.appendChild(div);
+  });
+
+  // log
+  const log = document.getElementById("log");
+  log.innerHTML = "";
+  s.log.slice().reverse().forEach(e=>{
+    const div = document.createElement("div");
+    div.className = "log-entry";
+    div.innerHTML = `<div class="tag">${e.turnTag}</div>${e.text}`;
+    log.appendChild(div);
+  });
+
+  renderAction(s);
+}
+
+function renderAction(s){
+  const el = document.getElementById("actionBody");
+  const me = s.players.find(p=>p.id===you);
+  if(!me){ el.innerHTML = `<div class="muted">Загрузка...</div>`; return; }
+  if(me.bankrupt){ el.innerHTML = `<div class="muted">Вы банкрот — можете наблюдать за игрой.</div>`; return; }
+
+  if(s.phase === "ended"){
+    el.innerHTML = `<div class="muted">Игра окончена. Нажмите «Новая партия», чтобы сыграть ещё раз.</div>`;
+    return;
+  }
+
+  if(s.phase === "roll"){
+    if(s.currentPlayerId !== you){
+      const cp = s.players.find(p=>p.id===s.currentPlayerId);
+      el.innerHTML = `<div class="muted">Ожидание хода игрока «${cp?cp.name:"?"}»...</div>`;
+      return;
+    }
+    if(!s.pendingRoll){
+      el.innerHTML = `
+        <div class="muted" style="margin-bottom:10px;font-size:12.5px;">Ваш ход! Бросьте 2×d12 — первый кубик даёт строку, второй столбец на поле.</div>
+        <button style="width:100%;" onclick="send({type:'roll'})">🎲 Бросить 2×d12</button>
+      `;
+      return;
+    }
+    const roll = s.pendingRoll;
+    const c = s.companies.find(x=>x.ticker===roll.ticker);
+    let actionsHtml;
+    if(c.owned >= 100){
+      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="send({type:'dividendFromRoll'})">Заплатить дивиденды владельцам ${roll.ticker}</button>`;
+    } else {
+      const free = 100 - c.owned;
+      actionsHtml = `
+        <div class="row-inline" style="margin-top:10px;">
+          <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
+          <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
+        </div>`;
+    }
+    el.innerHTML = `
+      <div class="event-banner" style="margin-bottom:0;">
+        🎲 <b>${roll.row}</b> / <b>${roll.col}</b> → <b>${c.name}</b> <span class="muted">(${roll.ticker})</span><br>
+        Цена: <b>${fmt(c.price)}</b> · В руках игроков: ${c.owned.toFixed(0)}%
+      </div>
+      ${actionsHtml}
+      <div class="row-inline" style="margin-top:10px;">
+        <button class="secondary" style="width:100%;" onclick="send({type:'skipRoll'})">Пропустить действие и завершить ход</button>
+      </div>
+    `;
+    return;
+  }
+
+  if(s.phase === "trade"){
+    const myTickers = Object.entries(me.holdings).filter(([,v])=>v>0).map(([t])=>t);
+    const companyOpts = s.companies.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker}) — ${fmt(c.price)}</option>`).join("");
+    const myTickerOpts = myTickers.length ? myTickers.map(t=>`<option value="${t}">${t} (у вас ${me.holdings[t]}%)</option>`).join("") : `<option value="">нет акций</option>`;
+    const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
+    const playerOpts = otherPlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+    const incoming = s.pendingTrades.filter(t=>t.toId===you);
+    const outgoing = s.pendingTrades.filter(t=>t.fromId===you);
+
+    el.innerHTML = `
+      <div class="muted" style="font-size:12.5px;margin-bottom:10px;">Фаза свободных торгов — доступна всем одновременно.</div>
+      <label style="display:block;font-size:12px;color:var(--muted);margin:6px 0 4px;">Купить у банка</label>
+      <div class="row-inline">
+        <select id="buyTicker" style="flex:1;">${companyOpts}</select>
+        <select id="buyPct"><option value="10">10%</option><option value="25">25%</option></select>
+        <button onclick="doBuyBank()">Купить</button>
+      </div>
+      <label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;">Продать банку</label>
+      <div class="row-inline">
+        <select id="sellTicker" style="flex:1;">${myTickerOpts}</select>
+        <select id="sellPct"><option value="10">10%</option><option value="25">25%</option></select>
+        <button onclick="doSellBank()">Продать</button>
+      </div>
+      <label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;">Предложить сделку игроку</label>
+      <div class="row-inline">
+        <select id="tradeTo" style="flex:1;">${playerOpts || "<option>нет других игроков</option>"}</select>
+      </div>
+      <div class="row-inline">
+        <select id="tradeTicker" style="flex:1;">${myTickerOpts}</select>
+        <input id="tradePct" type="number" placeholder="%" value="10" min="1" max="100" style="width:70px;">
+        <input id="tradePrice" type="number" placeholder="цена $" style="width:110px;">
+      </div>
+      <div class="row-inline"><button style="width:100%;" onclick="doProposeTrade()" ${otherPlayers.length===0?"disabled":""}>Предложить сделку</button></div>
+      ${incoming.length ? `<h3 style="font-size:13px;margin:14px 0 6px;">Предложения вам</h3>` + incoming.map(t=>{
+        const from = s.players.find(p=>p.id===t.fromId);
+        return `<div class="trade-offer">${from?from.name:"?"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}
+          <div class="row-inline" style="margin-top:6px;margin-bottom:0;">
+            <button class="small" onclick="send({type:'respondTrade',id:${t.id},accept:true})">Принять</button>
+            <button class="small secondary" onclick="send({type:'respondTrade',id:${t.id},accept:false})">Отклонить</button>
+          </div></div>`;
+      }).join("") : ""}
+      ${outgoing.length ? `<h3 style="font-size:13px;margin:14px 0 6px;">Ваши предложения</h3>` + outgoing.map(t=>{
+        const to = s.players.find(p=>p.id===t.toId);
+        return `<div class="trade-offer muted">Вы предложили ${to?to.name:"?"} купить ${t.pct}% ${t.ticker} за ${fmt(t.price)} — ожидание ответа.</div>`;
+      }).join("") : ""}
+    `;
+  }
+}
+
+function doBuyBank(){
+  send({type:"buyBank", ticker: document.getElementById("buyTicker").value, pct: parseInt(document.getElementById("buyPct").value)});
+}
+function doSellBank(){
+  const ticker = document.getElementById("sellTicker").value;
+  if(!ticker) return;
+  send({type:"sellBank", ticker, pct: parseInt(document.getElementById("sellPct").value)});
+}
+function doProposeTrade(){
+  const ticker = document.getElementById("tradeTicker").value;
+  if(!ticker) return;
+  send({
+    type:"proposeTrade",
+    to: parseInt(document.getElementById("tradeTo").value),
+    ticker,
+    pct: parseInt(document.getElementById("tradePct").value),
+    price: parseFloat(document.getElementById("tradePrice").value)||0,
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: birzha-multiplayer
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0

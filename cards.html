@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Биржа — печать карточек</title>
+<style>
+  @page { size: A4; margin: 8mm; }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#e9edf1;color:#1a1a1a;}
+  .toolbar{position:sticky;top:0;background:#20304a;color:#fff;padding:12px 20px;display:flex;gap:12px;align-items:center;z-index:10;}
+  .toolbar button{background:#4f8cff;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;}
+  .toolbar span{font-size:13px;opacity:.8;}
+  h2.section-title{margin:24px 8mm 8px;font-size:16px;}
+  .sheet{display:flex;flex-wrap:wrap;gap:3mm;padding:0 8mm 8mm;}
+  .card{
+    width:63.5mm;height:88.9mm;border-radius:3mm;border:0.4mm solid rgba(0,0,0,.25);
+    break-inside:avoid;page-break-inside:avoid;position:relative;overflow:hidden;
+    display:flex;flex-direction:column;background:#fff;
+  }
+  /* ---- Company cards ---- */
+  .ccard{color:#fff;}
+  .ccard .top{padding:4mm 4mm 2mm;display:flex;justify-content:space-between;align-items:flex-start;}
+  .ccard .ticker{font-size:5mm;font-weight:800;letter-spacing:.03em;}
+  .ccard .tier{font-size:2.6mm;background:rgba(255,255,255,.25);padding:1mm 2mm;border-radius:3mm;}
+  .ccard .name{padding:0 4mm;font-size:4mm;font-weight:700;line-height:1.15;}
+  .ccard .sector{padding:1mm 4mm 0;font-size:2.7mm;opacity:.85;text-transform:uppercase;letter-spacing:.04em;}
+  .ccard .price{margin-top:auto;padding:3mm 4mm;background:rgba(0,0,0,.18);}
+  .ccard .price .lbl{font-size:2.6mm;opacity:.8;}
+  .ccard .price .val{font-size:5.5mm;font-weight:800;}
+  .ccard .track{padding:2mm 4mm 4mm;background:rgba(0,0,0,.18);}
+  .ccard .track .lbl{font-size:2.5mm;opacity:.8;margin-bottom:1mm;}
+  .ccard .boxes{display:flex;gap:0.8mm;}
+  .ccard .boxes div{flex:1;height:4mm;border:0.3mm solid rgba(255,255,255,.6);border-radius:0.6mm;}
+
+  /* sector colors */
+  .sec-tech{background:linear-gradient(160deg,#3454d1,#1c2f6b);}
+  .sec-media{background:linear-gradient(160deg,#7a3fd1,#3d1e6b);}
+  .sec-consumer{background:linear-gradient(160deg,#d1673f,#7a3116);}
+  .sec-industrial{background:linear-gradient(160deg,#4a4a4a,#1c1c1c);}
+  .sec-finance{background:linear-gradient(160deg,#1f9e6d,#0e4a34);}
+
+  /* ---- News cards ---- */
+  .ncard{padding:4mm;}
+  .ncard .kicker{font-size:2.6mm;text-transform:uppercase;letter-spacing:.06em;font-weight:800;padding:1mm 2.5mm;border-radius:2mm;display:inline-block;color:#fff;}
+  .ncard .title{font-size:4.6mm;font-weight:800;margin-top:3mm;line-height:1.2;}
+  .ncard .desc{font-size:3.2mm;margin-top:3mm;line-height:1.4;color:#333;}
+  .ncard .effect{margin-top:auto;font-size:6mm;font-weight:800;padding-top:3mm;}
+  .ncard.type-global{border-top:6mm solid #8b3fd1;}
+  .ncard.type-sector{border-top:6mm solid #3f8bd1;}
+  .ncard.type-company{border-top:6mm solid #d1823f;}
+  .ncard.type-special{border-top:6mm solid #3fd18b;}
+  .kicker.k-global{background:#8b3fd1;}
+  .kicker.k-sector{background:#3f8bd1;}
+  .kicker.k-company{background:#d1823f;}
+  .kicker.k-special{background:#3fd18b;color:#053;}
+  .up{color:#0a8a4a;}
+  .down{color:#c0392b;}
+  .footer-note{padding:20px 8mm 60px;font-size:12px;color:#555;max-width:700px;}
+  @media print{
+    .toolbar{display:none;}
+    body{background:#fff;}
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">🖨️ Печать / Сохранить в PDF</button>
+  <span>21 карточка компаний + 68 карточек новостей · формат — стандартная игровая карта 63.5×88.9мм</span>
+</div>
+
+<h2 class="section-title">Карточки компаний (21 шт.)</h2>
+<div class="sheet" id="companySheet"></div>
+
+<h2 class="section-title">Карточки новостей (68 шт.)</h2>
+<div class="sheet" id="newsSheet"></div>
+
+<div class="footer-note">
+  Логотипы брендов на этих карточках сознательно не воспроизводятся (авторские права) — вместо них цветовое кодирование по сектору и тикер. Реальные логотипы остаются только на игровом поле, которое уже собрано вручную.<br><br>
+  Совет по печати: печатайте на плотной бумаге (160–200 г/м²), затем разрежьте по границам карточек. При печати в Chrome отключите «Масштаб» (100%) и включите «Фоновые графические элементы».
+</div>
+
+<script>
+const TIER_PRICE = {A:40000, B:20000, C:8000};
+const TIER_LABEL = {A:"Голубая фишка", B:"Средняя", C:"Малая"};
+const SECTOR_CLASS = {
+  "Технологии":"sec-tech",
+  "Интернет и медиа":"sec-media",
+  "Потребительские товары":"sec-consumer",
+  "Промышленность и транспорт":"sec-industrial",
+  "Финансы и сырьё":"sec-finance",
+};
+const COMPANIES = [
+  {ticker:"AAPL",name:"Apple",sector:"Технологии",tier:"A"},
+  {ticker:"MSFT",name:"Microsoft",sector:"Технологии",tier:"A"},
+  {ticker:"GOOGL",name:"Google",sector:"Технологии",tier:"A"},
+  {ticker:"NVDA",name:"NVIDIA",sector:"Технологии",tier:"B"},
+  {ticker:"IBM",name:"IBM",sector:"Технологии",tier:"B"},
+  {ticker:"AMZN",name:"Amazon",sector:"Интернет и медиа",tier:"B"},
+  {ticker:"DIS",name:"Disney",sector:"Интернет и медиа",tier:"A"},
+  {ticker:"YDEX",name:"Яндекс",sector:"Интернет и медиа",tier:"C"},
+  {ticker:"VKCO",name:"VK",sector:"Интернет и медиа",tier:"C"},
+  {ticker:"MCD",name:"McDonald's",sector:"Потребительские товары",tier:"A"},
+  {ticker:"NKE",name:"Nike",sector:"Потребительские товары",tier:"B"},
+  {ticker:"KO",name:"Coca-Cola",sector:"Потребительские товары",tier:"B"},
+  {ticker:"WMT",name:"Walmart",sector:"Потребительские товары",tier:"B"},
+  {ticker:"RKT",name:"Durex",sector:"Потребительские товары",tier:"C"},
+  {ticker:"BA",name:"Boeing",sector:"Промышленность и транспорт",tier:"A"},
+  {ticker:"MMM",name:"3M",sector:"Промышленность и транспорт",tier:"B"},
+  {ticker:"AFLT",name:"Аэрофлот",sector:"Промышленность и транспорт",tier:"C"},
+  {ticker:"SBER",name:"Сбербанк",sector:"Финансы и сырьё",tier:"B"},
+  {ticker:"GAZP",name:"Газпром",sector:"Финансы и сырьё",tier:"C"},
+  {ticker:"MGNT",name:"Магнит",sector:"Финансы и сырьё",tier:"C"},
+  {ticker:"MTSS",name:"МТС",sector:"Финансы и сырьё",tier:"C"},
+];
+
+function fmt(n){ return "$" + n.toLocaleString("ru-RU"); }
+
+const companySheet = document.getElementById("companySheet");
+COMPANIES.forEach(c=>{
+  const price = TIER_PRICE[c.tier];
+  const div = document.createElement("div");
+  div.className = `card ccard ${SECTOR_CLASS[c.sector]}`;
+  div.innerHTML = `
+    <div class="top"><span class="ticker">${c.ticker}</span><span class="tier">${TIER_LABEL[c.tier]}</span></div>
+    <div class="name">${c.name}</div>
+    <div class="sector">${c.sector}</div>
+    <div class="price"><div class="lbl">Стартовая цена</div><div class="val">${fmt(price)}</div></div>
+    <div class="track">
+      <div class="lbl">Владение (10% за клетку)</div>
+      <div class="boxes">${"<div></div>".repeat(10)}</div>
+    </div>
+  `;
+  companySheet.appendChild(div);
+});
+
+const newsSheet = document.getElementById("newsSheet");
+
+function newsCard(type, kicker, title, desc, effectHtml){
+  const div = document.createElement("div");
+  div.className = `card ncard type-${type}`;
+  div.innerHTML = `
+    <span class="kicker k-${type}">${kicker}</span>
+    <div class="title">${title}</div>
+    <div class="desc">${desc}</div>
+    <div class="effect">${effectHtml}</div>
+  `;
+  newsSheet.appendChild(div);
+}
+
+function effectText(p){
+  const cls = p>0 ? "up":"down";
+  return `<span class="${cls}">${p>0?"+":""}${p}%</span>`;
+}
+
+// 12 глобальных
+[
+  ["Мировой кризис", -15, "Обвал на мировых рынках задел все компании без исключения."],
+  ["Рецессия", -10, "Экономический спад снижает капитализацию всего рынка."],
+  ["Паника на рынке", -10, "Инвесторы массово избавляются от акций."],
+  ["Инфляционный шок", -5, "Рост цен снижает реальную стоимость активов."],
+  ["Бум на рынке", 15, "Волна оптимизма поднимает цены по всему рынку."],
+  ["Позитивная макростатистика", 10, "Хорошие экономические данные разгоняют рынок."],
+  ["Снижение ставки ЦБ", 10, "Дешёвые деньги подогревают спрос на акции."],
+  ["Оптимизм инвесторов", 5, "Общий позитивный настрой на бирже."],
+  ["Валютный кризис", -12, "Резкие колебания курса бьют по всему рынку."],
+  ["Дефицит поставок", -8, "Сбои в цепочках поставок тормозят весь рынок."],
+  ["Технологический ренессанс", 12, "Волна инноваций поднимает весь рынок."],
+  ["Волна IPO", 8, "Успешные размещения разогревают интерес инвесторов."],
+].forEach(([t,p,d])=>newsCard("global","Глобальная","🌍 "+t,d+" Эффект: всем компаниям на поле.",effectText(p)));
+
+// 20 отраслевых
+[
+  ["Технологии", 20, "Технологический прорыв", "Прорывная разработка поднимает весь сектор."],
+  ["Технологии", -20, "Утечка данных в отрасли", "Скандал с приватностью бьёт по всем tech-компаниям."],
+  ["Технологии", 12, "Взрывной спрос на чипы", "Дефицит чипов взвинчивает цены технологических компаний."],
+  ["Технологии", -15, "Антимонопольное расследование", "Регулятор начал проверку крупнейших игроков сектора."],
+  ["Интернет и медиа", 15, "Рост онлайн-аудитории", "Взрывной рост пользователей поднимает сектор."],
+  ["Интернет и медиа", -15, "Отток рекламодателей", "Рекламные бюджеты уходят из сектора."],
+  ["Интернет и медиа", 10, "Успешный запуск сервиса", "Новый продукт отрасли получил признание."],
+  ["Интернет и медиа", -10, "Блокировка платформы", "Регуляторные ограничения бьют по сектору."],
+  ["Потребительские товары", 12, "Ажиотажный спрос к сезону", "Сезонный спрос поднимает продажи всей отрасли."],
+  ["Потребительские товары", -12, "Бойкот покупателей", "Потребители массово отказываются от продукции сектора."],
+  ["Потребительские товары", 10, "Успешная рекламная кампания", "Отраслевой маркетинг увеличивает продажи."],
+  ["Потребительские товары", -18, "Отзыв продукции", "Масштабный отзыв товаров бьёт по репутации сектора."],
+  ["Промышленность и транспорт", 15, "Крупный госконтракт", "Государственный заказ поддержал всю отрасль."],
+  ["Промышленность и транспорт", -20, "Авария на производстве", "ЧП на производстве бьёт по всей отрасли."],
+  ["Промышленность и транспорт", 12, "Модернизация флота", "Обновление техники повышает эффективность отрасли."],
+  ["Промышленность и транспорт", -15, "Забастовка транспортников", "Массовая забастовка останавливает отрасль."],
+  ["Финансы и сырьё", 15, "Скачок цен на сырьё", "Рост цен на сырьё поднимает капитализацию сектора."],
+  ["Финансы и сырьё", -15, "Обвал цен на сырьё", "Падение цен на сырьё бьёт по сектору."],
+  ["Финансы и сырьё", 10, "Снижение налогов на сектор", "Налоговые льготы поддержали сектор."],
+  ["Финансы и сырьё", -12, "Ужесточение регулирования банков", "Новые требования регулятора давят на сектор."],
+].forEach(([s,p,t,d])=>newsCard("sector","Отраслевая · "+s,"🏭 "+t,d+" Эффект: все компании сектора «"+s+"».",effectText(p)));
+
+// 24 точечных
+[
+  ["Смена CEO", -18, true, "Неожиданная отставка руководителя пугает инвесторов."],
+  ["Рекордная квартальная прибыль", 22, false, "Отчётность превзошла все ожидания аналитиков."],
+  ["Скандал с отчётностью", -25, true, "Подозрения в манипуляциях с финансовой отчётностью."],
+  ["Крупная сделка слияния", 18, false, "Компания объявила о выгодном слиянии."],
+  ["Забастовка сотрудников", -12, true, "Массовая забастовка останавливает работу компании."],
+  ["Прорывной продукт", 20, false, "Новинка компании произвела фурор на рынке."],
+  ["Иск от регулятора", -16, true, "Регулятор подал иск против компании."],
+  ["Buyback объявлен менеджментом", 14, false, "Компания начинает выкуп собственных акций."],
+  ["Утечка исходного кода", -14, false, "Внутренние данные компании оказались в сети."],
+  ["Партнёрство с гигантом отрасли", 16, false, "Заключено стратегическое партнёрство."],
+  ["Санкции против компании", -22, true, "Компания попала под новые ограничения."],
+  ["Позитивный прогноз аналитиков", 12, false, "Крупный банк повысил прогноз по акциям."],
+  ["Кибератака на инфраструктуру", -18, true, "Хакерская атака нарушила работу компании."],
+  ["Выход на новый рынок", 15, false, "Компания успешно вышла на новый рынок."],
+  ["Отставка совета директоров", -10, true, "Массовый уход членов совета директоров."],
+  ["Заявление о рекордных дивидендах", 10, false, "Компания обещает рекордные выплаты акционерам."],
+  ["Отзыв лицензии", -20, true, "Регулятор отозвал ключевую лицензию компании."],
+  ["Крупный контракт с государством", 18, false, "Компания выиграла крупный госзаказ."],
+  ["Утечка данных клиентов", -16, true, "Компрометация персональных данных клиентов."],
+  ["Успешное IPO дочерней компании", 14, false, "Размещение акций «дочки» подняло группу."],
+  ["Расследование по коррупции", -14, true, "Против руководства открыто расследование."],
+  ["Прорывная разработка запатентована", 16, false, "Компания закрепила права на новую технологию."],
+  ["Массовые увольнения", -10, false, "Оптимизация штата насторожила инвесторов."],
+  ["Повышение кредитного рейтинга", 10, false, "Агентство повысило рейтинг компании."],
+].forEach(([t,p,skip,d])=>newsCard("company","Точечная","🎯 "+t,
+  d+" Эффект: одна компания, выбранная случайно (жребий/кубик по списку тикеров)."+(skip?" Дивиденды по ней пропускаются на 1 ход.":""),
+  effectText(p)));
+
+// 12 особых (6 типов × 2 копии)
+[
+  ["Заморозка цен", "До конца этого события цены не меняются, спецдействия запрещены."],
+  ["Принудительный выкуп", "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене."],
+  ["Дополнительная фаза торгов", "Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей."],
+  ["Аудит", "Каждый игрок с отрицательным балансом должен немедленно продать акции или объявить банкротство."],
+  ["Дивидендный сезон", "Все дивиденды, выплаченные в течение этой фазы торгов, удваиваются."],
+  ["Налоговая проверка", "Каждый игрок платит банку 2% от своего текущего чистого капитала."],
+  ["Заморозка цен", "До конца этого события цены не меняются, спецдействия запрещены."],
+  ["Принудительный выкуп", "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене."],
+  ["Дополнительная фаза торгов", "Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей."],
+  ["Аудит", "Каждый игрок с отрицательным балансом должен немедленно продать акции или объявить банкротство."],
+  ["Дивидендный сезон", "Все дивиденды, выплаченные в течение этой фазы торгов, удваиваются."],
+  ["Налоговая проверка", "Каждый игрок платит банку 2% от своего текущего чистого капитала."],
+].forEach(([t,d])=>newsCard("special","Особая","🃏 "+t,d,""));
+</script>
+</body>
+</html>
