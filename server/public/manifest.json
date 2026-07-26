@@ -1,6 +1,6 @@
 {
-  "name": "Биржа — онлайн",
-  "short_name": "Биржа",
+  "name": "Trade Monopoly",
+  "short_name": "Trade Monopoly",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

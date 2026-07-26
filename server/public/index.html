@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Биржа — онлайн</title>
+<title>Trade Monopoly</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" href="/icon-192.png">
 <meta name="theme-color" content="#EFE8DA">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Биржа">
+<meta name="apple-mobile-web-app-title" content="Trade Monopoly">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -32,13 +32,12 @@
       radial-gradient(circle at 88% 78%, var(--patch2) 0%, transparent 42%),
       var(--bg);
   }
-  header{padding:14px 20px;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5;}
-  header h1{font-size:18px;margin:0;font-weight:800;}
   .pill{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;color:var(--muted);}
   .pill b{color:var(--text);font-family:var(--font-mono);}
   .pill.phase-roll{border-color:var(--accent);color:var(--text);}
   .pill.phase-trade{border-color:var(--amber);color:#8a5a00;}
   .pill.phase-ended{border-color:var(--green);color:var(--green);}
+  .pill select{border:none;background:transparent;color:inherit;font-family:var(--font-mono);font-weight:700;padding:0;}
   button{cursor:pointer;border:none;border-radius:var(--radius-md);padding:9px 16px;font-size:13px;font-weight:700;font-family:var(--font-ui);background:var(--accent);color:#fff;transition:opacity .15s, transform .1s;}
   button:hover{opacity:.88;}
   button:active{transform:scale(.98);}
@@ -47,9 +46,6 @@
   button.danger{background:var(--accent2);}
   button.small{padding:5px 10px;font-size:12px;border-radius:10px;}
   select,input{background:var(--panel2);border:1px solid var(--glass-border);color:var(--text);border-radius:10px;padding:7px 9px;font-size:13px;font-family:var(--font-ui);}
-  main{max-width:1300px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
-  main > div{min-width:0;}
-  @media(max-width:1000px){main{grid-template-columns:1fr;}}
   section{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:18px;margin-bottom:20px;box-shadow:0 6px 24px rgba(36,31,26,.06);}
   h2{font-size:13px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -82,12 +78,12 @@
   .muted{color:var(--muted);}
   .event-banner{background:linear-gradient(120deg, rgba(255,214,168,.5), rgba(198,224,214,.5));border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text);}
   .footer-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px;}
-  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
   .join-box{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px;width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(36,31,26,.1);}
   .join-box h1{font-size:20px;margin:0 0 6px;}
   .join-box p{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
   .join-box label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
-  .join-box input{width:100%;}
+  .join-box input, .join-box select{width:100%;}
   .join-box .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:1em;}
   .trade-offer{background:var(--panel2);border:1px solid var(--amber);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px;font-size:12.5px;}
   details.tips summary{cursor:pointer;font-weight:700;color:var(--text);list-style:none;padding:4px 0;}
@@ -96,23 +92,96 @@
   details.tips[open] summary::before{content:"▾ ";}
   details.tips + details.tips{margin-top:8px;}
   #app{display:none;}
+
+  .ticker-wrap{background:#241F1A;color:#EFE8DA;overflow:hidden;white-space:nowrap;position:sticky;top:0;z-index:6;border-bottom:1px solid rgba(255,255,255,.08);}
+  .ticker-track{display:inline-block;padding:6px 0;font-family:var(--font-mono);font-size:12px;white-space:nowrap;animation:ticker-scroll 38s linear infinite;}
+  .ticker-track span{margin-right:36px;}
+  .ticker-track .up{color:#8fd6ac;} .ticker-track .down{color:#e39c8c;}
+  @keyframes ticker-scroll{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
+
+  main{max-width:1300px;margin:0 auto;padding:14px 16px 110px;}
+  .turn-section{background:linear-gradient(120deg, rgba(76,122,107,.14), rgba(201,123,74,.10));border:1px solid var(--glass-border);}
+  .turn-section h2{color:var(--accent);}
+
+  .game-menu-btn{position:fixed;top:12px;right:12px;z-index:30;width:44px;height:44px;border-radius:50%;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);color:var(--text);font-size:18px;box-shadow:0 4px 16px rgba(36,31,26,.14);display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
+  .game-menu-panel{position:fixed;top:62px;right:12px;z-index:30;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:14px;width:230px;max-width:calc(100vw - 24px);box-shadow:0 12px 40px rgba(36,31,26,.16);display:none;}
+  .game-menu-panel.open{display:block;}
+  .game-menu-title{font-weight:800;font-size:14px;margin-bottom:10px;}
+  .game-menu-panel a, .game-menu-panel button{display:block;width:100%;text-align:center;text-decoration:none;box-sizing:border-box;margin-bottom:8px;}
+  .game-menu-panel > *:last-child{margin-bottom:0;}
+
+  .tab-bar-wrap{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--glass-border);padding-bottom:env(safe-area-inset-bottom);}
+  .tab-bar{max-width:1300px;margin:0 auto;padding:7px 8px;display:flex;gap:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab-btn{flex:1 1 0;min-width:60px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:var(--radius-md);padding:8px 4px;font-size:11px;white-space:nowrap;}
+  .tab-btn.active{background:var(--accent);color:#fff;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .mini-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;}
+  .mini-card h3{font-size:12px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
+  .status-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:3px;}
+  .rating-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .rating-row:last-child{border-bottom:none;}
+  .rating-rank{width:18px;text-align:center;font-family:var(--font-mono);color:var(--muted);font-weight:700;font-size:12px;}
+  .rating-row.you{font-weight:700;}
+  .rating-row.bankrupt{opacity:.45;}
+  .rating-net{margin-left:auto;font-family:var(--font-mono);font-weight:700;white-space:nowrap;}
+  .cap-mini-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .cap-mini{flex:1;min-width:88px;background:var(--panel);border-radius:10px;padding:8px 10px;font-size:11px;color:var(--muted);}
+  .cap-mini b{display:block;font-family:var(--font-mono);font-size:14px;color:var(--text);margin-top:2px;}
+  .stock-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);background:var(--panel);border:1px solid var(--line);margin-bottom:6px;cursor:pointer;font-size:13px;}
+  .stock-row:active{opacity:.85;}
+  .stock-row .stk-name{flex:1;min-width:0;}
+  .stock-row .stk-caret{color:var(--muted);width:14px;text-align:center;}
+  .stock-actions{padding:10px 12px 12px;background:var(--panel);border:1px dashed var(--glass-border);border-radius:var(--radius-md);margin:-2px 0 10px;}
+
+  .cap-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;gap:8px;}
+  .cap-row:last-child{border-bottom:none;}
+  .cap-row .tkr{font-weight:700;}
+  .cap-tip{font-size:11px;padding:1px 8px;border-radius:var(--radius-pill);white-space:nowrap;}
+  .cap-tip.hold{background:rgba(62,115,88,.15);color:var(--green);}
+  .cap-tip.sell{background:rgba(168,84,62,.15);color:var(--red);}
+  .cap-tip.control{background:rgba(224,177,104,.25);color:#7a5300;}
+  .cap-summary{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .cap-summary b{font-family:var(--font-mono);}
+
+  .control-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;}
+  .control-card h3{font-size:13px;margin:0 0 4px;}
+  .control-card p{font-size:11.5px;color:var(--muted);margin:0 0 8px;line-height:1.5;}
+  .control-card .row-inline select, .control-card .row-inline button{flex:1;}
+  .insider-box{background:rgba(224,177,104,.18);border:1px solid var(--amber);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;font-size:12.5px;}
+
+  .menu-btn-col{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+  .room-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:9px 12px;margin-bottom:7px;cursor:pointer;font-size:12.5px;transition:border-color .15s;}
+  .room-card:hover{border-color:var(--accent);}
+  .room-card b{font-family:var(--font-mono);}
+  .room-list-box{max-height:200px;overflow-y:auto;}
+  .offline-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:4px 6px 4px 12px;margin:4px 6px 4px 0;font-size:12.5px;}
+  .offline-chip button{padding:2px 7px;font-size:11px;background:transparent;color:var(--red);}
+
+  @media (max-width:480px){
+    main{padding:10px 10px 108px;}
+    section{padding:14px;border-radius:16px;margin-bottom:14px;}
+    .join-box{padding:20px;}
+    .control-card .row-inline{flex-direction:column;align-items:stretch;}
+    .control-card .row-inline select, .control-card .row-inline button{width:100%;}
+    table{min-width:420px;}
+    .tab-btn{font-size:10px;padding:7px 3px;}
+    .mini-card{padding:10px 12px;}
+  }
 </style>
 </head>
 <body>
 
-<div class="center-screen" id="joinScreen">
+<div class="center-screen" id="mainMenu">
   <div class="join-box">
-    <h1>📈 Биржа — онлайн</h1>
-    <p>Введите комнату и ник, чтобы подключиться к общей партии через интернет.</p>
-    <label>Комната</label>
-    <input id="joinRoom" placeholder="например MAIN" maxlength="20">
-    <label>Ваш ник</label>
-    <input id="joinName" placeholder="например Игрок1" maxlength="20">
-    <div class="row-inline" style="margin-top:16px;">
-      <button style="width:100%;" id="btnJoin">Войти в игру</button>
+    <h1>📈 Trade Monopoly</h1>
+    <p>Настольная экономическая игра. Выберите, как хотите играть.</p>
+    <div class="menu-btn-col">
+      <button style="width:100%;" id="btnGoOnline">🌐 Играть онлайн</button>
+      <button class="secondary" style="width:100%;" id="btnGoOffline">🎮 Офлайн (хот-сит на одном устройстве)</button>
     </div>
-    <div class="err" id="joinErr"></div>
-    <div style="text-align:center;margin-top:16px;font-size:12px;">
+    <div style="text-align:center;margin-top:18px;font-size:12px;">
       <a href="/app.html" style="color:var(--muted);">📊 Офлайн-калькулятор</a>
       &nbsp;·&nbsp;
       <a href="/cards.html" style="color:var(--muted);">🃏 Карточки для печати</a>
@@ -120,24 +189,80 @@
   </div>
 </div>
 
+<div class="center-screen" id="onlineScreen" style="display:none;">
+  <div class="join-box" style="width:400px;">
+    <h1>🌐 Играть онлайн</h1>
+    <p>Выберите комнату из списка или создайте новую — партия хранится на сервере и общая для всех.</p>
+    <label>Ваш ник</label>
+    <input id="joinName" placeholder="например Игрок1" maxlength="20">
+
+    <label>Активные комнаты</label>
+    <div class="room-list-box" id="roomList"></div>
+    <div class="muted" id="roomListEmpty" style="font-size:12px;display:none;">Пока нет активных комнат — создайте новую ниже.</div>
+
+    <details class="tips" style="margin-top:14px;">
+      <summary>Создать новую комнату</summary>
+      <div style="padding:10px 0 0 4px;">
+        <label style="margin-top:0;">Код комнаты (необязательно)</label>
+        <input id="joinRoom" placeholder="например MAIN" maxlength="20">
+        <label>Формат</label>
+        <select id="createFormat" disabled>
+          <option value="online" selected>🌐 Онлайн (мультиплеер)</option>
+        </select>
+        <label>Скорость торгов</label>
+        <select id="createTradeSpeed">
+          <option value="30000">Быстро (30с)</option>
+          <option value="90000" selected>Стандарт (90с)</option>
+          <option value="180000">Долго (180с)</option>
+        </select>
+        <button style="width:100%;margin-top:12px;" id="btnCreateRoom">Создать и войти</button>
+      </div>
+    </details>
+
+    <div class="err" id="joinErr"></div>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromOnline">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="offlineSetup" style="display:none;">
+  <div class="join-box">
+    <h1>🎮 Офлайн — хот-сит</h1>
+    <p>Игра на одном устройстве: передавайте его по кругу. Добавьте от 2 до 6 игроков.</p>
+    <div id="offlinePlayersBox"></div>
+    <div class="row-inline" style="margin-top:6px;">
+      <input id="offlineNewName" placeholder="Имя игрока" maxlength="20" style="flex:1;">
+      <button class="small secondary" id="btnAddOfflinePlayer">Добавить</button>
+    </div>
+    <div class="err" id="offlineErr"></div>
+    <button style="width:100%;margin-top:16px;" id="btnStartOffline">Начать игру</button>
+    <button class="secondary" style="width:100%;margin-top:8px;" id="btnBackFromOffline">← Назад в меню</button>
+  </div>
+</div>
+
 <div id="app">
-<header>
-  <h1>📈 Биржа — онлайн</h1>
-  <span class="pill">Комната: <b id="roomLabel">—</b></span>
-  <span class="pill">Ход в раунде: <b id="turnCounter">1</b> / 3</span>
-  <span class="pill">Событий: <b id="eventCounter">0</b></span>
-  <span class="pill">Карт в колоде: <b id="deckCounter">68</b></span>
-  <span class="pill" id="phasePill">—</span>
-  <button id="btnEvent" class="secondary">🎲 Событие сейчас</button>
-  <a href="/app.html" class="pill" style="margin-left:auto;text-decoration:none;">📊 Калькулятор (офлайн)</a>
-  <a href="/cards.html" class="pill" style="text-decoration:none;">🃏 Карточки</a>
-  <button id="btnNewGame" class="danger">Новая партия</button>
-</header>
+<button class="game-menu-btn" id="btnGameMenu" aria-label="Меню">☰</button>
+<div class="game-menu-panel" id="gameMenuPanel">
+  <div class="game-menu-title">📈 Trade Monopoly</div>
+  <button class="secondary" onclick="send({type:'forceEvent'}); closeGameMenu();">🎲 Форсировать событие</button>
+  <a href="/app.html" class="secondary">📊 Калькулятор (офлайн)</a>
+  <a href="/cards.html" class="secondary">🃏 Карточки</a>
+  <button class="danger" id="btnNewGame">Новая партия</button>
+  <button class="secondary" id="btnExitToMenu">← В меню</button>
+</div>
+
+<div class="ticker-wrap"><div class="ticker-track" id="tickerTrack">📡 Загрузка ленты...</div></div>
 
 <main>
-  <div>
+  <div class="tab-panel active" data-panel="turn">
+    <section class="turn-section" id="actionSection">
+      <h2>🎯 Главный ход</h2>
+      <div id="actionBody"></div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="market">
     <section>
-      <h2>Рынок компаний</h2>
+      <h2>💹 Биржа</h2>
       <div class="table-scroll">
       <table id="marketTable">
         <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th>В руках игроков</th></tr></thead>
@@ -145,24 +270,32 @@
       </table>
       </div>
     </section>
-    <section>
-      <h2>Лента событий</h2>
-      <div class="log" id="log"></div>
-    </section>
   </div>
 
-  <div>
+  <div class="tab-panel" data-panel="capital">
+    <section>
+      <h2>💰 Капитал</h2>
+      <div id="capitalBody"></div>
+    </section>
     <section>
       <h2>Игроки</h2>
       <div id="playersList"></div>
       <button class="small secondary" id="btnBankrupt">Объявить своё банкротство</button>
     </section>
+  </div>
 
-    <section id="actionSection">
-      <h2>Действие</h2>
-      <div id="actionBody"></div>
+  <div class="tab-panel" data-panel="control">
+    <section>
+      <h2>👑 Контрольный пакет</h2>
+      <div id="controlBody"></div>
     </section>
+  </div>
 
+  <div class="tab-panel" data-panel="log">
+    <section>
+      <h2>📡 Лента событий</h2>
+      <div class="log" id="log"></div>
+    </section>
     <section>
       <h2>Подсказки</h2>
       <details class="tips" open>
@@ -171,52 +304,150 @@
       </details>
       <details class="tips">
         <summary>Фаза торгов</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">открывается всем игрокам одновременно каждый 3-й ход (90 секунд) — можно покупать/продавать банку без очереди и предлагать сделки другим игрокам по договорной цене.</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">открывается всем игрокам одновременно каждый 3-й ход. Покупка у банка в это окно закрыта — доступны только продажа акций банку и обмен (сделки) с другими игроками по договорной цене.</div>
       </details>
       <details class="tips">
         <summary>Контрольный пакет (&gt;50%)</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">даёт право на спецдействия компании — см. §7 правил (в этой онлайн-версии спецдействия проводятся по договорённости вне приложения).</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">открывает вкладку «Контрольный пакет» в фазе торгов — вброс негативной информации, PR-кампания/байбэк, Инсайд, принудительный выкуп миноритариев (&gt;75%) и Шорт. См. §7 правил. Слияние компаний не реализовано — необязательное усложнение.</div>
+      </details>
+      <details class="tips">
+        <summary>Офлайн (хот-сит)</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">в офлайн-режиме нет сети и таймеров — устройство передаётся по кругу. Переключайте «Ход как» на вкладке «Главный ход», чтобы действовать от лица нужного игрока, а фазу торгов завершайте вручную кнопкой там же.</div>
       </details>
       <details class="tips">
         <summary>Банкротство</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">наступает, если вы не можете оплатить обязательный платёж, даже продав все акции банку — сервер сделает это автоматически.</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">наступает, если вы не можете оплатить обязательный платёж, даже продав все акции банку — игра сделает это автоматически.</div>
       </details>
     </section>
   </div>
 </main>
-<div class="footer-note">Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.</div>
+<div class="footer-note" id="footerNote">Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.</div>
+
+<div class="tab-bar-wrap">
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="turn">🎯 Ход</button>
+    <button class="tab-btn" data-tab="market">💹 Биржа</button>
+    <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+    <button class="tab-btn" data-tab="control" id="tabBtnControl" style="display:none;">👑 Контроль</button>
+    <button class="tab-btn" data-tab="log">📡 Лента</button>
+  </div>
+</div>
 </div>
 
+<script src="/engine.js"></script>
 <script>
+let mode = null; // 'online' | 'offline'
 let ws = null;
 let you = null;
 let latest = null;
 let myName = "";
 let roomCode = "";
+let pendingInsiderCard = null;
+let activeTab = "turn";
+let roomListPollTimer = null;
+
+// офлайн-режим
+let localRoom = null;
+let viewAs = null;
+let offlinePlayerNames = [];
+let expandedTicker = null;
 
 function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
 function wsUrl(){
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${location.host}`;
 }
+function showOnly(id){
+  ["mainMenu","onlineScreen","offlineSetup","app"].forEach(x=>{
+    document.getElementById(x).style.display = (x===id) ? (x==="app"?"block":"flex") : "none";
+  });
+}
 
-function connect(room, name){
+// ---------------------------------------------------------------------
+// Главное меню и навигация между экранами
+// ---------------------------------------------------------------------
+document.getElementById("btnGoOnline").onclick = ()=>{
+  showOnly("onlineScreen");
+  refreshRoomList();
+  if(roomListPollTimer) clearInterval(roomListPollTimer);
+  roomListPollTimer = setInterval(refreshRoomList, 4000);
+};
+document.getElementById("btnBackFromOnline").onclick = ()=>{
+  if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
+  showOnly("mainMenu");
+};
+document.getElementById("btnGoOffline").onclick = ()=>{
+  offlinePlayerNames = [];
+  renderOfflinePlayersBox();
+  showOnly("offlineSetup");
+};
+document.getElementById("btnBackFromOffline").onclick = ()=> showOnly("mainMenu");
+document.getElementById("btnExitToMenu").onclick = ()=>{
+  if(mode === "online"){
+    if(ws){ ws.onclose = null; ws.close(); ws = null; }
+  }
+  mode = null; latest = null; you = null; localRoom = null; pendingInsiderCard = null;
+  showOnly("mainMenu");
+};
+
+// ---------------------------------------------------------------------
+// Онлайн: список комнат + создание/вход
+// ---------------------------------------------------------------------
+function refreshRoomList(){
+  fetch("/api/rooms").then(r=>r.json()).then(list=>{
+    const el = document.getElementById("roomList");
+    const empty = document.getElementById("roomListEmpty");
+    el.innerHTML = "";
+    if(!list.length){ empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.forEach(r=>{
+      const speed = r.tradeWindowMs===30000?"быстрые торги":r.tradeWindowMs===180000?"долгие торги":"стандартные торги";
+      const phaseLabel = r.phase==="ended" ? "игра окончена" : (r.phase==="trade" ? "фаза торгов" : "фаза ходов");
+      const div = document.createElement("div");
+      div.className = "room-card";
+      div.innerHTML = `<b>${r.code}</b> <span class="muted">— ${r.activeCount}/${r.totalPlayers} игроков · ${phaseLabel} · ${speed}</span>`;
+      div.onclick = ()=> doJoin(r.code);
+      el.appendChild(div);
+    });
+  }).catch(()=>{});
+}
+function doJoin(code){
+  const name = document.getElementById("joinName").value.trim();
+  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
+  document.getElementById("joinErr").textContent = "";
+  connectOnline(code, name);
+}
+document.getElementById("btnCreateRoom").onclick = ()=>{
+  const name = document.getElementById("joinName").value.trim();
+  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
+  const room = document.getElementById("joinRoom").value.trim() || ("R" + Math.random().toString(36).slice(2,6).toUpperCase());
+  document.getElementById("joinErr").textContent = "";
+  const tradeWindowMs = parseInt(document.getElementById("createTradeSpeed").value);
+  connectOnline(room, name, tradeWindowMs);
+};
+document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
+
+function connectOnline(room, name, tradeWindowMs){
+  mode = "online";
   roomCode = room; myName = name;
   ws = new WebSocket(wsUrl());
-  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name})); };
+  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name, tradeWindowMs})); };
   ws.onmessage = (ev)=>{
     const msg = JSON.parse(ev.data);
     if(msg.type === "joined"){
       you = msg.playerId;
-      document.getElementById("joinScreen").style.display = "none";
-      document.getElementById("app").style.display = "block";
-      document.getElementById("roomLabel").textContent = msg.room;
+      if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
+      showOnly("app");
+      document.getElementById("footerNote").textContent = "Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.";
     } else if(msg.type === "state"){
       you = msg.you;
       latest = msg;
       render();
+    } else if(msg.type === "insiderCard"){
+      pendingInsiderCard = msg.card;
+      if(latest) renderControlPanel(latest);
     } else if(msg.type === "error"){
-      if(document.getElementById("joinScreen").style.display !== "none"){
+      if(document.getElementById("app").style.display === "none"){
         document.getElementById("joinErr").textContent = msg.message;
       } else {
         flashError(msg.message);
@@ -224,6 +455,102 @@ function connect(room, name){
     }
   };
   ws.onclose = ()=>{ flashError("Соединение с сервером потеряно. Обновите страницу для переподключения."); };
+}
+
+// ---------------------------------------------------------------------
+// Офлайн: настройка игроков и локальный запуск
+// ---------------------------------------------------------------------
+function renderOfflinePlayersBox(){
+  const box = document.getElementById("offlinePlayersBox");
+  box.innerHTML = offlinePlayerNames.map((n,i)=>`<span class="offline-chip">${n}<button onclick="removeOfflinePlayer(${i})">✕</button></span>`).join("") || `<div class="muted" style="font-size:12px;">Пока никого не добавили.</div>`;
+}
+function removeOfflinePlayer(i){ offlinePlayerNames.splice(i,1); renderOfflinePlayersBox(); }
+function addOfflinePlayer(){
+  const el = document.getElementById("offlineNewName");
+  const name = el.value.trim();
+  if(!name) return;
+  if(offlinePlayerNames.length >= 6){ document.getElementById("offlineErr").textContent = "Максимум 6 игроков."; return; }
+  if(offlinePlayerNames.includes(name)){ document.getElementById("offlineErr").textContent = "Такое имя уже добавлено."; return; }
+  document.getElementById("offlineErr").textContent = "";
+  offlinePlayerNames.push(name);
+  el.value = "";
+  renderOfflinePlayersBox();
+}
+document.getElementById("btnAddOfflinePlayer").onclick = addOfflinePlayer;
+document.getElementById("offlineNewName").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addOfflinePlayer(); } });
+
+document.getElementById("btnStartOffline").onclick = ()=>{
+  if(offlinePlayerNames.length < 2){ document.getElementById("offlineErr").textContent = "Нужно минимум 2 игрока."; return; }
+  document.getElementById("offlineErr").textContent = "";
+  mode = "offline";
+  localRoom = GameEngine.freshRoom("OFFLINE");
+  offlinePlayerNames.forEach(n=>{ const r = GameEngine.addPlayer(localRoom, n); viewAs = viewAs || (r.ok && r.player.id); });
+  viewAs = localRoom.players[0].id;
+  showOnly("app");
+  document.getElementById("footerNote").textContent = "Офлайн-партия хранится только в этой вкладке браузера и не сохраняется на сервере.";
+  refreshLocal();
+};
+
+function refreshLocal(){
+  if(mode !== "offline" || !localRoom) return;
+  if(localRoom.phase === "roll"){
+    const cp = GameEngine.currentPlayerId(localRoom);
+    if(cp) viewAs = cp;
+  }
+  you = viewAs;
+  latest = GameEngine.buildStatePayload(localRoom, viewAs);
+  render();
+}
+function onViewAsChange(sel){
+  viewAs = parseInt(sel.value);
+  expandedTicker = null;
+  refreshLocal();
+}
+
+// ---------------------------------------------------------------------
+// Единая отправка действий: онлайн — через WebSocket, офлайн — напрямую в движок
+// ---------------------------------------------------------------------
+function send(obj){
+  if(mode === "online"){
+    if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+    return;
+  }
+  if(mode === "offline") localDispatch(obj);
+}
+function localDispatch(obj){
+  let result;
+  switch(obj.type){
+    case "roll": result = GameEngine.rollDice(localRoom, viewAs); break;
+    case "buyFromRoll": result = GameEngine.buyFromRoll(localRoom, viewAs, obj.pct); break;
+    case "dividendFromRoll": result = GameEngine.dividendFromRoll(localRoom, viewAs); break;
+    case "skipRoll": result = GameEngine.skipRoll(localRoom, viewAs); break;
+    case "buyBank": result = GameEngine.buyBank(); break;
+    case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
+    case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price); break;
+    case "respondTrade": result = GameEngine.respondTrade(localRoom, viewAs, obj.id, obj.accept); break;
+    case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
+    case "newGame": {
+      localRoom = GameEngine.newGameKeepPlayers(localRoom);
+      viewAs = localRoom.players[0].id;
+      result = { ok:true };
+      break;
+    }
+    case "forceEvent": result = GameEngine.forceEvent(localRoom); break;
+    case "endTradeWindowManual": GameEngine.endTradeWindow(localRoom); result = { ok:true }; break;
+    case "ctrlNegativeInfo": result = GameEngine.ctrlNegativeInfo(localRoom, viewAs, obj.ticker); break;
+    case "ctrlPrCampaign": result = GameEngine.ctrlPrCampaign(localRoom, viewAs, obj.ticker); break;
+    case "ctrlInsiderPeek": {
+      result = GameEngine.ctrlInsiderPeek(localRoom, viewAs);
+      if(result.ok) pendingInsiderCard = result.card;
+      break;
+    }
+    case "ctrlInsiderResolve": result = GameEngine.ctrlInsiderResolve(localRoom, viewAs, obj.action); break;
+    case "ctrlSqueezeOut": result = GameEngine.ctrlSqueezeOut(localRoom, viewAs, obj.ticker); break;
+    case "ctrlShort": result = GameEngine.ctrlShort(localRoom, viewAs, obj.ticker); break;
+    default: result = { error: "Неизвестное действие." };
+  }
+  if(result && result.error) flashError(result.error);
+  refreshLocal();
 }
 
 function flashError(text){
@@ -236,55 +563,46 @@ function flashError(text){
   log.prepend(div);
 }
 
-document.getElementById("btnJoin").onclick = ()=>{
-  const room = document.getElementById("joinRoom").value.trim() || "MAIN";
-  const name = document.getElementById("joinName").value.trim();
-  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
-  document.getElementById("joinErr").textContent = "";
-  connect(room, name);
-};
-document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnJoin").click(); });
-
-function send(obj){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
-
-document.getElementById("btnEvent").onclick = ()=> send({type:"forceEvent"});
 document.getElementById("btnNewGame").onclick = ()=>{
+  closeGameMenu();
   if(confirm("Начать новую партию? Все данные текущей партии будут потеряны.")) send({type:"newGame"});
 };
 document.getElementById("btnBankrupt").onclick = ()=>{
   if(confirm("Объявить своё банкротство? Все ваши акции вернутся в банк.")) send({type:"declareBankruptcy"});
 };
 
+// ---------------------------------------------------------------------
+// Меню в игре (заменяет верхнюю шапку)
+// ---------------------------------------------------------------------
+document.getElementById("btnGameMenu").onclick = (e)=>{
+  e.stopPropagation();
+  document.getElementById("gameMenuPanel").classList.toggle("open");
+};
+document.addEventListener("click", (e)=>{
+  const panel = document.getElementById("gameMenuPanel");
+  const btn = document.getElementById("btnGameMenu");
+  if(panel && panel.classList.contains("open") && !panel.contains(e.target) && e.target!==btn){
+    panel.classList.remove("open");
+  }
+});
+function closeGameMenu(){ document.getElementById("gameMenuPanel").classList.remove("open"); }
+
+// ---------------------------------------------------------------------
+// Вкладки
+// ---------------------------------------------------------------------
+function switchTab(name){
+  activeTab = name;
+  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===name));
+  document.querySelectorAll(".tab-panel").forEach(p=> p.classList.toggle("active", p.dataset.panel===name));
+}
+document.querySelectorAll(".tab-btn").forEach(b=> b.onclick = ()=> switchTab(b.dataset.tab));
+
 let countdownTimer = null;
 function render(){
   if(!latest) return;
   const s = latest;
-  document.getElementById("turnCounter").textContent = s.turn;
-  document.getElementById("eventCounter").textContent = s.eventCount;
-  document.getElementById("deckCounter").textContent = s.deckRemaining;
 
-  const phasePill = document.getElementById("phasePill");
-  phasePill.className = "pill phase-" + s.phase;
-  if(s.phase === "roll"){
-    const cp = s.players.find(p=>p.id===s.currentPlayerId);
-    phasePill.innerHTML = `Ход: <b>${cp ? cp.name : "—"}</b>`;
-  } else if(s.phase === "trade"){
-    phasePill.innerHTML = `Фаза торгов <b id="tradeCountdown"></b>`;
-  } else {
-    phasePill.innerHTML = `Игра окончена`;
-  }
-
-  if(countdownTimer) clearInterval(countdownTimer);
-  if(s.phase === "trade" && s.tradeWindowEndsAt){
-    const tick = ()=>{
-      const el = document.getElementById("tradeCountdown");
-      if(!el) return;
-      const left = Math.max(0, Math.round((s.tradeWindowEndsAt - Date.now())/1000));
-      el.textContent = `(${left}с)`;
-    };
-    tick();
-    countdownTimer = setInterval(tick, 1000);
-  }
+  if(countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
 
   // market table
   const body = document.getElementById("marketBody");
@@ -335,125 +653,378 @@ function render(){
   });
 
   renderAction(s);
+  renderCapital(s);
+  renderControlPanel(s);
+  renderTicker(s);
+
+  if(mode === "online" && s.phase === "trade" && s.tradeWindowEndsAt){
+    const tick = ()=>{
+      const el = document.getElementById("tradeCountdown");
+      if(!el) return;
+      const left = Math.max(0, Math.round((s.tradeWindowEndsAt - Date.now())/1000));
+      el.textContent = `(${left}с)`;
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+}
+
+function renderTicker(s){
+  const track = document.getElementById("tickerTrack");
+  if(!track) return;
+  const items = [];
+  s.companies.forEach(c=>{
+    const delta = c.price - c.prevPrice;
+    const pct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
+    if(Math.abs(pct) < 0.01) return;
+    items.push(`<span class="${delta>0?'up':'down'}">${c.ticker} ${fmt(c.price)} (${delta>0?"▲":"▼"}${Math.abs(pct).toFixed(1)}%)</span>`);
+  });
+  s.log.slice(-6).reverse().forEach(e=> items.push(`<span>📰 ${e.text.replace(/<[^>]+>/g,"")}</span>`));
+  if(items.length === 0) items.push(`<span>Trade Monopoly открыта. Удачных сделок!</span>`);
+  const html = items.join("");
+  track.innerHTML = html + html; // дублируем для бесшовной прокрутки
+}
+
+function recommendTag(c, held){
+  if(held > 50) return `<span class="cap-tip control">👑 контроль</span>`;
+  const delta = c.price - c.prevPrice;
+  if(delta > 0) return `<span class="cap-tip hold">растёт — держать</span>`;
+  if(delta < 0) return `<span class="cap-tip sell">падает — подумайте о продаже</span>`;
+  return `<span class="cap-tip">стабильна</span>`;
+}
+
+function renderCapital(s){
+  const el = document.getElementById("capitalBody");
+  const me = s.players.find(p=>p.id===you);
+  if(!me){ el.innerHTML = `<div class="muted">Загрузка...</div>`; return; }
+  const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
+  const rows = holdings.map(([t,v])=>{
+    const c = s.companies.find(x=>x.ticker===t);
+    if(!c) return "";
+    const value = c.price * (v/100);
+    return `<div class="cap-row"><span class="tkr">${t}</span><span>${v}% · ${fmt(value)}</span>${recommendTag(c, v)}</div>`;
+  }).join("") || `<div class="muted" style="font-size:12.5px;">У вас пока нет акций.</div>`;
+  const invested = holdings.reduce((sum,[t,v])=>{ const c=s.companies.find(x=>x.ticker===t); return sum + (c?c.price*(v/100):0); },0);
+  el.innerHTML = `
+    <div class="cap-summary"><span>Наличные</span><b class="${me.cash<0?'down':''}">${fmt(me.cash)}</b></div>
+    <div class="cap-summary"><span>В акциях</span><b>${fmt(invested)}</b></div>
+    <div class="cap-summary"><span>Чистый капитал</span><b>${fmt(me.netWorth)}</b></div>
+    ${rows}
+  `;
+}
+
+function renderControlPanel(s){
+  const el = document.getElementById("controlBody");
+  const tabBtn = document.getElementById("tabBtnControl");
+  const me = s.players.find(p=>p.id===you);
+  if(!me || me.bankrupt){
+    tabBtn.style.display = "none";
+    if(activeTab === "control") switchTab("turn");
+    return;
+  }
+  const myControlled = s.companies.filter(c => (me.holdings[c.ticker]||0) > 50);
+  if(myControlled.length === 0 && !pendingInsiderCard){
+    tabBtn.style.display = "none";
+    if(activeTab === "control") switchTab("turn");
+    return;
+  }
+  tabBtn.style.display = "inline-block";
+
+  if(pendingInsiderCard){
+    const card = pendingInsiderCard;
+    const desc = card.type==="global" ? `Глобальная: ${card.title} (${card.percent>0?"+":""}${card.percent}% всем)`
+      : card.type==="sector" ? `Отраслевая (${card.sector}): ${card.title} (${card.percent>0?"+":""}${card.percent}%)`
+      : card.type==="company" ? `Точечная: ${card.title} (${card.percent>0?"+":""}${card.percent}%, компания определится случайно)`
+      : `Особая: ${card.title} — ${card.desc||""}`;
+    el.innerHTML = `
+      <div class="insider-box">
+        🕵️ <b>Верхняя карта колоды:</b> ${desc}
+        <div class="row-inline" style="margin-top:8px;">
+          <button class="small" onclick="doCtrlInsiderResolve('keep')">Оставить наверху</button>
+          <button class="small secondary" onclick="doCtrlInsiderResolve('moveToBack')">Переложить в конец</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if(s.phase !== "trade"){
+    el.innerHTML = `<div class="muted" style="font-size:12.5px;">Спецдействия доступны только во время фазы торгов (следующее биржевое событие откроет окно).</div>`;
+    return;
+  }
+  if(s.frozen){
+    el.innerHTML = `<div class="muted" style="font-size:12.5px;">🧊 Заморозка цен — спецдействия временно запрещены.</div>`;
+    return;
+  }
+
+  const foreignOpts = s.companies.filter(c=>!(myControlled.some(m=>m.ticker===c.ticker)))
+    .map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join("");
+  const ownOpts = myControlled.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker}) — ${fmt(c.price)}</option>`).join("");
+  const squeezeCandidates = s.companies.filter(c => (me.holdings[c.ticker]||0) > 75);
+  const shortOpts = s.companies.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join("");
+  const myShorts = (s.shorts||[]).filter(sh=>sh.playerId===you);
+
+  el.innerHTML = `
+    <div class="control-card">
+      <h3>📉 Вброс негативной информации</h3>
+      <p>$10 000 · цена чужой компании −15% · раз в 2 события на одну и ту же цель.</p>
+      <div class="row-inline">
+        <select id="negTarget">${foreignOpts}</select>
+        <button onclick="doCtrlNegativeInfo()">Атаковать</button>
+      </div>
+    </div>
+    <div class="control-card">
+      <h3>📈 PR-кампания / байбэк</h3>
+      <p>5% капитализации своей компании · цена +10% · раз за событие.</p>
+      <div class="row-inline">
+        <select id="prTarget">${ownOpts}</select>
+        <button onclick="doCtrlPrCampaign()">Провести</button>
+      </div>
+    </div>
+    <div class="control-card">
+      <h3>🕵️ Инсайд</h3>
+      <p>$5 000 · подсмотреть верхнюю карту колоды новостей, один раз за событие.</p>
+      <button style="width:100%;" onclick="send({type:'ctrlInsiderPeek'})">Подсмотреть карту</button>
+    </div>
+    <div class="control-card">
+      <h3>🧹 Принудительный выкуп миноритариев</h3>
+      <p>Нужно &gt;75% компании · выкупаете миноритариев по текущей цене · дивиденды по компании становятся ×2.</p>
+      <div class="row-inline">
+        <select id="squeezeTarget" ${squeezeCandidates.length===0?"disabled":""}>${squeezeCandidates.length?squeezeCandidates.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join(""):"<option>нет доступных компаний</option>"}</select>
+        <button onclick="doCtrlSqueezeOut()" ${squeezeCandidates.length===0?"disabled":""}>Выкупить</button>
+      </div>
+    </div>
+    <div class="control-card">
+      <h3>🎲 Шорт</h3>
+      <p>$5 000 залог · ставка, что цена компании упадёт к следующему биржевому событию · выигрыш ×2 из банка.</p>
+      <div class="row-inline">
+        <select id="shortTarget">${shortOpts}</select>
+        <button onclick="doCtrlShort()">Открыть шорт</button>
+      </div>
+      ${myShorts.length ? myShorts.map(sh=>`<div class="muted" style="font-size:11.5px;margin-top:6px;">Открыт шорт по ${sh.ticker} при цене ${fmt(sh.priceAtBet)} — ждём итогов события.</div>`).join("") : ""}
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------
+// Главный ход: статус, рейтинг, капитал, ваши акции (кликабельно), действие хода
+// ---------------------------------------------------------------------
+function statusRowHtml(s){
+  const cp = s.players.find(p=>p.id===s.currentPlayerId);
+  let phaseHtml;
+  if(s.phase === "roll") phaseHtml = `<span class="pill phase-roll">🎯 Ходит: <b>${cp ? cp.name : "—"}</b></span>`;
+  else if(s.phase === "trade") phaseHtml = `<span class="pill phase-trade">💱 Фаза торгов ${mode==="online" ? `<b id="tradeCountdown"></b>` : ""}</span>`;
+  else phaseHtml = `<span class="pill phase-ended">🏁 Игра окончена</span>`;
+
+  const viewAsHtml = (mode==="offline" && localRoom) ? `<span class="pill">Ход как:
+    <select onchange="onViewAsChange(this)" ${s.phase==="roll"?"disabled":""}>
+      ${localRoom.players.map(p=>`<option value="${p.id}" ${p.id===viewAs?"selected":""}>${p.name}</option>`).join("")}
+    </select></span>` : "";
+
+  const roomText = mode === "online" ? `Комната ${roomCode}` : "Офлайн-партия";
+  return `
+    <div class="status-row">${phaseHtml}${viewAsHtml}</div>
+    <div class="muted" style="font-size:11px;margin:2px 0 14px;">${roomText} · Раунд ${s.turn}/3 · Событий: ${s.eventCount} · Колода: ${s.deckRemaining}</div>
+  `;
+}
+
+function ratingHtml(s){
+  const ranked = s.players.slice().sort((a,b)=>b.netWorth-a.netWorth);
+  const rows = ranked.map((p,i)=>{
+    const isTurn = p.id===s.currentPlayerId && s.phase==="roll";
+    return `<div class="rating-row${p.id===you?' you':''}${p.bankrupt?' bankrupt':''}">
+      <span class="rating-rank">${i+1}</span>
+      <span>${p.name}${p.id===you?' <span class="muted">(вы)</span>':''}${isTurn?' 🎯':''}${p.bankrupt?' 💀':''}</span>
+      <span class="rating-net">${fmt(p.netWorth)}</span>
+    </div>`;
+  }).join("");
+  return `<div class="mini-card"><h3>🏆 Рейтинг</h3>${rows}</div>`;
+}
+
+function capSummaryHtml(s){
+  const me = s.players.find(p=>p.id===you);
+  if(!me) return "";
+  const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
+  const invested = holdings.reduce((sum,[t,v])=>{ const c=s.companies.find(x=>x.ticker===t); return sum + (c?c.price*(v/100):0); },0);
+  return `<div class="mini-card">
+    <h3>💰 Ваш капитал</h3>
+    <div class="cap-mini-row">
+      <div class="cap-mini"><span>Наличные</span><b class="${me.cash<0?'down':''}">${fmt(me.cash)}</b></div>
+      <div class="cap-mini"><span>В акциях</span><b>${fmt(invested)}</b></div>
+      <div class="cap-mini"><span>Итого</span><b>${fmt(me.netWorth)}</b></div>
+    </div>
+  </div>`;
+}
+
+function toggleStock(t){ expandedTicker = (expandedTicker===t) ? null : t; render(); }
+
+function stockActionsHtml(s, c, v){
+  if(s.phase !== "trade"){
+    return `<div class="stock-actions muted" style="font-size:12px;">Продажа и обмен доступны только в фазу торгов.</div>`;
+  }
+  if(s.frozen){
+    return `<div class="stock-actions muted" style="font-size:12px;">🧊 Заморозка цен — торги временно недоступны.</div>`;
+  }
+  const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
+  const playerOpts = otherPlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  return `<div class="stock-actions">
+    <div class="row-inline">
+      <button class="small" style="flex:1;" onclick="doSellStock('${c.ticker}',10)" ${v<10?"disabled":""}>Продать 10% (${fmt(c.price*0.10)})</button>
+      <button class="small" style="flex:1;" onclick="doSellStock('${c.ticker}',25)" ${v<25?"disabled":""}>Продать 25% (${fmt(c.price*0.25)})</button>
+    </div>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;">Предложить сделку игроку</label>
+    <div class="row-inline">
+      <select id="tradeTo_${c.ticker}" style="flex:1;">${playerOpts || "<option>нет других игроков</option>"}</select>
+    </div>
+    <div class="row-inline">
+      <input id="tradePct_${c.ticker}" type="number" placeholder="%" value="10" min="1" max="${v}" style="width:70px;">
+      <input id="tradePrice_${c.ticker}" type="number" placeholder="цена $" style="flex:1;">
+      <button class="small" onclick="doProposeStockTrade('${c.ticker}')" ${otherPlayers.length===0?"disabled":""}>Предложить</button>
+    </div>
+  </div>`;
+}
+
+function stocksListHtml(s){
+  const me = s.players.find(p=>p.id===you);
+  if(!me) return "";
+  const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
+  if(!holdings.length) return `<div class="mini-card"><h3>📦 Ваши акции</h3><div class="muted" style="font-size:12.5px;">У вас пока нет акций.</div></div>`;
+  const rows = holdings.map(([t,v])=>{
+    const c = s.companies.find(x=>x.ticker===t);
+    if(!c) return "";
+    const value = c.price * (v/100);
+    const expanded = expandedTicker === t;
+    return `
+      <div class="stock-row" onclick="toggleStock('${t}')">
+        <span class="stk-name"><b>${t}</b> <span class="muted">${v}%</span></span>
+        <span class="price">${fmt(c.price)}</span>
+        <span class="muted">${fmt(value)}</span>
+        <span class="stk-caret">${expanded?"▾":"▸"}</span>
+      </div>
+      ${expanded ? stockActionsHtml(s, c, v) : ""}
+    `;
+  }).join("");
+  return `<div class="mini-card"><h3>📦 Ваши акции</h3>${rows}</div>`;
+}
+
+function rollPhaseHtml(s, me){
+  if(s.currentPlayerId !== you){
+    const cp = s.players.find(p=>p.id===s.currentPlayerId);
+    return `<div class="mini-card"><div class="muted">${mode==="offline" ? `Передайте устройство игроку «${cp?cp.name:"?"}»...` : `Ожидание хода игрока «${cp?cp.name:"?"}»...`}</div></div>`;
+  }
+  if(!s.pendingRoll){
+    return `<div class="mini-card">
+      <div class="muted" style="margin-bottom:10px;font-size:12.5px;">Ваш ход! Бросьте 2×d12 — первый кубик даёт строку, второй столбец на поле.</div>
+      <button style="width:100%;" onclick="send({type:'roll'})">🎲 Бросить 2×d12</button>
+    </div>`;
+  }
+  const roll = s.pendingRoll;
+  const c = s.companies.find(x=>x.ticker===roll.ticker);
+  let actionsHtml;
+  if(c.owned >= 100){
+    actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="send({type:'dividendFromRoll'})">Заплатить дивиденды владельцам ${roll.ticker}</button>`;
+  } else {
+    const free = 100 - c.owned;
+    actionsHtml = `
+      <div class="row-inline" style="margin-top:10px;">
+        <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
+        <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
+      </div>`;
+  }
+  return `<div class="mini-card">
+    <div class="event-banner" style="margin-bottom:0;">
+      🎲 <b>${roll.row}</b> / <b>${roll.col}</b> → <b>${c.name}</b> <span class="muted">(${roll.ticker})</span><br>
+      Цена: <b>${fmt(c.price)}</b> · В руках игроков: ${c.owned.toFixed(0)}%
+    </div>
+    ${actionsHtml}
+    <div class="row-inline" style="margin-top:10px;">
+      <button class="secondary" style="width:100%;" onclick="send({type:'skipRoll'})">Пропустить действие и завершить ход</button>
+    </div>
+  </div>`;
+}
+
+function tradePhaseHtml(s, me){
+  const incoming = s.pendingTrades.filter(t=>t.toId===you);
+  const outgoing = s.pendingTrades.filter(t=>t.fromId===you);
+  let html = `<div class="mini-card">
+    <div class="muted" style="font-size:12.5px;${mode==="offline"?"margin-bottom:10px;":""}">Фаза свободных торгов — доступна всем одновременно. Покупка у банка закрыта. Нажмите на свою акцию ниже, чтобы продать банку или предложить сделку игроку.</div>
+    ${mode==="offline" ? `<button style="width:100%;" class="secondary" onclick="send({type:'endTradeWindowManual'})">⏭️ Завершить фазу торгов и передать ход дальше</button>` : ""}
+  </div>`;
+  if(incoming.length){
+    html += `<div class="mini-card"><h3>📥 Предложения вам</h3>` + incoming.map(t=>{
+      const from = s.players.find(p=>p.id===t.fromId);
+      return `<div class="trade-offer">${from?from.name:"?"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}
+        <div class="row-inline" style="margin-top:6px;margin-bottom:0;">
+          <button class="small" onclick="send({type:'respondTrade',id:${t.id},accept:true})">Принять</button>
+          <button class="small secondary" onclick="send({type:'respondTrade',id:${t.id},accept:false})">Отклонить</button>
+        </div></div>`;
+    }).join("") + `</div>`;
+  }
+  if(outgoing.length){
+    html += `<div class="mini-card"><h3>📤 Ваши предложения</h3>` + outgoing.map(t=>{
+      const to = s.players.find(p=>p.id===t.toId);
+      return `<div class="trade-offer muted">Вы предложили ${to?to.name:"?"} купить ${t.pct}% ${t.ticker} за ${fmt(t.price)} — ожидание ответа.</div>`;
+    }).join("") + `</div>`;
+  }
+  return html;
 }
 
 function renderAction(s){
   const el = document.getElementById("actionBody");
   const me = s.players.find(p=>p.id===you);
   if(!me){ el.innerHTML = `<div class="muted">Загрузка...</div>`; return; }
-  if(me.bankrupt){ el.innerHTML = `<div class="muted">Вы банкрот — можете наблюдать за игрой.</div>`; return; }
 
-  if(s.phase === "ended"){
-    el.innerHTML = `<div class="muted">Игра окончена. Нажмите «Новая партия», чтобы сыграть ещё раз.</div>`;
-    return;
+  let bodyHtml;
+  if(me.bankrupt){
+    bodyHtml = `<div class="mini-card"><div class="muted">Вы банкрот — можете наблюдать за игрой.</div></div>`;
+  } else if(s.phase === "ended"){
+    bodyHtml = `<div class="mini-card"><div class="muted">Игра окончена. Откройте меню (☰) и начните новую партию, чтобы сыграть ещё раз.</div></div>`;
+  } else if(s.phase === "roll"){
+    bodyHtml = rollPhaseHtml(s, me);
+  } else {
+    bodyHtml = tradePhaseHtml(s, me);
   }
 
-  if(s.phase === "roll"){
-    if(s.currentPlayerId !== you){
-      const cp = s.players.find(p=>p.id===s.currentPlayerId);
-      el.innerHTML = `<div class="muted">Ожидание хода игрока «${cp?cp.name:"?"}»...</div>`;
-      return;
-    }
-    if(!s.pendingRoll){
-      el.innerHTML = `
-        <div class="muted" style="margin-bottom:10px;font-size:12.5px;">Ваш ход! Бросьте 2×d12 — первый кубик даёт строку, второй столбец на поле.</div>
-        <button style="width:100%;" onclick="send({type:'roll'})">🎲 Бросить 2×d12</button>
-      `;
-      return;
-    }
-    const roll = s.pendingRoll;
-    const c = s.companies.find(x=>x.ticker===roll.ticker);
-    let actionsHtml;
-    if(c.owned >= 100){
-      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="send({type:'dividendFromRoll'})">Заплатить дивиденды владельцам ${roll.ticker}</button>`;
-    } else {
-      const free = 100 - c.owned;
-      actionsHtml = `
-        <div class="row-inline" style="margin-top:10px;">
-          <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
-          <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
-        </div>`;
-    }
-    el.innerHTML = `
-      <div class="event-banner" style="margin-bottom:0;">
-        🎲 <b>${roll.row}</b> / <b>${roll.col}</b> → <b>${c.name}</b> <span class="muted">(${roll.ticker})</span><br>
-        Цена: <b>${fmt(c.price)}</b> · В руках игроков: ${c.owned.toFixed(0)}%
-      </div>
-      ${actionsHtml}
-      <div class="row-inline" style="margin-top:10px;">
-        <button class="secondary" style="width:100%;" onclick="send({type:'skipRoll'})">Пропустить действие и завершить ход</button>
-      </div>
-    `;
-    return;
-  }
-
-  if(s.phase === "trade"){
-    const myTickers = Object.entries(me.holdings).filter(([,v])=>v>0).map(([t])=>t);
-    const companyOpts = s.companies.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker}) — ${fmt(c.price)}</option>`).join("");
-    const myTickerOpts = myTickers.length ? myTickers.map(t=>`<option value="${t}">${t} (у вас ${me.holdings[t]}%)</option>`).join("") : `<option value="">нет акций</option>`;
-    const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
-    const playerOpts = otherPlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-    const incoming = s.pendingTrades.filter(t=>t.toId===you);
-    const outgoing = s.pendingTrades.filter(t=>t.fromId===you);
-
-    el.innerHTML = `
-      <div class="muted" style="font-size:12.5px;margin-bottom:10px;">Фаза свободных торгов — доступна всем одновременно.</div>
-      <label style="display:block;font-size:12px;color:var(--muted);margin:6px 0 4px;">Купить у банка</label>
-      <div class="row-inline">
-        <select id="buyTicker" style="flex:1;">${companyOpts}</select>
-        <select id="buyPct"><option value="10">10%</option><option value="25">25%</option></select>
-        <button onclick="doBuyBank()">Купить</button>
-      </div>
-      <label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;">Продать банку</label>
-      <div class="row-inline">
-        <select id="sellTicker" style="flex:1;">${myTickerOpts}</select>
-        <select id="sellPct"><option value="10">10%</option><option value="25">25%</option></select>
-        <button onclick="doSellBank()">Продать</button>
-      </div>
-      <label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;">Предложить сделку игроку</label>
-      <div class="row-inline">
-        <select id="tradeTo" style="flex:1;">${playerOpts || "<option>нет других игроков</option>"}</select>
-      </div>
-      <div class="row-inline">
-        <select id="tradeTicker" style="flex:1;">${myTickerOpts}</select>
-        <input id="tradePct" type="number" placeholder="%" value="10" min="1" max="100" style="width:70px;">
-        <input id="tradePrice" type="number" placeholder="цена $" style="width:110px;">
-      </div>
-      <div class="row-inline"><button style="width:100%;" onclick="doProposeTrade()" ${otherPlayers.length===0?"disabled":""}>Предложить сделку</button></div>
-      ${incoming.length ? `<h3 style="font-size:13px;margin:14px 0 6px;">Предложения вам</h3>` + incoming.map(t=>{
-        const from = s.players.find(p=>p.id===t.fromId);
-        return `<div class="trade-offer">${from?from.name:"?"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}
-          <div class="row-inline" style="margin-top:6px;margin-bottom:0;">
-            <button class="small" onclick="send({type:'respondTrade',id:${t.id},accept:true})">Принять</button>
-            <button class="small secondary" onclick="send({type:'respondTrade',id:${t.id},accept:false})">Отклонить</button>
-          </div></div>`;
-      }).join("") : ""}
-      ${outgoing.length ? `<h3 style="font-size:13px;margin:14px 0 6px;">Ваши предложения</h3>` + outgoing.map(t=>{
-        const to = s.players.find(p=>p.id===t.toId);
-        return `<div class="trade-offer muted">Вы предложили ${to?to.name:"?"} купить ${t.pct}% ${t.ticker} за ${fmt(t.price)} — ожидание ответа.</div>`;
-      }).join("") : ""}
-    `;
-  }
+  el.innerHTML = statusRowHtml(s) + ratingHtml(s) + capSummaryHtml(s) + bodyHtml + stocksListHtml(s);
 }
 
-function doBuyBank(){
-  send({type:"buyBank", ticker: document.getElementById("buyTicker").value, pct: parseInt(document.getElementById("buyPct").value)});
+function doSellStock(ticker, pct){
+  send({type:"sellBank", ticker, pct});
 }
-function doSellBank(){
-  const ticker = document.getElementById("sellTicker").value;
-  if(!ticker) return;
-  send({type:"sellBank", ticker, pct: parseInt(document.getElementById("sellPct").value)});
-}
-function doProposeTrade(){
-  const ticker = document.getElementById("tradeTicker").value;
-  if(!ticker) return;
+function doProposeStockTrade(ticker){
+  const toEl = document.getElementById(`tradeTo_${ticker}`);
+  if(!toEl || !toEl.value) return;
   send({
     type:"proposeTrade",
-    to: parseInt(document.getElementById("tradeTo").value),
+    to: parseInt(toEl.value),
     ticker,
-    pct: parseInt(document.getElementById("tradePct").value),
-    price: parseFloat(document.getElementById("tradePrice").value)||0,
+    pct: parseInt(document.getElementById(`tradePct_${ticker}`).value),
+    price: parseFloat(document.getElementById(`tradePrice_${ticker}`).value)||0,
   });
+}
+
+function doCtrlNegativeInfo(){
+  const el = document.getElementById("negTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlNegativeInfo", ticker: el.value});
+}
+function doCtrlPrCampaign(){
+  const el = document.getElementById("prTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlPrCampaign", ticker: el.value});
+}
+function doCtrlSqueezeOut(){
+  const el = document.getElementById("squeezeTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlSqueezeOut", ticker: el.value});
+}
+function doCtrlShort(){
+  const el = document.getElementById("shortTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlShort", ticker: el.value});
+}
+function doCtrlInsiderResolve(action){
+  send({type:"ctrlInsiderResolve", action});
+  pendingInsiderCard = null;
 }
 </script>
 </body>
