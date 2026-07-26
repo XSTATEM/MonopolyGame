@@ -2,8 +2,15 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Биржа — онлайн</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" href="/icon-192.png">
+<meta name="theme-color" content="#182430">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Биржа">
 <style>
   :root{
     --bg:#0f1720; --panel:#182430; --panel2:#1f2e3c; --line:#2b3a4a;
@@ -26,10 +33,13 @@
   button.small{padding:4px 9px;font-size:12px;border-radius:6px;}
   select,input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:13px;}
   main{max-width:1300px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
+  main > div{min-width:0;}
   @media(max-width:1000px){main{grid-template-columns:1fr;}}
   section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;}
   h2{font-size:15px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
-  table{width:100%;border-collapse:collapse;font-size:13px;}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{width:100%;min-width:480px;border-collapse:collapse;font-size:13px;}
+  body{overflow-x:hidden;}
   th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);}
   td{padding:6px 8px;border-bottom:1px solid var(--line);}
   tr:hover td{background:rgba(255,255,255,0.02);}
@@ -108,10 +118,12 @@
   <div>
     <section>
       <h2>Рынок компаний</h2>
+      <div class="table-scroll">
       <table id="marketTable">
         <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th>Δ</th><th>В руках игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
       </table>
+      </div>
     </section>
     <section>
       <h2>Лента событий</h2>
