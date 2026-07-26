@@ -7,74 +7,94 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" href="/icon-192.png">
-<meta name="theme-color" content="#182430">
+<meta name="theme-color" content="#EFE8DA">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Биржа">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1720; --panel:#182430; --panel2:#1f2e3c; --line:#2b3a4a;
-    --text:#e8eef4; --muted:#8ea3b5; --green:#3ecf8e; --red:#ef5b5b; --amber:#e8b339; --accent:#4f8cff;
+    --bg:#EFE8DA; --patch1:rgba(255,214,168,.35); --patch2:rgba(198,224,214,.45);
+    --panel:rgba(255,255,255,.55); --panel2:rgba(255,255,255,.72); --line:rgba(36,31,26,.12);
+    --glass-border:rgba(255,255,255,.8);
+    --text:#241F1A; --muted:#6B6459; --green:#3E7358; --red:#A8543E; --amber:#E0B168;
+    --accent:#4C7A6B; --accent2:#C97B4A;
+    --radius-md:14px; --radius-lg:24px; --radius-pill:999px;
+    --font-ui:'Manrope',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
   }
   *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
-  header{padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-  header h1{font-size:18px;margin:0;font-weight:700;}
-  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:13px;color:var(--muted);}
-  .pill b{color:var(--text);}
+  body{margin:0;font-family:var(--font-ui);color:var(--text);overflow-x:hidden;min-height:100vh;
+    background:
+      radial-gradient(circle at 12% 18%, var(--patch1) 0%, transparent 40%),
+      radial-gradient(circle at 88% 78%, var(--patch2) 0%, transparent 42%),
+      var(--bg);
+  }
+  header{padding:14px 20px;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5;}
+  header h1{font-size:18px;margin:0;font-weight:800;}
+  .pill{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;color:var(--muted);}
+  .pill b{color:var(--text);font-family:var(--font-mono);}
   .pill.phase-roll{border-color:var(--accent);color:var(--text);}
-  .pill.phase-trade{border-color:var(--amber);color:var(--amber);}
+  .pill.phase-trade{border-color:var(--amber);color:#8a5a00;}
   .pill.phase-ended{border-color:var(--green);color:var(--green);}
-  button{cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;transition:opacity .15s;}
-  button:hover{opacity:.85;}
+  button{cursor:pointer;border:none;border-radius:var(--radius-md);padding:9px 16px;font-size:13px;font-weight:700;font-family:var(--font-ui);background:var(--accent);color:#fff;transition:opacity .15s, transform .1s;}
+  button:hover{opacity:.88;}
+  button:active{transform:scale(.98);}
   button:disabled{opacity:.35;cursor:not-allowed;}
-  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
-  button.danger{background:var(--red);}
-  button.small{padding:4px 9px;font-size:12px;border-radius:6px;}
-  select,input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:13px;}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--glass-border);}
+  button.danger{background:var(--accent2);}
+  button.small{padding:5px 10px;font-size:12px;border-radius:10px;}
+  select,input{background:var(--panel2);border:1px solid var(--glass-border);color:var(--text);border-radius:10px;padding:7px 9px;font-size:13px;font-family:var(--font-ui);}
   main{max-width:1300px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
   main > div{min-width:0;}
   @media(max-width:1000px){main{grid-template-columns:1fr;}}
-  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;}
-  h2{font-size:15px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  section{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:18px;margin-bottom:20px;box-shadow:0 6px 24px rgba(36,31,26,.06);}
+  h2{font-size:13px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   table{width:100%;min-width:480px;border-collapse:collapse;font-size:13px;}
-  body{overflow-x:hidden;}
-  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);}
-  td{padding:6px 8px;border-bottom:1px solid var(--line);}
-  tr:hover td{background:rgba(255,255,255,0.02);}
-  .sector-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--panel2);color:var(--muted);white-space:nowrap;}
-  .price{font-weight:700;}
+  th{text-align:left;color:var(--muted);font-weight:700;padding:8px;border-bottom:1px solid var(--line);}
+  td{padding:8px;border-bottom:1px solid var(--line);}
+  tr:hover td{background:rgba(76,122,107,0.06);}
+  tr.active-row td{background:rgba(76,122,107,.1);box-shadow:inset 0 0 0 1px var(--accent);}
+  .sector-tag{font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
+  .price{font-weight:700;font-family:var(--font-mono);}
   .up{color:var(--green);} .down{color:var(--red);}
-  .owned-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;}
+  .owned-bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;}
   .owned-fill{height:100%;background:var(--accent);}
   .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
-  .player-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+  .player-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;}
   .player-card.bankrupt{opacity:.4;}
   .player-card.you{border-color:var(--accent);}
   .player-card.turn{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber);}
   .player-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
   .player-head b{font-size:14px;}
-  .holdings{font-size:12px;color:var(--muted);margin-top:4px;}
+  .holdings{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono);}
   .holdings span{display:inline-block;margin-right:10px;}
   .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:6px;}
-  .log-entry{padding:6px 8px;border-radius:6px;background:var(--panel2);}
+  .log-entry{padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);}
   .log-entry .tag{font-size:10.5px;color:var(--muted);}
-  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:8px;margin-left:6px;}
-  .badge.control{background:var(--amber);color:#332400;}
+  .badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:var(--radius-pill);margin-left:6px;}
+  .badge.control{background:var(--amber);color:#4a3300;}
   .badge.offline{background:var(--red);color:#fff;}
-  .net{font-weight:700;}
+  .net{font-weight:700;font-family:var(--font-mono);}
   .muted{color:var(--muted);}
-  .event-banner{background:linear-gradient(90deg,#3a2a55,#2a3a55);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;}
+  .event-banner{background:linear-gradient(120deg, rgba(255,214,168,.5), rgba(198,224,214,.5));border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text);}
   .footer-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px;}
   .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
-  .join-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:340px;max-width:90vw;}
+  .join-box{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px;width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(36,31,26,.1);}
   .join-box h1{font-size:20px;margin:0 0 6px;}
   .join-box p{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
   .join-box label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
   .join-box input{width:100%;}
   .join-box .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:1em;}
-  .trade-offer{background:var(--panel);border:1px solid var(--amber);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12.5px;}
+  .trade-offer{background:var(--panel2);border:1px solid var(--amber);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px;font-size:12.5px;}
+  details.tips summary{cursor:pointer;font-weight:700;color:var(--text);list-style:none;padding:4px 0;}
+  details.tips summary::-webkit-details-marker{display:none;}
+  details.tips summary::before{content:"▸ ";color:var(--accent);}
+  details.tips[open] summary::before{content:"▾ ";}
+  details.tips + details.tips{margin-top:8px;}
   #app{display:none;}
 </style>
 </head>
@@ -120,7 +140,7 @@
       <h2>Рынок компаний</h2>
       <div class="table-scroll">
       <table id="marketTable">
-        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th>Δ</th><th>В руках игроков</th></tr></thead>
+        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th>В руках игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
       </table>
       </div>
@@ -145,12 +165,22 @@
 
     <section>
       <h2>Подсказки</h2>
-      <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-        <b style="color:var(--text);">Как ходить:</b> когда наступает ваш ход, нажмите «Бросить 2×d12» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.<br>
-        <b style="color:var(--text);">Фаза торгов</b> открывается всем игрокам одновременно каждый 3-й ход (90 секунд) — можно покупать/продавать банку без очереди и предлагать сделки другим игрокам по договорной цене.<br>
-        <b style="color:var(--text);">Контрольный пакет</b> (&gt;50%) даёт право на спецдействия компании — см. §7 правил (в этой онлайн-версии спецдействия проводятся по договорённости вне приложения).<br>
-        <b style="color:var(--text);">Банкротство</b> наступает, если вы не можете оплатить обязательный платёж, даже продав все акции банку — сервер сделает это автоматически.
-      </div>
+      <details class="tips" open>
+        <summary>Как ходить</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">когда наступает ваш ход, нажмите «Бросить 2×d12» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.</div>
+      </details>
+      <details class="tips">
+        <summary>Фаза торгов</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">открывается всем игрокам одновременно каждый 3-й ход (90 секунд) — можно покупать/продавать банку без очереди и предлагать сделки другим игрокам по договорной цене.</div>
+      </details>
+      <details class="tips">
+        <summary>Контрольный пакет (&gt;50%)</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">даёт право на спецдействия компании — см. §7 правил (в этой онлайн-версии спецдействия проводятся по договорённости вне приложения).</div>
+      </details>
+      <details class="tips">
+        <summary>Банкротство</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">наступает, если вы не можете оплатить обязательный платёж, даже продав все акции банку — сервер сделает это автоматически.</div>
+      </details>
     </section>
   </div>
 </main>
@@ -264,6 +294,7 @@ function render(){
     const deltaPct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
     const controller = s.players.find(p=>p.id===c.controllerId);
     const tr = document.createElement("tr");
+    if(s.pendingRoll && s.pendingRoll.ticker === c.ticker) tr.className = "active-row";
     tr.innerHTML = `
       <td><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</td>
       <td><span class="sector-tag">${c.sector}</span></td>
