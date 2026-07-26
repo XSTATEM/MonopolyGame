@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Биржа — калькулятор рынка</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#182430; --panel2:#1f2e3c; --line:#2b3a4a;
+    --text:#e8eef4; --muted:#8ea3b5; --green:#3ecf8e; --red:#ef5b5b; --amber:#e8b339; --accent:#4f8cff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  header h1{font-size:18px;margin:0;font-weight:700;}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:13px;color:var(--muted);}
+  .pill b{color:var(--text);}
+  button{cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;transition:opacity .15s;}
+  button:hover{opacity:.85;}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
+  button.danger{background:var(--red);}
+  button.small{padding:4px 9px;font-size:12px;border-radius:6px;}
+  select,input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:13px;}
+  main{max-width:1300px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.4fr 1fr;gap:20px;}
+  @media(max-width:1000px){main{grid-template-columns:1fr;}}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;}
+  h2{font-size:15px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);}
+  td{padding:6px 8px;border-bottom:1px solid var(--line);}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .sector-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--panel2);color:var(--muted);white-space:nowrap;}
+  .price{font-weight:700;}
+  .up{color:var(--green);}
+  .down{color:var(--red);}
+  .owned-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;}
+  .owned-fill{height:100%;background:var(--accent);}
+  .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+  .player-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+  .player-card.bankrupt{opacity:.4;}
+  .player-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .player-head b{font-size:14px;}
+  .holdings{font-size:12px;color:var(--muted);margin-top:4px;}
+  .holdings span{display:inline-block;margin-right:10px;}
+  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:6px;}
+  .log-entry{padding:6px 8px;border-radius:6px;background:var(--panel2);}
+  .log-entry .tag{font-size:10.5px;color:var(--muted);}
+  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:8px;margin-left:6px;}
+  .badge.control{background:var(--amber);color:#332400;}
+  .net{font-weight:700;}
+  .muted{color:var(--muted);}
+  .event-banner{background:linear-gradient(90deg,#3a2a55,#2a3a55);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .footer-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:380px;max-width:90vw;}
+  .modal h3{margin:0 0 12px;font-size:15px;}
+  .modal label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;}
+  .modal select,.modal input{width:100%;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📈 Биржа — калькулятор рынка</h1>
+  <span class="pill">Ход в раунде: <b id="turnCounter">1</b> / 3</span>
+  <span class="pill">Событий сыграно: <b id="eventCounter">0</b></span>
+  <span class="pill">Карт в колоде: <b id="deckCounter">68</b></span>
+  <button id="btnEndTurn">Завершить ход игрока</button>
+  <button id="btnEvent" class="secondary">🎲 Биржевое событие сейчас</button>
+  <button id="btnReset" class="danger" style="margin-left:auto;">Новая партия</button>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>Рынок компаний</h2>
+      <table id="marketTable">
+        <thead><tr>
+          <th>Компания</th><th>Сектор</th><th>Цена</th><th>Δ</th><th>В руках игроков</th><th></th>
+        </tr></thead>
+        <tbody id="marketBody"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Лента событий</h2>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>Игроки</h2>
+      <div class="row-inline">
+        <input id="newPlayerName" placeholder="Имя игрока" style="flex:1;">
+        <button id="btnAddPlayer">+ Игрок</button>
+      </div>
+      <div id="playersList"></div>
+    </section>
+
+    <section>
+      <h2>Стандартный ход</h2>
+      <div class="row-inline"><button id="btnRoll" style="width:100%;">🎲 Бросить 2×d12 и разыграть ход</button></div>
+      <div class="muted" style="font-size:12px;">Первый кубик = номер строки, второй = номер столбца на поле. Пересечение — единственная компания, доступная в этот ход.</div>
+    </section>
+
+    <section>
+      <h2>Свободные торги (во время биржевого события)</h2>
+      <div class="row-inline"><button id="btnBuy" class="secondary" style="width:100%;">Купить акции у банка</button></div>
+      <div class="row-inline"><button id="btnSell" class="secondary" style="width:100%;">Продать акции банку</button></div>
+      <div class="row-inline"><button id="btnTrade" class="secondary" style="width:100%;">Сделка между игроками</button></div>
+      <div class="row-inline"><button id="btnDividend" class="secondary" style="width:100%;">Рассчитать и заплатить дивиденды</button></div>
+    </section>
+
+    <section>
+      <h2>Подсказки</h2>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+        <b style="color:var(--text);">Как ходить:</b> нажмите «Бросить 2×d12» — игра сама найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.<br>
+        <b style="color:var(--text);">Свободные торги</b> открываются только во время биржевого события (каждый 3-й ход) — там можно покупать/продавать без привязки к броску, в т.ч. торговаться с другими игроками по договорной цене.<br>
+        <b style="color:var(--text);">Контрольный пакет</b> (&gt;50%) даёт право на спецдействия компании — см. §7 правил.<br>
+        <b style="color:var(--text);">Банкротство</b> наступает, если игрок не может оплатить обязательный платёж, даже продав все акции банку.
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="footer-note">Все данные партии сохраняются в этом браузере (localStorage). «Новая партия» полностью сбрасывает цены, игроков и колоду.</div>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBody"></div></div>
+
+<script>
+const SECTORS = ["Технологии","Интернет и медиа","Потребительские товары","Промышленность и транспорт","Финансы и сырьё"];
+const TIER_PRICE = {A:40000, B:20000, C:8000};
+const COMPANIES = [
+  {ticker:"AAPL",name:"Apple",sector:"Технологии",tier:"A"},
+  {ticker:"MSFT",name:"Microsoft",sector:"Технологии",tier:"A"},
+  {ticker:"GOOGL",name:"Google",sector:"Технологии",tier:"A"},
+  {ticker:"NVDA",name:"NVIDIA",sector:"Технологии",tier:"B"},
+  {ticker:"IBM",name:"IBM",sector:"Технологии",tier:"B"},
+  {ticker:"AMZN",name:"Amazon",sector:"Интернет и медиа",tier:"B"},
+  {ticker:"DIS",name:"Disney",sector:"Интернет и медиа",tier:"A"},
+  {ticker:"YDEX",name:"Яндекс",sector:"Интернет и медиа",tier:"C"},
+  {ticker:"VKCO",name:"VK",sector:"Интернет и медиа",tier:"C"},
+  {ticker:"MCD",name:"McDonald's",sector:"Потребительские товары",tier:"A"},
+  {ticker:"NKE",name:"Nike",sector:"Потребительские товары",tier:"B"},
+  {ticker:"KO",name:"Coca-Cola",sector:"Потребительские товары",tier:"B"},
+  {ticker:"WMT",name:"Walmart",sector:"Потребительские товары",tier:"B"},
+  {ticker:"RKT",name:"Durex",sector:"Потребительские товары",tier:"C"},
+  {ticker:"BA",name:"Boeing",sector:"Промышленность и транспорт",tier:"A"},
+  {ticker:"MMM",name:"3M",sector:"Промышленность и транспорт",tier:"B"},
+  {ticker:"AFLT",name:"Аэрофлот",sector:"Промышленность и транспорт",tier:"C"},
+  {ticker:"SBER",name:"Сбербанк",sector:"Финансы и сырьё",tier:"B"},
+  {ticker:"GAZP",name:"Газпром",sector:"Финансы и сырьё",tier:"C"},
+  {ticker:"MGNT",name:"Магнит",sector:"Финансы и сырьё",tier:"C"},
+  {ticker:"MTSS",name:"МТС",sector:"Финансы и сырьё",tier:"C"},
+];
+// board[row-1][col-1]: row = номер, подписанный слева на поле (1-12, сверху вниз),
+// col = номер, подписанный сверху на поле (1-12, слева направо). См. companies.json / maps.png.
+const BOARD = [
+  ["AAPL","AMZN","MMM","MTSS","KO","YDEX","RKT","YDEX","NKE","AMZN","MMM","BA"],
+  ["MGNT","GOOGL","NKE","AAPL","BA","GOOGL","AAPL","SBER","NVDA","AAPL","KO","MSFT"],
+  ["MTSS","NKE","MSFT","RKT","IBM","NVDA","KO","GOOGL","WMT","IBM","MCD","DIS"],
+  ["NVDA","NVDA","WMT","SBER","NKE","MGNT","AMZN","VKCO","AFLT","GAZP","MTSS","MGNT"],
+  ["MGNT","GAZP","IBM","KO","AMZN","GOOGL","MSFT","IBM","AMZN","NVDA","MMM","GOOGL"],
+  ["GAZP","SBER","VKCO","MTSS","BA","IBM","BA","KO","IBM","NKE","BA","AAPL"],
+  ["MCD","MSFT","AMZN","RKT","MSFT","YDEX","AAPL","KO","MSFT","GOOGL","WMT","KO"],
+  ["AAPL","KO","GOOGL","NKE","AFLT","MMM","YDEX","GOOGL","RKT","AMZN","NVDA","GOOGL"],
+  ["MCD","MGNT","MSFT","MCD","AMZN","AAPL","IBM","MSFT","AAPL","MMM","IBM","RKT"],
+  ["WMT","BA","GAZP","IBM","MGNT","NVDA","KO","RKT","SBER","VKCO","NVDA","BA"],
+  ["GAZP","AFLT","MCD","GOOGL","KO","WMT","SBER","AFLT","IBM","SBER","KO","MSFT"],
+  ["MCD","AAPL","MSFT","YDEX","MCD","NVDA","MMM","SBER","NVDA","GOOGL","YDEX","AAPL"]
+];
+function companyByTicker(t){ return COMPANIES.find(c=>c.ticker===t); }
+
+function buildDeck(){
+  const deck = [];
+  // 12 глобальных
+  const globals = [
+    ["Мировой кризис", -15], ["Рецессия", -10], ["Паника на рынке", -10], ["Инфляционный шок", -5],
+    ["Бум на рынке", 15], ["Позитивная макростатистика", 10], ["Снижение ставки ЦБ", 10], ["Оптимизм инвесторов", 5],
+    ["Валютный кризис", -12], ["Дефицит поставок", -8], ["Технологический ренессанс", 12], ["Волна IPO", 8],
+  ];
+  globals.forEach(([t,p])=>deck.push({type:"global",title:t,percent:p}));
+  // 20 отраслевых (по 4 на каждый из 5 секторов, +/-)
+  const sectorEvents = [
+    ["Технологии", 20, "Технологический прорыв"], ["Технологии", -20, "Утечка данных в отрасли"],
+    ["Технологии", 12, "Взрывной спрос на чипы"], ["Технологии", -15, "Антимонопольное расследование"],
+    ["Интернет и медиа", 15, "Рост онлайн-аудитории"], ["Интернет и медиа", -15, "Отток рекламодателей"],
+    ["Интернет и медиа", 10, "Успешный запуск сервиса"], ["Интернет и медиа", -10, "Блокировка платформы"],
+    ["Потребительские товары", 12, "Ажиотажный спрос к сезону"], ["Потребительские товары", -12, "Бойкот покупателей"],
+    ["Потребительские товары", 10, "Успешная рекламная кампания"], ["Потребительские товары", -18, "Отзыв продукции"],
+    ["Промышленность и транспорт", 15, "Крупный госконтракт"], ["Промышленность и транспорт", -20, "Авария на производстве"],
+    ["Промышленность и транспорт", 12, "Модернизация флота"], ["Промышленность и транспорт", -15, "Забастовка транспортников"],
+    ["Финансы и сырьё", 15, "Скачок цен на сырьё"], ["Финансы и сырьё", -15, "Обвал цен на сырьё"],
+    ["Финансы и сырьё", 10, "Снижение налогов на сектор"], ["Финансы и сырьё", -12, "Ужесточение регулирования банков"],
+  ];
+  sectorEvents.forEach(([s,p,t])=>deck.push({type:"sector",title:t,sector:s,percent:p}));
+  // 24 точечных (компания выбирается случайно в момент вскрытия)
+  const companyEvents = [
+    ["Смена CEO", -18, true], ["Рекордная квартальная прибыль", 22, false],
+    ["Скандал с отчётностью", -25, true], ["Крупная сделка слияния", 18, false],
+    ["Забастовка сотрудников", -12, true], ["Прорывной продукт", 20, false],
+    ["Иск от регулятора", -16, true], ["Buyback объявлен менеджментом", 14, false],
+    ["Утечка исходного кода", -14, false], ["Партнёрство с гигантом отрасли", 16, false],
+    ["Санкции против компании", -22, true], ["Позитивный прогноз аналитиков", 12, false],
+    ["Кибератака на инфраструктуру", -18, true], ["Выход на новый рынок", 15, false],
+    ["Отставка совета директоров", -10, true], ["Заявление о рекордных дивидендах", 10, false],
+    ["Отзыв лицензии", -20, true], ["Крупный контракт с государством", 18, false],
+    ["Утечка данных клиентов", -16, true], ["Успешное IPO дочерней компании", 14, false],
+    ["Расследование по коррупции", -14, true], ["Прорывная разработка запатентована", 16, false],
+    ["Массовые увольнения", -10, false], ["Повышение кредитного рейтинга", 10, false],
+  ];
+  companyEvents.forEach(([t,p,skip])=>deck.push({type:"company",title:t,percent:p,skipDividend:skip}));
+  // 12 особых (6 типов × 2 копии)
+  const specials = [
+    {key:"freeze", title:"Заморозка цен", desc:"До конца этого события цены не меняются, спецдействия запрещены."},
+    {key:"buyback", title:"Принудительный выкуп", desc:"Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене (выберите компанию и проведите вручную)."},
+    {key:"extra_trade", title:"Дополнительная фаза торгов", desc:"Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей."},
+    {key:"audit", title:"Аудит", desc:"Каждый игрок с отрицательным балансом должен немедленно продать акции или объявить банкротство."},
+    {key:"double_dividend", title:"Дивидендный сезон", desc:"Все дивиденды, выплаченные в течение этой фазы торгов, удваиваются."},
+    {key:"tax", title:"Налоговая проверка", desc:"Каждый игрок платит банку 2% от своего текущего чистого капитала (проведите вручную через «± наличные»)."},
+    {key:"freeze", title:"Заморозка цен", desc:"До конца этого события цены не меняются, спецдействия запрещены."},
+    {key:"buyback", title:"Принудительный выкуп", desc:"Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене."},
+    {key:"extra_trade", title:"Дополнительная фаза торгов", desc:"Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей."},
+    {key:"audit", title:"Аудит", desc:"Каждый игрок с отрицательным балансом должен немедленно продать акции или объявить банкротство."},
+    {key:"double_dividend", title:"Дивидендный сезон", desc:"Все дивиденды, выплаченные в течение этой фазы торгов, удваиваются."},
+    {key:"tax", title:"Налоговая проверка", desc:"Каждый игрок платит банку 2% от своего текущего чистого капитала (проведите вручную через «± наличные»)."},
+  ];
+  specials.forEach(s=>deck.push({type:"special",title:s.title,desc:s.desc,key:s.key}));
+  return deck;
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+const STORAGE_KEY = "birzha-game-state-v1";
+
+function freshState(){
+  const companies = {};
+  COMPANIES.forEach(c=>{ companies[c.ticker] = {price: TIER_PRICE[c.tier], prevPrice: TIER_PRICE[c.tier]}; });
+  return {
+    turn: 1,
+    eventCount: 0,
+    companies,
+    players: [],
+    deck: shuffle(buildDeck().map((c,i)=>i)),
+    deckData: buildDeck(),
+    deckPos: 0,
+    log: [],
+    nextPlayerId: 1,
+  };
+}
+
+let state = load() || freshState();
+
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+
+function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
+
+function addLog(text, tag){
+  state.log.push({text, tag: tag||"", turnTag: "Событие "+state.eventCount});
+  if(state.log.length>300) state.log.shift();
+}
+
+function totalOwnedPct(ticker){
+  return state.players.reduce((sum,p)=> sum + (p.holdings[ticker]||0), 0);
+}
+
+function ownerOfControl(ticker){
+  return state.players.find(p=>!p.bankrupt && (p.holdings[ticker]||0) > 50);
+}
+
+function netWorth(p){
+  let v = p.cash;
+  for(const t in p.holdings){ v += (p.holdings[t]/100) * state.companies[t].price; }
+  return v;
+}
+
+function applyPriceDelta(ticker, pct){
+  const c = state.companies[ticker];
+  const tierStart = TIER_PRICE[COMPANIES.find(x=>x.ticker===ticker).tier];
+  const floor = tierStart * 0.10;
+  c.prevPrice = c.price;
+  c.price = Math.max(floor, c.price * (1 + pct/100));
+}
+
+function marketEvent(){
+  state.eventCount++;
+  addLog(`— Биржевое событие #${state.eventCount} —`, "header");
+
+  // volatility roll
+  const roll = 1 + Math.floor(Math.random()*6);
+  let volPct = 0;
+  if(roll<=2) volPct = -5;
+  else if(roll>=5) volPct = 5;
+  COMPANIES.forEach(c=>applyPriceDelta(c.ticker, volPct));
+  addLog(`Кубик волатильности: ${roll} → ${volPct>0?"+":""}${volPct}% всем компаниям`, "vol");
+
+  // draw card
+  if(state.deckPos >= state.deck.length){
+    state.deck = shuffle(state.deck);
+    state.deckPos = 0;
+    addLog("Колода новостей закончилась — переshuffle.", "deck");
+  }
+  const idx = state.deck[state.deckPos++];
+  const card = state.deckData[idx];
+
+  if(card.type==="global"){
+    COMPANIES.forEach(c=>applyPriceDelta(c.ticker, card.percent));
+    addLog(`📰 [Глобальная] ${card.title}: ${card.percent>0?"+":""}${card.percent}% всем компаниям`, "news");
+  } else if(card.type==="sector"){
+    COMPANIES.filter(c=>c.sector===card.sector).forEach(c=>applyPriceDelta(c.ticker, card.percent));
+    addLog(`📰 [Отраслевая, ${card.sector}] ${card.title}: ${card.percent>0?"+":""}${card.percent}%`, "news");
+  } else if(card.type==="company"){
+    const c = COMPANIES[Math.floor(Math.random()*COMPANIES.length)];
+    applyPriceDelta(c.ticker, card.percent);
+    if(card.skipDividend) state.companies[c.ticker].skipDividendUntil = state.eventCount+1;
+    addLog(`📰 [Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent>0?"+":""}${card.percent}%${card.skipDividend?" (дивиденды пропущены на 1 ход)":""}`, "news");
+  } else if(card.type==="special"){
+    addLog(`🃏 [Особая] ${card.title}: ${card.desc}`, "news");
+  }
+
+  state.turn = 1;
+  render();
+  save();
+}
+
+function endTurn(){
+  state.turn++;
+  if(state.turn>3){
+    marketEvent();
+  } else {
+    addLog(`Ход завершён. Ход в раунде: ${state.turn}/3.`, "turn");
+    render();
+    save();
+  }
+}
+
+// ---------- Rendering ----------
+function render(){
+  document.getElementById("turnCounter").textContent = state.turn;
+  document.getElementById("eventCounter").textContent = state.eventCount;
+  document.getElementById("deckCounter").textContent = (state.deck.length - state.deckPos);
+
+  const body = document.getElementById("marketBody");
+  body.innerHTML = "";
+  COMPANIES.forEach(c=>{
+    const cur = state.companies[c.ticker];
+    const delta = cur.price - cur.prevPrice;
+    const deltaPct = cur.prevPrice ? (delta/cur.prevPrice*100) : 0;
+    const owned = totalOwnedPct(c.ticker);
+    const controller = ownerOfControl(c.ticker);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</td>
+      <td><span class="sector-tag">${c.sector}</span></td>
+      <td class="price">${fmt(cur.price)}</td>
+      <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
+      <td><span class="owned-bar"><span class="owned-fill" style="width:${owned}%"></span></span> <span class="muted">${owned.toFixed(0)}%</span></td>
+      <td></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  const playersList = document.getElementById("playersList");
+  playersList.innerHTML = "";
+  if(state.players.length===0){
+    playersList.innerHTML = `<div class="muted" style="font-size:13px;">Добавьте игроков, чтобы начать.</div>`;
+  }
+  state.players.forEach(p=>{
+    const div = document.createElement("div");
+    div.className = "player-card" + (p.bankrupt ? " bankrupt" : "");
+    const holdingsStr = Object.entries(p.holdings).filter(([,v])=>v>0)
+      .map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`;
+    div.innerHTML = `
+      <div class="player-head">
+        <b>${p.name}${p.bankrupt?" 💀":""}</b>
+        <span class="net">Капитал: ${fmt(netWorth(p))}</span>
+      </div>
+      <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span></div>
+      <div class="holdings">${holdingsStr}</div>
+      ${p.bankrupt ? "" : `<div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="small secondary" onclick="editCash(${p.id})">± наличные</button>
+        <button class="small danger" onclick="declareBankruptcy(${p.id})">Банкротство</button>
+      </div>`}
+    `;
+    playersList.appendChild(div);
+  });
+
+  const log = document.getElementById("log");
+  log.innerHTML = "";
+  state.log.slice().reverse().forEach(e=>{
+    const div = document.createElement("div");
+    div.className = "log-entry";
+    div.innerHTML = `<div class="tag">${e.turnTag}</div>${e.text}`;
+    log.appendChild(div);
+  });
+}
+
+// ---------- Player actions ----------
+function addPlayer(name){
+  if(!name) return;
+  state.players.push({id: state.nextPlayerId++, name, cash:150000, holdings:{}, bankrupt:false});
+  addLog(`Игрок «${name}» присоединился со стартовым капиталом ${fmt(150000)}.`, "player");
+  render(); save();
+}
+
+function editCash(id){
+  const p = state.players.find(x=>x.id===id);
+  openModal(`
+    <h3>Изменить наличные — ${p.name}</h3>
+    <label>Сумма (можно отрицательную)</label>
+    <input type="number" id="cashDelta" placeholder="например -5000 или 3000">
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="applyCashDelta(${id})">Применить</button>
+    </div>
+  `);
+}
+function applyCashDelta(id){
+  const p = state.players.find(x=>x.id===id);
+  const v = parseFloat(document.getElementById("cashDelta").value)||0;
+  p.cash += v;
+  addLog(`${p.name}: наличные ${v>=0?"+":""}${fmt(v)} → ${fmt(p.cash)}`, "cash");
+  closeModal(); render(); save();
+}
+
+function declareBankruptcy(id){
+  const p = state.players.find(x=>x.id===id);
+  showConfirm(`Объявить банкротство игрока «${p.name}»? Все его акции вернутся в банк.`, ()=>{
+    p.holdings = {};
+    p.bankrupt = true;
+    addLog(`💀 Игрок «${p.name}» объявлен банкротом. Его акции возвращены в банк / выставлены на аукцион.`, "bankrupt");
+    render(); save();
+  });
+}
+
+function openModal(html){
+  document.getElementById("modalBody").innerHTML = html;
+  document.getElementById("modalBg").classList.add("show");
+}
+function closeModal(){ document.getElementById("modalBg").classList.remove("show"); }
+
+function showAlert(msg){
+  openModal(`<h3>Внимание</h3><p style="font-size:13px;">${msg}</p><div class="modal-actions"><button onclick="closeModal()">Ок</button></div>`);
+}
+let confirmCallback = null;
+function showConfirm(msg, callback){
+  confirmCallback = callback;
+  openModal(`<h3>Подтверждение</h3><p style="font-size:13px;">${msg}</p><div class="modal-actions"><button class="secondary" onclick="closeModal()">Отмена</button><button onclick="runConfirm()">Да</button></div>`);
+}
+function runConfirm(){
+  const cb = confirmCallback;
+  confirmCallback = null;
+  closeModal();
+  if(cb) cb();
+}
+
+function activePlayers(){ return state.players.filter(p=>!p.bankrupt); }
+
+function companyOptions(selectedTicker){
+  return COMPANIES.map(c=>`<option value="${c.ticker}" ${c.ticker===selectedTicker?"selected":""}>${c.name} (${c.ticker}) — ${fmt(state.companies[c.ticker].price)}</option>`).join("");
+}
+function playerOptions(){
+  return activePlayers().map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+}
+
+function openBuyModal(){
+  if(activePlayers().length===0){ showAlert("Сначала добавьте игрока."); return; }
+  openModal(`
+    <h3>Купить акции у банка</h3>
+    <label>Игрок</label><select id="buyPlayer">${playerOptions()}</select>
+    <label>Компания</label><select id="buyTicker">${companyOptions()}</select>
+    <label>Блок</label>
+    <select id="buyPct"><option value="10">10%</option><option value="25">25%</option></select>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="doBuy()">Купить</button>
+    </div>
+  `);
+}
+function doBuy(){
+  const pid = parseInt(document.getElementById("buyPlayer").value);
+  const ticker = document.getElementById("buyTicker").value;
+  const pct = parseInt(document.getElementById("buyPct").value);
+  const p = state.players.find(x=>x.id===pid);
+  const c = state.companies[ticker];
+  const owned = totalOwnedPct(ticker);
+  if(owned + pct > 100){ showAlert("У банка недостаточно свободных акций этой компании."); return; }
+  const cost = c.price * pct/100;
+  if(p.cash < cost){ showAlert("Недостаточно наличных."); return; }
+  p.cash -= cost;
+  p.holdings[ticker] = (p.holdings[ticker]||0) + pct;
+  applyPriceDelta(ticker, 2*(pct/10));
+  addLog(`${p.name} купил ${pct}% ${ticker} у банка за ${fmt(cost)}. Новая цена: ${fmt(state.companies[ticker].price)}.`, "trade");
+  closeModal(); render(); save();
+}
+
+function openSellModal(){
+  if(activePlayers().length===0){ showAlert("Сначала добавьте игрока."); return; }
+  openModal(`
+    <h3>Продать акции банку</h3>
+    <label>Игрок</label><select id="sellPlayer" onchange="refreshSellTickers()">${playerOptions()}</select>
+    <label>Компания</label><select id="sellTicker"></select>
+    <label>Блок</label>
+    <select id="sellPct"><option value="10">10%</option><option value="25">25%</option></select>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="doSell()">Продать</button>
+    </div>
+  `);
+  refreshSellTickers();
+}
+function refreshSellTickers(){
+  const pid = parseInt(document.getElementById("sellPlayer").value);
+  const p = state.players.find(x=>x.id===pid);
+  const owned = Object.entries(p.holdings).filter(([,v])=>v>0);
+  const sel = document.getElementById("sellTicker");
+  sel.innerHTML = owned.length ? owned.map(([t,v])=>`<option value="${t}">${t} (у вас ${v}%)</option>`).join("") : `<option value="">нет акций</option>`;
+}
+function doSell(){
+  const pid = parseInt(document.getElementById("sellPlayer").value);
+  const ticker = document.getElementById("sellTicker").value;
+  const pct = parseInt(document.getElementById("sellPct").value);
+  if(!ticker){ showAlert("У игрока нет акций для продажи."); return; }
+  const p = state.players.find(x=>x.id===pid);
+  if((p.holdings[ticker]||0) < pct){ showAlert("У игрока недостаточно акций этой компании."); return; }
+  const c = state.companies[ticker];
+  const proceeds = c.price * pct/100;
+  p.holdings[ticker] -= pct;
+  p.cash += proceeds;
+  applyPriceDelta(ticker, -2*(pct/10));
+  addLog(`${p.name} продал ${pct}% ${ticker} банку за ${fmt(proceeds)}. Новая цена: ${fmt(state.companies[ticker].price)}.`, "trade");
+  closeModal(); render(); save();
+}
+
+function openTradeModal(){
+  if(activePlayers().length<2){ showAlert("Для сделки нужны минимум 2 активных игрока."); return; }
+  openModal(`
+    <h3>Сделка между игроками</h3>
+    <label>Продавец</label><select id="tradeFrom" onchange="refreshTradeTickers()">${playerOptions()}</select>
+    <label>Покупатель</label><select id="tradeTo">${playerOptions()}</select>
+    <label>Компания</label><select id="tradeTicker"></select>
+    <label>Процент</label><input type="number" id="tradePct" value="10" min="1" max="100">
+    <label>Договорная цена за весь пакет</label><input type="number" id="tradePrice" placeholder="сумма $">
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="doTrade()">Провести сделку</button>
+    </div>
+  `);
+  refreshTradeTickers();
+}
+function refreshTradeTickers(){
+  const pid = parseInt(document.getElementById("tradeFrom").value);
+  const p = state.players.find(x=>x.id===pid);
+  const owned = Object.entries(p.holdings).filter(([,v])=>v>0);
+  const sel = document.getElementById("tradeTicker");
+  sel.innerHTML = owned.length ? owned.map(([t,v])=>`<option value="${t}">${t} (есть ${v}%)</option>`).join("") : `<option value="">нет акций</option>`;
+}
+function doTrade(){
+  const fromId = parseInt(document.getElementById("tradeFrom").value);
+  const toId = parseInt(document.getElementById("tradeTo").value);
+  const ticker = document.getElementById("tradeTicker").value;
+  const pct = parseInt(document.getElementById("tradePct").value);
+  const price = parseFloat(document.getElementById("tradePrice").value)||0;
+  if(fromId===toId){ showAlert("Продавец и покупатель должны различаться."); return; }
+  if(!ticker){ showAlert("У продавца нет акций."); return; }
+  const from = state.players.find(x=>x.id===fromId);
+  const to = state.players.find(x=>x.id===toId);
+  if((from.holdings[ticker]||0) < pct){ showAlert("У продавца недостаточно акций."); return; }
+  if(to.cash < price){ showAlert("У покупателя недостаточно наличных."); return; }
+  from.holdings[ticker] -= pct;
+  to.holdings[ticker] = (to.holdings[ticker]||0) + pct;
+  from.cash += price;
+  to.cash -= price;
+  addLog(`Сделка: ${to.name} купил ${pct}% ${ticker} у ${from.name} за ${fmt(price)} (договорная цена, рыночная цена не меняется).`, "trade");
+  closeModal(); render(); save();
+}
+
+function openDividendModal(){
+  if(activePlayers().length===0){ showAlert("Сначала добавьте игрока."); return; }
+  openModal(`
+    <h3>Дивиденды</h3>
+    <label>Кто платит (игрок, остановившийся на клетке)</label><select id="divPayer">${playerOptions()}</select>
+    <label>Компания</label><select id="divTicker">${companyOptions()}</select>
+    <div id="divResult" style="margin-top:12px;font-size:13px;color:var(--muted);"></div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="computeDividend()">Рассчитать</button>
+      <button id="payDivBtn" style="display:none;" onclick="payDividend()">Заплатить</button>
+    </div>
+  `);
+}
+let pendingDividend = null;
+function computeDividend(){
+  const payerId = parseInt(document.getElementById("divPayer").value);
+  const ticker = document.getElementById("divTicker").value;
+  const c = state.companies[ticker];
+  if(c.skipDividendUntil && c.skipDividendUntil >= state.eventCount){
+    document.getElementById("divResult").innerHTML = `По этой компании дивиденды временно не платятся (эффект карты новостей).`;
+    document.getElementById("payDivBtn").style.display="none";
+    return;
+  }
+  const owners = state.players.filter(p=>!p.bankrupt && p.id!==payerId && (p.holdings[ticker]||0)>0);
+  const totalPct = owners.reduce((s,p)=>s+p.holdings[ticker],0);
+  const amount = c.price * 0.05 * (totalPct/100);
+  if(owners.length===0 || amount<=0){
+    document.getElementById("divResult").innerHTML = `У других игроков нет акций ${ticker} — дивиденды не начисляются.`;
+    document.getElementById("payDivBtn").style.display="none";
+    return;
+  }
+  const breakdown = owners.map(o=>({id:o.id, name:o.name, share: amount * (o.holdings[ticker]/totalPct)}));
+  document.getElementById("divResult").innerHTML = `Итого к выплате: <b>${fmt(amount)}</b><br>` +
+    breakdown.map(b=>`— ${b.name}: ${fmt(b.share)}`).join("<br>");
+  pendingDividend = {payerId, ticker, amount, breakdown};
+  document.getElementById("payDivBtn").style.display="inline-block";
+}
+function payDividend(){
+  if(!pendingDividend) return;
+  const payer = state.players.find(x=>x.id===pendingDividend.payerId);
+  payer.cash -= pendingDividend.amount;
+  pendingDividend.breakdown.forEach(b=>{
+    const owner = state.players.find(x=>x.id===b.id);
+    owner.cash += b.share;
+  });
+  addLog(`${payer.name} заплатил дивиденды по ${pendingDividend.ticker}: ${fmt(pendingDividend.amount)}, распределено между ${pendingDividend.breakdown.length} владельцем(-ами).`, "dividend");
+  pendingDividend = null;
+  closeModal(); render(); save();
+}
+
+// ---------- Standard turn: dice roll → coordinate → single company ----------
+let currentRoll = null;
+function openRollModal(){
+  if(activePlayers().length===0){ showAlert("Сначала добавьте игрока."); return; }
+  currentRoll = null;
+  openModal(`
+    <h3>Стандартный ход</h3>
+    <label>Чей ход</label><select id="rollPlayer">${playerOptions()}</select>
+    <div id="rollResult" style="margin-top:14px;"></div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal()">Отмена</button>
+      <button onclick="rollDiceForTurn()">Бросить кубики</button>
+    </div>
+  `);
+}
+function rollDiceForTurn(){
+  const pid = parseInt(document.getElementById("rollPlayer").value);
+  const row = 1 + Math.floor(Math.random()*12);
+  const col = 1 + Math.floor(Math.random()*12);
+  const ticker = BOARD[row-1][col-1];
+  const c = companyByTicker(ticker);
+  const cur = state.companies[ticker];
+  const owned = totalOwnedPct(ticker);
+  const free = 100 - owned;
+  currentRoll = {pid, row, col, ticker};
+  addLog(`🎲 Бросок: строка ${row}, столбец ${col} → ${c.name} (${ticker}).`, "roll");
+
+  let actionsHtml = "";
+  if(free<=0){
+    actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="dividendFromRoll()">Заплатить дивиденды владельцам ${ticker}</button>`;
+  } else {
+    actionsHtml = `
+      <div class="row-inline" style="margin-top:10px;">
+        <button style="flex:1;" onclick="buyFromRoll(10)" ${free<10?"disabled":""}>Купить 10%</button>
+        <button style="flex:1;" onclick="buyFromRoll(25)" ${free<25?"disabled":""}>Купить 25%</button>
+      </div>`;
+  }
+
+  document.getElementById("rollResult").innerHTML = `
+    <div class="event-banner" style="margin-bottom:0;">
+      🎲 <b>${row}</b> / <b>${col}</b> → <b>${c.name}</b> <span class="muted">(${ticker})</span><br>
+      Цена: <b>${fmt(cur.price)}</b> · В руках игроков: ${owned.toFixed(0)}%
+    </div>
+    ${actionsHtml}
+    <div class="row-inline" style="margin-top:10px;">
+      <button class="secondary" style="width:100%;" onclick="skipRollAction()">Пропустить действие и завершить ход</button>
+    </div>
+  `;
+}
+function buyFromRoll(pct){
+  if(!currentRoll) return;
+  const p = state.players.find(x=>x.id===currentRoll.pid);
+  const ticker = currentRoll.ticker;
+  const c = state.companies[ticker];
+  const owned = totalOwnedPct(ticker);
+  if(owned + pct > 100){ showAlert("У банка недостаточно свободных акций этой компании."); return; }
+  const cost = c.price * pct/100;
+  if(p.cash < cost){ showAlert("Недостаточно наличных."); return; }
+  p.cash -= cost;
+  p.holdings[ticker] = (p.holdings[ticker]||0) + pct;
+  applyPriceDelta(ticker, 2*(pct/10));
+  addLog(`${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}. Новая цена: ${fmt(state.companies[ticker].price)}.`, "trade");
+  currentRoll = null;
+  closeModal(); endTurn();
+}
+function dividendFromRoll(){
+  if(!currentRoll) return;
+  const payerId = currentRoll.pid;
+  const ticker = currentRoll.ticker;
+  const c = state.companies[ticker];
+  if(c.skipDividendUntil && c.skipDividendUntil >= state.eventCount){
+    addLog(`По ${ticker} дивиденды временно не платятся (эффект карты новостей).`, "dividend");
+    currentRoll = null;
+    closeModal(); endTurn();
+    return;
+  }
+  const owners = state.players.filter(p=>!p.bankrupt && p.id!==payerId && (p.holdings[ticker]||0)>0);
+  const totalPct = owners.reduce((s,p)=>s+p.holdings[ticker],0);
+  const amount = c.price * 0.05 * (totalPct/100);
+  const payer = state.players.find(x=>x.id===payerId);
+  if(owners.length===0 || amount<=0){
+    addLog(`${payer.name}: дивиденды по ${ticker} не начисляются (нет других владельцев).`, "dividend");
+    currentRoll = null;
+    closeModal(); endTurn();
+    return;
+  }
+  payer.cash -= amount;
+  owners.forEach(o=>{ o.cash += amount * (o.holdings[ticker]/totalPct); });
+  addLog(`${payer.name} заплатил дивиденды по ${ticker}: ${fmt(amount)}, распределено между ${owners.length} владельцем(-ами).`, "dividend");
+  currentRoll = null;
+  closeModal(); endTurn();
+}
+function skipRollAction(){
+  currentRoll = null;
+  closeModal(); endTurn();
+}
+
+function resetGame(){
+  showConfirm("Начать новую партию? Все данные текущей партии будут потеряны.", ()=>{
+    state = freshState();
+    save(); render();
+  });
+}
+
+document.getElementById("btnAddPlayer").onclick = ()=>{
+  const input = document.getElementById("newPlayerName");
+  addPlayer(input.value.trim());
+  input.value = "";
+};
+document.getElementById("btnEndTurn").onclick = endTurn;
+document.getElementById("btnRoll").onclick = openRollModal;
+document.getElementById("btnEvent").onclick = ()=>{ showConfirm("Провести биржевое событие прямо сейчас (вне очереди)?", marketEvent); };
+document.getElementById("btnReset").onclick = resetGame;
+document.getElementById("btnBuy").onclick = openBuyModal;
+document.getElementById("btnSell").onclick = openSellModal;
+document.getElementById("btnTrade").onclick = openTradeModal;
+document.getElementById("btnDividend").onclick = openDividendModal;
+document.getElementById("modalBg").onclick = (e)=>{ if(e.target.id==="modalBg") closeModal(); };
+
+render();
+</script>
+</body>
+</html>
