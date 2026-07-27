@@ -327,10 +327,14 @@
   .popup-card{background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:0 24px 60px rgba(0,0,0,.5);max-width:360px;width:100%;max-height:calc(100% - 20px);overflow-y:auto;}
   .popup-card.popup-wide{max-width:440px;background:var(--panel);}
 
-  .stage-board-outer{position:relative;width:min(60vmin,460px);max-width:100%;margin:0 auto;}
+  .stage-board-outer{position:relative;width:min(60vmin,460px);max-width:100%;margin:0 auto;transform-origin:center center;transition:transform .12s ease;}
+  .zoom-controls{position:fixed;left:10px;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .zoom-btn{width:36px;height:36px;border-radius:50%;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);color:var(--text);font-size:18px;font-weight:800;box-shadow:0 4px 16px rgba(36,31,26,.14);display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
+  .zoom-btn:active{transform:scale(.92);}
+  .zoom-label{font-size:10.5px;color:var(--muted);background:var(--panel2);border-radius:8px;padding:2px 6px;-webkit-user-select:none;user-select:none;}
   .stage-board{position:relative;width:100%;aspect-ratio:1/1;background:linear-gradient(160deg,#f3e6c8,#e6d19f);border-radius:16px;border:9px solid #6b4a30;box-shadow:0 24px 60px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.25);}
   .stage-cells{position:absolute;inset:9px;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(12,1fr);gap:2px;}
-  .stage-cell{position:relative;display:flex;align-items:center;justify-content:center;}
+  .stage-cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .stage-cell-badge{position:relative;width:80%;height:80%;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.3);overflow:hidden;}
   .stage-cell-badge img{width:62%;height:62%;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4));}
   .stage-cell-fb{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:var(--font-mono);font-weight:800;font-size:7px;color:#fff;}
@@ -426,9 +430,32 @@
     .overlay-panel.active{padding:10px 12px calc(58px + env(safe-area-inset-bottom));}
     .popup-card{max-height:calc(100% - 12px);padding:10px 12px;}
   }
+
+  .toast-stack{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:8px;width:min(360px,92vw);pointer-events:none;align-items:center;}
+  .toast-item{pointer-events:auto;width:100%;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-left:4px solid var(--accent2);border-radius:14px;padding:10px 14px;box-shadow:0 12px 30px rgba(0,0,0,.35);display:flex;gap:10px;align-items:flex-start;animation:toastIn .25s ease-out;cursor:pointer;}
+  .toast-item.toast-out{animation:toastOut .25s ease-in forwards;}
+  .toast-item.toast-danger{border-left-color:var(--red,#e35f5f);}
+  .toast-item.toast-warn{border-left-color:#e3b34f;}
+  .toast-item.toast-good{border-left-color:#4fe3a8;}
+  .toast-icon{font-size:20px;line-height:1;flex-shrink:0;}
+  .toast-body{flex:1;min-width:0;}
+  .toast-title{font-weight:800;font-size:13px;color:var(--text);}
+  .toast-text{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35;}
+  .toast-close{flex-shrink:0;background:none;border:none;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:2px;}
+  @keyframes toastIn{ from{opacity:0;transform:translateY(-14px) scale(.96);} to{opacity:1;transform:translateY(0) scale(1);} }
+  @keyframes toastOut{ from{opacity:1;transform:translateY(0) scale(1);} to{opacity:0;transform:translateY(-10px) scale(.96);} }
+  @media (max-width:480px){ .toast-stack{width:94vw;} }
+
+  .end-screen-icon{font-size:44px;line-height:1;animation:endIconPop .5s ease-out;}
+  @keyframes endIconPop{ from{transform:scale(.4);opacity:0;} to{transform:scale(1);opacity:1;} }
+  .end-rank-row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel);border-radius:12px;padding:8px 12px;font-size:13px;}
+  .end-rank-row.me{border:1px solid var(--accent2);}
+  .end-rank-row .end-rank-name{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
+
+<div class="toast-stack" id="toastStack"></div>
 
 <div class="center-screen" id="mainMenu">
   <div class="join-box">
@@ -732,6 +759,11 @@
       <div class="stage-corner corner-bl" id="cornerAction"></div>
       <div class="stage-corner corner-br" id="cornerRating"></div>
       <div class="context-popup" id="contextPopup"></div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" type="button" onclick="zoomBoardBy(0.15)" aria-label="Приблизить поле">+</button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button class="zoom-btn" type="button" onclick="zoomBoardBy(-0.15)" aria-label="Отдалить поле">−</button>
+      </div>
     </div>
   </div>
 
@@ -1338,7 +1370,9 @@ function connectOnline(room, tradeWindowMs, auth){
       if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
     } else if(msg.type === "state"){
       you = msg.you;
+      const prevState = latest;
       latest = msg;
+      detectNotifications(prevState, msg);
       const mePlayer = msg.players && msg.players.find(p=>p.id===you);
       if(mePlayer) applyBoardSkin(mePlayer.equippedBoardSkin || "default");
       if(msg.phase === "lobby"){
@@ -1416,7 +1450,9 @@ function refreshLocal(){
     if(cp) viewAs = cp;
   }
   you = viewAs;
+  const prevState = latest;
   latest = GameEngine.buildStatePayload(localRoom, viewAs);
+  detectNotifications(prevState, latest);
   render();
 }
 function onViewAsChange(sel){
@@ -1462,6 +1498,7 @@ function localDispatch(obj){
     }
     case "forceEvent": result = GameEngine.forceEvent(localRoom); break;
     case "endTradeWindowManual": GameEngine.endTradeWindow(localRoom); result = { ok:true }; break;
+    case "readyEndTrade": result = GameEngine.readyEndTradeWindow(localRoom, viewAs); break;
     case "ctrlNegativeInfo": result = GameEngine.ctrlNegativeInfo(localRoom, viewAs, obj.ticker); break;
     case "ctrlPrCampaign": result = GameEngine.ctrlPrCampaign(localRoom, viewAs, obj.ticker); break;
     case "ctrlInsiderPeek": {
@@ -1479,6 +1516,7 @@ function localDispatch(obj){
     case "payRealEstateRentFromRoll": result = GameEngine.payRealEstateRentFromRoll(localRoom, viewAs); break;
     case "ctrlEspionage": result = GameEngine.ctrlEspionage(localRoom, viewAs, obj.target); break;
     case "ctrlDiscredit": result = GameEngine.ctrlDiscredit(localRoom, viewAs, obj.target); break;
+    case "ctrlInvestigate": result = GameEngine.ctrlInvestigate(localRoom, viewAs); break;
     default: result = { error: "Неизвестное действие." };
   }
   if(result && result.error) flashError(result.error);
@@ -1493,6 +1531,98 @@ function flashError(text){
   div.style.borderLeft = "3px solid var(--red)";
   div.innerHTML = `<div class="tag">Ошибка</div>${text}`;
   log.prepend(div);
+}
+
+// ---------------------------------------------------------------------
+// Всплывающие уведомления (как push на телефоне) об особо важных событиях,
+// требующих внимания игрока. detectNotifications() сравнивает предыдущий и
+// новый снимок состояния (оба — buildStatePayload для меня) и решает, что
+// достойно тоста; showToast() рисует карточку в верхнем стеке toastStack.
+// ---------------------------------------------------------------------
+function showToast(opts){
+  const stack = document.getElementById("toastStack");
+  if(!stack) return;
+  const div = document.createElement("div");
+  div.className = "toast-item" + (opts.kind ? " toast-"+opts.kind : "");
+  div.innerHTML = `
+    <div class="toast-icon">${opts.icon||"🔔"}</div>
+    <div class="toast-body">
+      <div class="toast-title">${escapeHtml(opts.title||"")}</div>
+      ${opts.text ? `<div class="toast-text">${escapeHtml(opts.text)}</div>` : ""}
+    </div>
+    <button class="toast-close" type="button">✕</button>`;
+  div.querySelector(".toast-close").onclick = (e)=>{ e.stopPropagation(); dismissToast(div); };
+  if(opts.onClick){ div.addEventListener("click", ()=>{ opts.onClick(); dismissToast(div); }); }
+  stack.appendChild(div);
+  div._toastTimer = setTimeout(()=> dismissToast(div), opts.duration || 6500);
+  // Не копим больше 4 тостов одновременно — старые убираем сразу.
+  while(stack.children.length > 4) dismissToast(stack.children[0]);
+}
+function dismissToast(div){
+  if(!div || div._dismissed) return;
+  div._dismissed = true;
+  if(div._toastTimer) clearTimeout(div._toastTimer);
+  div.classList.add("toast-out");
+  setTimeout(()=>{ if(div.parentNode) div.parentNode.removeChild(div); }, 260);
+}
+function detectNotifications(prev, msg){
+  if(!msg || msg.you == null || !msg.players) return;
+  if(!prev || prev.you !== msg.you || prev.phase === "lobby") return; // не спамим при входе/смене вида
+
+  const prevIncCount = (prev.mySpyIncidents||[]).length;
+  const nowIncCount = (msg.mySpyIncidents||[]).length;
+  if(nowIncCount > prevIncCount){
+    showToast({ kind:"danger", icon:"🕵️", title:"Против вас действовали тайно!",
+      text:"Кто-то шпионил за вами или дискредитировал вас. Раскройте личность расследованием во вкладке «Контроль».",
+      onClick: ()=> switchTab("control") });
+  }
+
+  const prevFP = prev.pendingForcedPrice, nowFP = msg.pendingForcedPrice;
+  if(nowFP && nowFP.targetId === msg.you && (!prevFP || prevFP.targetId !== msg.you || prevFP.ticker !== nowFP.ticker)){
+    showToast({ kind:"warn", icon:"⚖️", title:"Вам назначили принудительную цену выкупа",
+      text:`Контролирующий акционер требует ${fmt(nowFP.amount)} за вашу долю в ${nowFP.ticker}.`,
+      onClick: ()=> switchTab("turn") });
+  }
+
+  const prevTradeIds = new Set((prev.pendingTrades||[]).filter(t=>t.status==="pending").map(t=>t.id));
+  (msg.pendingTrades||[]).forEach(t=>{
+    if(t.status === "pending" && t.toId === msg.you && !prevTradeIds.has(t.id)){
+      const fromP = msg.players.find(p=>p.id===t.fromId);
+      showToast({ kind:"good", icon:"🤝", title:"Новое предложение сделки",
+        text:`${fromP?fromP.name:"Игрок"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}.`,
+        onClick: ()=> switchTab("capital") });
+    }
+  });
+
+  if(msg.myLoan && prev.myLoan && (msg.myLoan.missedPayments||0) > (prev.myLoan.missedPayments||0)){
+    showToast({ kind:"danger", icon:"🏦", title:"Пропущен платёж по кредиту",
+      text:"Банк начислил штраф за просрочку — погасите долг, пока не стало хуже.",
+      onClick: ()=> switchTab("capital") });
+  }
+
+  if(prev.players){
+    msg.players.forEach(p=>{
+      const before = prev.players.find(b=>b.id===p.id);
+      if(before && !before.bankrupt && p.bankrupt){
+        const iAmIt = p.id === msg.you;
+        showToast({ kind: iAmIt?"danger":"warn", icon:"💥",
+          title: iAmIt ? "Вы обанкротились" : `${p.name} обанкротился(ась)` });
+      }
+    });
+  }
+
+  if(msg.pendingInsider && msg.pendingInsider.playerId === msg.you && !(prev.pendingInsider && prev.pendingInsider.playerId===msg.you)){
+    showToast({ kind:"good", icon:"🕵️", title:"Доступна инсайдерская карта",
+      text:"Можно подсмотреть верхнюю карту колоды новостей во вкладке «Контроль».",
+      onClick: ()=> switchTab("control") });
+  }
+
+  if(msg.gameResult && !prev.gameResult){
+    const iAmWinner = msg.gameResult.winnerId === msg.you;
+    showToast({ kind: iAmWinner?"good":"warn", icon: iAmWinner?"🏆":"🏁",
+      title: iAmWinner ? "Победа! Игра окончена" : "Игра окончена",
+      text:`Победитель: ${msg.gameResult.winnerName} (капитал ${fmt(msg.gameResult.netWorth)}).`, duration:10000 });
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -1753,6 +1883,7 @@ function render(){
   renderControlPanel(s);
   renderTicker(s);
   if(openModalTicker) refreshCompanyModal();
+  if(openModalRE) refreshRealEstateModal();
 
   if(mode === "online" && s.phase === "trade" && s.tradeWindowEndsAt){
     const tick = ()=>{
@@ -1801,7 +1932,7 @@ function renderStageBoard(s){
         const owner = re.ownerId ? playerMap[re.ownerId] : null;
         const stars = re.level>0 ? "★".repeat(re.level) : "";
         const title = `${re.name||cityId} — рента ${fmt(re.rent||0)}${owner?` — владелец: ${owner.name}`:""}${re.level?` — улучшение ${re.level}/${GameEngine.MAX_RE_LEVEL}`:""}`;
-        cellsHtml += `<div class="stage-cell re-cell${isActive?" active-cell":""}${owner?" re-owned":""}" title="${escapeHtml(title)}">
+        cellsHtml += `<div class="stage-cell re-cell${isActive?" active-cell":""}${owner?" re-owned":""}" title="${escapeHtml(title)}" onclick="openRealEstateModal('${cityId}')">
           <div class="stage-cell-badge re-badge">
             <span class="re-icon">🏠</span>
             ${owner?`<span class="re-owner">${owner.avatar || owner.name.charAt(0).toUpperCase()}</span>`:""}
@@ -1812,7 +1943,7 @@ function renderStageBoard(s){
         const ticker = cell;
         const comp = companyMap[ticker];
         const cls = SECTOR_CLASS[comp ? comp.sector : ""] || "";
-        cellsHtml += `<div class="stage-cell${isActive?" active-cell":""}" title="${comp?comp.name:ticker} (${ticker})">
+        cellsHtml += `<div class="stage-cell${isActive?" active-cell":""}" title="${comp?comp.name:ticker} (${ticker})" onclick="openCompanyModal('${ticker}')">
           <div class="stage-cell-badge ${cls}">${boardIconHtml(ticker)}</div>
         </div>`;
       }
@@ -1837,7 +1968,55 @@ function renderStageBoard(s){
     <div class="stage-board"><div class="stage-cells">${cellsHtml}</div></div>
     ${avatarsHtml}
   </div>`;
+  applyBoardZoom();
 }
+
+// --- Приближение игрового поля -----------------------------------------
+// Масштабируем только .stage-board-outer через CSS transform (не меняет
+// раскладку/грид, поэтому попапы и угловые панели остаются на месте).
+// Уровень зума сохраняется между сессиями через localStorage.
+let boardZoom = 1;
+(function initBoardZoom(){
+  const saved = parseFloat(localStorage.getItem("boardZoom"));
+  if(!isNaN(saved)) boardZoom = Math.min(1.8, Math.max(0.6, saved));
+})();
+function applyBoardZoom(){
+  const outer = document.querySelector("#tableBody .stage-board-outer");
+  if(outer) outer.style.transform = `scale(${boardZoom})`;
+  const lbl = document.getElementById("zoomLabel");
+  if(lbl) lbl.textContent = Math.round(boardZoom*100) + "%";
+}
+function setBoardZoom(z){
+  boardZoom = Math.round(Math.min(1.8, Math.max(0.6, z)) * 100) / 100;
+  localStorage.setItem("boardZoom", boardZoom);
+  applyBoardZoom();
+}
+function zoomBoardBy(delta){ setBoardZoom(boardZoom + delta); }
+(function initBoardZoomGestures(){
+  document.addEventListener("wheel", (e)=>{
+    const stage = document.getElementById("stage");
+    if(!stage || stage.style.display === "none" || !stage.offsetParent) return;
+    const tableBody = document.getElementById("tableBody");
+    if(!tableBody || !tableBody.contains(e.target)) return;
+    if(!e.ctrlKey && !e.metaKey) return; // обычная прокрутка колесом не должна триггерить зум
+    e.preventDefault();
+    zoomBoardBy(e.deltaY < 0 ? 0.1 : -0.1);
+  }, { passive:false });
+  let pinchStartDist = null, pinchStartZoom = 1;
+  document.addEventListener("touchstart", (e)=>{
+    const tableBody = document.getElementById("tableBody");
+    if(!tableBody || e.touches.length !== 2 || !tableBody.contains(e.target)) { pinchStartDist = null; return; }
+    pinchStartDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    pinchStartZoom = boardZoom;
+  }, { passive:true });
+  document.addEventListener("touchmove", (e)=>{
+    if(pinchStartDist == null || e.touches.length !== 2) return;
+    const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    e.preventDefault();
+    setBoardZoom(pinchStartZoom * (dist/pinchStartDist));
+  }, { passive:false });
+  document.addEventListener("touchend", ()=>{ pinchStartDist = null; });
+})();
 
 function renderTicker(s){
   const track = document.getElementById("tickerTrack");
@@ -2046,6 +2225,19 @@ function renderControlPanel(s){
     </div>
   `;
 
+  const incidents = s.mySpyIncidents || [];
+  if(incidents.length){
+    const prev = s.investigationPreview || {cost:0, chancePct:0};
+    html += `
+    <div class="control-card" style="border-color:#e35f5f66;">
+      <h3>🔍 Расследование</h3>
+      <p>Против вас зафиксировано анонимных случаев: <b>${incidents.length}</b> (шпионаж/дискредитация). Стоимость и шанс раскрытия личности зависят от вашего капитала и репутации.</p>
+      <div class="row-inline">
+        <button onclick="send({type:'ctrlInvestigate'})">Расследовать за ${fmt(prev.cost)} (шанс ${prev.chancePct}%)</button>
+      </div>
+    </div>`;
+  }
+
   if(myControlled.length === 0){
     html += `<div class="muted" style="font-size:12px;padding:4px 2px;">👑 Спецдействия с контрольным пакетом (вброс новостей, PR-кампания, инсайд, выкуп миноритариев) появятся здесь, когда вы получите &gt;50% какой-либо компании.</div>`;
     el.innerHTML = html;
@@ -2227,6 +2419,35 @@ function forcedPriceWaitingPopupHtml(s){
   </div>`;
 }
 
+function gameEndPopupHtml(s){
+  const gr = s.gameResult;
+  if(!gr){
+    return `<div class="popup-card"><div class="muted">Игра окончена. Откройте меню (☰) и начните новую партию, чтобы сыграть ещё раз.</div></div>`;
+  }
+  const iAmWinner = gr.winnerId === you;
+  const rankRows = gr.ranking.map((r,i)=>{
+    const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
+    const isMe = r.id === you;
+    return `<div class="end-rank-row${isMe?" me":""}">
+      <span class="end-rank-name">${medal} ${escapeHtml(r.name)}${isMe?' <span class="muted">(вы)</span>':""}${r.bankrupt?" 💀":""}</span>
+      <b>${fmt(r.netWorth)}</b>
+    </div>`;
+  }).join("");
+  return `<div class="popup-card popup-wide" style="text-align:center;">
+    <div class="end-screen-icon">${iAmWinner?"🏆":"🏁"}</div>
+    <h2 style="margin:8px 0 2px;">${iAmWinner?"Победа!":"Игра окончена"}</h2>
+    <div class="muted" style="margin-bottom:14px;font-size:13px;">Победитель — <b>${escapeHtml(gr.winnerName)}</b> с капиталом ${fmt(gr.netWorth)}</div>
+    <div style="display:flex;flex-direction:column;gap:6px;text-align:left;margin-bottom:14px;">${rankRows}</div>
+    <div class="mini-card" style="margin-bottom:14px;text-align:left;">
+      <h3>🏆 Награда рейтинга</h3>
+      ${iAmWinner
+        ? `<div class="cap-mini"><span>Начислено очков</span><b>+${gr.pointsEarned}</b></div>`
+        : `<div class="muted" style="font-size:12px;">Очки рейтинга за партию получает только победитель. В следующий раз повезёт!</div>`}
+    </div>
+    <button style="width:100%;" onclick="send({type:'newGame'})">🔄 Новая партия</button>
+  </div>`;
+}
+
 function rollPopupHtml(s){
   const roll = s.pendingRoll;
   const meta = s.pendingRollMeta || {};
@@ -2303,9 +2524,13 @@ function rollPopupHtml(s){
 function tradePhaseHtml(s, me){
   const incoming = s.pendingTrades.filter(t=>t.toId===you);
   const outgoing = s.pendingTrades.filter(t=>t.fromId===you);
+  const activeTraders = s.players.filter(p=>!p.bankrupt);
+  const readyIds = s.tradeReadyIds || [];
+  const iAmReady = readyIds.includes(you);
   let html = `<div class="mini-card">
-    <div class="muted" style="font-size:12.5px;${mode==="offline"?"margin-bottom:10px;":""}">Фаза свободных торгов — доступна всем одновременно. Покупка у банка закрыта. Нажмите на свою акцию ниже, чтобы продать банку или предложить сделку игроку.</div>
-    ${mode==="offline" ? `<button style="width:100%;" class="secondary" onclick="send({type:'endTradeWindowManual'})">⏭️ Завершить фазу торгов и передать ход дальше</button>` : ""}
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px;">Фаза свободных торгов — доступна всем одновременно. Покупка у банка закрыта. Нажмите на свою акцию ниже, чтобы продать банку или предложить сделку игроку.</div>
+    <button style="width:100%;" class="${iAmReady?"":"secondary"}" onclick="send({type:'readyEndTrade'})">${iAmReady?"✅ Вы готовы — ждём остальных":"⏭️ Готов завершить фазу торгов"} (${readyIds.length}/${activeTraders.length})</button>
+    ${mode==="offline" ? `<button style="width:100%;margin-top:8px;" class="secondary" onclick="send({type:'endTradeWindowManual'})">⏭️⏭️ Сразу завершить фазу торгов и передать ход дальше</button>` : ""}
   </div>`;
   if(incoming.length){
     html += `<div class="mini-card"><h3>📥 Предложения вам</h3>` + incoming.map(t=>{
@@ -2346,16 +2571,16 @@ function renderStage(s){
   cornerCapital.innerHTML = capSummaryHtml(s);
   cornerRating.innerHTML = ratingHtml(s);
 
+  if(s.phase === "ended"){
+    cornerAction.innerHTML = "";
+    popup.style.display = "flex";
+    popup.innerHTML = gameEndPopupHtml(s);
+    return;
+  }
   if(me.bankrupt){
     cornerAction.innerHTML = "";
     popup.style.display = "flex";
     popup.innerHTML = `<div class="popup-card"><div class="muted">Вы банкрот — можете наблюдать за игрой.</div></div>`;
-    return;
-  }
-  if(s.phase === "ended"){
-    cornerAction.innerHTML = "";
-    popup.style.display = "flex";
-    popup.innerHTML = `<div class="popup-card"><div class="muted">Игра окончена. Откройте меню (☰) и начните новую партию, чтобы сыграть ещё раз.</div></div>`;
     return;
   }
   if(s.phase === "roll"){
@@ -2410,14 +2635,63 @@ function doProposeStockTrade(ticker){
 // но рисует его крупнее с подписями мин/макс и статистикой.
 // ---------------------------------------------------------------------
 let openModalTicker = null;
+let openModalRE = null; // id города — открыта карточка недвижимости, а не компании
 function openCompanyModal(ticker){
   openModalTicker = ticker;
+  openModalRE = null;
   document.getElementById("companyModalOverlay").style.display = "flex";
   refreshCompanyModal();
 }
+function openRealEstateModal(cityId){
+  openModalRE = cityId;
+  openModalTicker = null;
+  document.getElementById("companyModalOverlay").style.display = "flex";
+  refreshRealEstateModal();
+}
 function closeCompanyModal(){
   openModalTicker = null;
+  openModalRE = null;
   document.getElementById("companyModalOverlay").style.display = "none";
+}
+function refreshRealEstateModal(){
+  if(!openModalRE || !latest){ return; }
+  const s = latest;
+  const re = (s.realEstate||[]).find(x=>x.id===openModalRE);
+  if(!re){ closeCompanyModal(); return; }
+  const owner = re.ownerId ? s.players.find(p=>p.id===re.ownerId) : null;
+  const isMine = re.ownerId === you;
+  const canActNow = !!(s.pendingRoll && s.pendingRollMeta && s.pendingRollMeta.kind==="realestate" && s.pendingRollMeta.cityId===re.id && s.pendingRoll.playerId===you);
+  let actionsHtml;
+  if(canActNow){
+    if(!re.ownerId){
+      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="doBuyRealEstateFromRoll();closeCompanyModal();">Купить за ${fmt(re.price)}</button>`;
+    } else if(isMine){
+      actionsHtml = re.level < re.maxLevel
+        ? `<button style="width:100%;margin-top:10px;" onclick="doUpgradeRealEstateFromRoll();closeCompanyModal();">Улучшить (${re.level}/${re.maxLevel}) за ${fmt(re.upgradeCost)}</button>`
+        : `<div class="muted" style="margin-top:10px;font-size:12.5px;">Максимум улучшений (${re.maxLevel}/${re.maxLevel}) уже достигнут.</div>`;
+    } else {
+      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="doPayRealEstateRentFromRoll();closeCompanyModal();">Заплатить ренту ${fmt(re.rent)} игроку ${owner?escapeHtml(owner.name):"?"}</button>`;
+    }
+  } else {
+    actionsHtml = `<div class="muted" style="font-size:11.5px;margin-top:8px;">Купить, улучшить или заплатить ренту можно только когда фишка попадёт на эту клетку.</div>`;
+  }
+  document.getElementById("companyModalCard").innerHTML = `
+    <div class="company-modal-head">
+      <div class="stage-cell-badge re-badge" style="width:40px;height:40px;flex-shrink:0;border-radius:50%;"><span class="re-icon" style="font-size:18px;">🏠</span></div>
+      <div>
+        <h2>${escapeHtml(re.name||re.id)}</h2>
+        <div class="muted">Недвижимость${re.level?` · уровень ${re.level}/${re.maxLevel}`:""}</div>
+      </div>
+      <button type="button" class="company-modal-close" onclick="closeCompanyModal()">✕</button>
+    </div>
+    <div class="company-modal-stats">
+      <div class="cap-mini"><span>Цена</span><b>${fmt(re.price)}</b></div>
+      <div class="cap-mini"><span>Рента</span><b>${fmt(re.rent)}</b></div>
+      <div class="cap-mini"><span>Уровень</span><b>${re.level}/${re.maxLevel}</b></div>
+      <div class="cap-mini"><span>Владелец</span><b>${owner ? (owner.id===you?"👑 вы":escapeHtml(owner.name)) : "Свободна"}</b></div>
+    </div>
+    ${actionsHtml}
+  `;
 }
 function fullChartSvg(ticker, color){
   const w = 440, h = 140, pad = 6;

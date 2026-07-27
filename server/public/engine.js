@@ -228,6 +228,10 @@
       reveals: [], // {spyId, targetId, expiresEvent} — раскрытые шпионажем активы
       spyCooldown: {}, // targetId -> eventCount последней попытки шпионажа против него
       discreditCooldown: {}, // targetId -> eventCount последней попытки дискредитации
+      investigateCooldown: {}, // targetId -> eventCount последнего расследования
+      spyIncidents: [], // {id, kind:'espionage'|'discredit', targetId, suspectId, eventCount} — нераскрытые случаи, ждущие расследования
+      nextIncidentId: 1,
+      gameResult: null, // {winnerId, winnerName, netWorth, pointsEarned, ranking:[{id,name,netWorth,bankrupt,points}]}
       deckData: buildDeck(),
       deckOrder: shuffle(buildDeck().map((_, i) => i)),
       deckPos: 0,
@@ -252,6 +256,7 @@
       tradeWindowEndsAt: null,
       tradeTimer: null, // используется только сервером (сетевой таймер), движок его не трогает
       tradeWindowMs: tradeWindowMs || DEFAULT_TRADE_WINDOW_MS,
+      tradeReadyIds: [], // id игроков, нажавших «Готов завершить торги» в текущей фазе торгов
       insiderUsedEvent: {},
       pendingInsider: null,
       shorts: [],
@@ -361,6 +366,14 @@
       winner.points = (winner.points || 0) + pointsEarned;
       // Сетевой слой (server.js) заберёт это один раз и допишет очки в персистентный аккаунт игрока.
       room.lastGamePointsAward = { playerId: winner.id, amount: pointsEarned };
+      // Итоговая таблица для экрана завершения игры — не одноразовая (в отличие
+      // от lastGamePointsAward), остаётся в комнате до начала новой партии.
+      room.gameResult = {
+        winnerId: winner.id, winnerName: winner.name, netWorth: won, pointsEarned,
+        ranking: room.players
+          .map((p) => ({ id: p.id, name: p.name, netWorth: Math.round(netWorth(room, p)), bankrupt: !!p.bankrupt, points: p.points || 0 }))
+          .sort((a, b) => b.netWorth - a.netWorth),
+      };
       addLog(room, `🏆 Игра окончена! Победитель: ${winner.name} с капиталом ${fmt(won)} — начислено ${pointsEarned} очков (всего ${winner.points}).`, "win");
     }
   }
@@ -386,6 +399,7 @@
   function startTradeWindow(room) {
     room.phase = "trade";
     room.tradeWindowEndsAt = Date.now() + (room.tradeWindowMs || DEFAULT_TRADE_WINDOW_MS);
+    room.tradeReadyIds = [];
   }
 
   function endTradeWindow(room) {
@@ -399,9 +413,36 @@
     room.pendingTrades = [];
     room.phase = "roll";
     room.tradeWindowEndsAt = null;
+    room.tradeReadyIds = [];
     room.turnIndex = (room.turnIndex + 1) % Math.max(1, room.turnOrder.length);
     addLog(room, "Фаза торгов завершена. Ход переходит к следующему игроку.", "turn");
     checkEndGame(room);
+  }
+
+  // Голосование «пропустить фазу торгов»: каждый активный (не банкрот) игрок
+  // жмёт готовность; как только готовы все — фаза заканчивается досрочно,
+  // без ожидания таймера. Один и тот же игрок может отменить свою готовность
+  // повторным вызовом (toggle), пока фаза не завершилась.
+  function readyEndTradeWindow(room, playerId) {
+    if (room.phase !== "trade") return { error: "Сейчас не фаза торгов." };
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || player.bankrupt) return { error: "Недоступно." };
+    if (!room.tradeReadyIds) room.tradeReadyIds = [];
+    const idx = room.tradeReadyIds.indexOf(playerId);
+    if (idx >= 0) {
+      room.tradeReadyIds.splice(idx, 1);
+      addLog(room, `${player.name} передумал(а) завершать фазу торгов досрочно.`, "trade");
+      return { ok: true };
+    }
+    room.tradeReadyIds.push(playerId);
+    addLog(room, `${player.name} готов(а) завершить фазу торгов досрочно.`, "trade");
+    const active = room.players.filter((p) => !p.bankrupt);
+    const allReady = active.length > 0 && active.every((p) => room.tradeReadyIds.includes(p.id));
+    if (allReady) {
+      addLog(room, "Все игроки готовы — фаза торгов завершается досрочно.", "trade");
+      endTradeWindow(room);
+    }
+    return { ok: true };
   }
 
   function marketEvent(room) {
@@ -1093,7 +1134,9 @@
     if (success) {
       room.reveals = room.reveals.filter((r) => !(r.spyId === p.id && r.targetId === target.id));
       room.reveals.push({ spyId: p.id, targetId: target.id, expiresEvent: room.eventCount + 2 });
-      addLog(room, `🕵️ ${p.name} провёл шпионаж против ${target.name} за ${fmt(cost)} — активы раскрыты на 2 события.`, "espionage");
+      // Личность шпиона не раскрывается публично — только через расследование цели (ctrlInvestigate).
+      room.spyIncidents.push({ id: room.nextIncidentId++, kind: "espionage", targetId: target.id, suspectId: p.id, eventCount: room.eventCount });
+      addLog(room, `🕵️ Кто-то провёл шпионаж против ${target.name} — активы раскрыты на 2 события. Личность неизвестна.`, "espionage");
     } else {
       adjustReputation(room, p, -8, "пойман на шпионаже");
       addLog(room, `🚨 ${p.name} попытался шпионить за ${target.name}, но был пойман! Репутация ${p.name} снижена.`, "espionage");
@@ -1116,13 +1159,52 @@
     room.discreditCooldown[targetId] = room.eventCount;
     const success = Math.random() < 0.55;
     if (success) {
-      adjustReputation(room, target, -15, `дискредитирован игроком ${p.name}`);
-      addLog(room, `🗞️ ${p.name} дискредитировал ${target.name} за ${fmt(cost)} — репутация цели снижена.`, "espionage");
+      adjustReputation(room, target, -15, "дискредитирован анонимно");
+      // Личность инициатора не раскрывается публично — только через расследование цели (ctrlInvestigate).
+      room.spyIncidents.push({ id: room.nextIncidentId++, kind: "discredit", targetId: target.id, suspectId: p.id, eventCount: room.eventCount });
+      addLog(room, `🗞️ Кто-то дискредитировал ${target.name} — репутация цели снижена. Личность неизвестна.`, "espionage");
     } else {
       adjustReputation(room, p, -10, "провалившаяся попытка дискредитации");
       addLog(room, `🚨 Попытка ${p.name} дискредитировать ${target.name} провалилась и вскрылась публично! Репутация ${p.name} снижена.`, "espionage");
     }
     return { ok: true, success };
+  }
+
+  // Расследование: цель шпионажа/дискредитации может попытаться вычислить,
+  // кто именно против неё действовал. Стоимость и шанс успеха зависят от
+  // капитала и репутации самой цели (богаче и репутабельнее — доступнее
+  // качественное расследование). Раскрывает самый старый нераскрытый случай.
+  function investigationCost(player) {
+    const rep = player.reputation == null ? REPUTATION_START : player.reputation;
+    const base = clamp(Math.round((player.cash || 0) * 0.04), 5000, 50000);
+    return Math.max(3000, Math.round(base - rep * 40));
+  }
+  function investigationChance(player) {
+    const rep = player.reputation == null ? REPUTATION_START : player.reputation;
+    return clamp(0.28 + rep / 380 + (player.cash || 0) / 2500000, 0.2, 0.85);
+  }
+  function ctrlInvestigate(room, playerId) {
+    const err = requireTradePhase(room);
+    if (err) return { error: err };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    const incidents = room.spyIncidents.filter((i) => i.targetId === playerId).sort((a, b) => a.eventCount - b.eventCount);
+    if (!incidents.length) return { error: "Нет нераскрытых случаев против вас — расследовать нечего." };
+    const incident = incidents[0];
+    const cost = investigationCost(p);
+    if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
+    p.cash -= cost;
+    const success = Math.random() < investigationChance(p);
+    room.spyIncidents = room.spyIncidents.filter((i) => i.id !== incident.id);
+    if (success) {
+      const suspect = room.players.find((x) => x.id === incident.suspectId);
+      const kindLabel = incident.kind === "espionage" ? "шпионил за вами" : "дискредитировал вас";
+      if (suspect) adjustReputation(room, suspect, -10, "разоблачён расследованием");
+      addLog(room, `🔍 Расследование ${p.name} (${fmt(cost)}) увенчалось успехом: ${suspect ? suspect.name : "неизвестный игрок"} ${kindLabel}!`, "espionage");
+      return { ok: true, success: true, suspectId: incident.suspectId, suspectName: suspect ? suspect.name : null };
+    }
+    addLog(room, `🔍 ${p.name} потратил(а) ${fmt(cost)} на расследование, но виновный остался неизвестен.`, "espionage");
+    return { ok: true, success: false };
   }
 
   function forceEvent(room) {
@@ -1182,6 +1264,7 @@
       dividendMultiplier: room.dividendMultiplier || 1,
       tradeWindowEndsAt: room.tradeWindowEndsAt,
       tradeWindowMs: room.tradeWindowMs,
+      tradeReadyIds: room.tradeReadyIds || [],
       currentPlayerId: currentPlayerId(room),
       pendingRoll: room.pendingRoll,
       pendingRollMeta: pendingRollMeta(room),
@@ -1189,6 +1272,11 @@
       pendingTrades: room.pendingTrades,
       shorts: room.shorts,
       pendingInsider: room.pendingInsider,
+      gameResult: room.gameResult || null,
+      // Случаи шпионажа/дискредитации против меня — без suspectId, чтобы не
+      // подсказывать личность до успешного расследования (ctrlInvestigate).
+      mySpyIncidents: me ? room.spyIncidents.filter((i) => i.targetId === youId).map((i) => ({ id: i.id, kind: i.kind, eventCount: i.eventCount })) : [],
+      investigationPreview: me ? { cost: investigationCost(me), chancePct: Math.round(investigationChance(me) * 100) } : null,
       bankFeePct: me ? bankFeePct(me.reputation) : 0,
       bankTerms: me ? loanTerms(room, me) : null,
       myLoan: me && me.loan ? { principal: Math.round(me.loan.principal), ratePct: me.loan.ratePct, missedPayments: me.loan.missedPayments || 0 } : null,
@@ -1242,7 +1330,7 @@
     realEstatePrice, realEstateRent, realEstateUpgradeCost,
     freshRoom, addLog,
     totalOwnedPct, ownerOfControl, controlledTickers, netWorth, applyPriceDelta, ambientJitter, activePlayers, currentPlayerId,
-    settleDebt, checkEndGame, resolveShorts, marketEvent, startTradeWindow, endTradeWindow, afterRollAction,
+    settleDebt, checkEndGame, resolveShorts, marketEvent, startTradeWindow, endTradeWindow, readyEndTradeWindow, afterRollAction,
     addPlayer, setConnected, newGameKeepPlayers, startGame, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
     setForcedPrice, payForcedPrice,
@@ -1250,7 +1338,7 @@
     declareBankruptcy, forceEvent,
     adjustReputation, bankFeePct, loanTerms, takeLoan, repayLoan, processLoans,
     buyRealEstateFromRoll, upgradeRealEstateFromRoll, payRealEstateRentFromRoll, processRealEstate,
-    ctrlEspionage, ctrlDiscredit, isRevealed,
+    ctrlEspionage, ctrlDiscredit, isRevealed, ctrlInvestigate, investigationCost, investigationChance,
     buildStatePayload,
   };
 });

@@ -127,6 +127,7 @@ function handleMessage(ws, raw) {
     case "setForcedPrice": return run(conn, engine.setForcedPrice(room, conn.playerId, msg.amount));
     case "payForcedPrice": return run(conn, engine.payForcedPrice(room, conn.playerId));
     case "skipRoll": return run(conn, engine.skipRoll(room, conn.playerId));
+    case "readyEndTrade": return run(conn, engine.readyEndTradeWindow(room, conn.playerId));
     case "buyBank": return run(conn, engine.buyBank());
     case "sellBank": return run(conn, engine.sellBank(room, conn.playerId, msg.ticker, msg.pct));
     case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price));
@@ -156,6 +157,7 @@ function handleMessage(ws, raw) {
     case "payRealEstateRentFromRoll": return run(conn, engine.payRealEstateRentFromRoll(room, conn.playerId));
     case "ctrlEspionage": return run(conn, engine.ctrlEspionage(room, conn.playerId, msg.target));
     case "ctrlDiscredit": return run(conn, engine.ctrlDiscredit(room, conn.playerId, msg.target));
+    case "ctrlInvestigate": return run(conn, engine.ctrlInvestigate(room, conn.playerId));
   }
 }
 
