@@ -67,12 +67,14 @@ function run(conn, result) {
 function handleJoin(ws, msg) {
   const code = String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
   const name = String(msg.name || "").trim().slice(0, 20);
+  const gender = String(msg.gender || "").trim().slice(0, 24);
+  const avatar = String(msg.avatar || "").trim().slice(0, 8);
   if (!name) return sendTo(ws, { type: "error", message: "Введите имя игрока." });
   const isNew = !rooms.has(code);
   const twm = ALLOWED_TRADE_WINDOWS.includes(Number(msg.tradeWindowMs)) ? Number(msg.tradeWindowMs) : undefined;
   const room = isNew ? getOrCreateRoom(code, twm) : getOrCreateRoom(code);
 
-  const result = engine.addPlayer(room, name);
+  const result = engine.addPlayer(room, name, gender, avatar);
   if (result.error) return sendTo(ws, { type: "error", message: result.error });
 
   connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name });
@@ -100,6 +102,8 @@ function handleMessage(ws, raw) {
     case "respondTrade": return run(conn, engine.respondTrade(room, conn.playerId, msg.id, msg.accept));
     case "declareBankruptcy": return run(conn, engine.declareBankruptcy(room, conn.playerId));
     case "newGame": return handleNewGame(conn);
+    case "startGame": return run(conn, engine.startGame(room, conn.playerId));
+    case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": return run(conn, engine.forceEvent(room));
     case "ctrlNegativeInfo": return run(conn, engine.ctrlNegativeInfo(room, conn.playerId, msg.ticker));
     case "ctrlPrCampaign": return run(conn, engine.ctrlPrCampaign(room, conn.playerId, msg.ticker));

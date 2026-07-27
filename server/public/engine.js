@@ -13,6 +13,10 @@
 
   const DEFAULT_TRADE_WINDOW_MS = 90000;
   const TIER_PRICE = { A: 40000, B: 20000, C: 8000 };
+  // Волатильность по тиру: голубые фишки (A) двигаются спокойнее, малые компании (C) — резче.
+  // Множитель применяется к любому изменению цены (события, сделки, спецдействия).
+  const TIER_VOL = { A: 0.7, B: 1.0, C: 1.6 };
+  const VOL_LABEL = { A: "Низкая", B: "Средняя", C: "Высокая" };
   const COMPANIES = [
     { ticker: "AAPL", name: "Apple", sector: "Технологии", tier: "A" },
     { ticker: "MSFT", name: "Microsoft", sector: "Технологии", tier: "A" },
@@ -139,7 +143,10 @@
       nextShortId: 1,
       turnOrder: [],
       turnIndex: 0,
-      phase: "roll", // 'roll' | 'trade' | 'ended'
+      phase: "lobby", // 'lobby' | 'roll' | 'trade' | 'ended'
+      hostPlayerId: null,
+      chat: [],
+      nextChatId: 1,
       pendingRoll: null,
       pendingTrades: [],
       dividendMultiplier: 1,
@@ -178,10 +185,21 @@
   function applyPriceDelta(room, ticker, pct) {
     if (room.frozen) return;
     const c = room.companies[ticker];
-    const tierStart = TIER_PRICE[companyByTicker(ticker).tier];
+    const tier = companyByTicker(ticker).tier;
+    const vol = TIER_VOL[tier] || 1;
+    const tierStart = TIER_PRICE[tier];
     const floor = tierStart * 0.1;
     c.prevPrice = c.price;
-    c.price = Math.max(floor, c.price * (1 + pct / 100));
+    c.price = Math.max(floor, c.price * (1 + (pct * vol) / 100));
+  }
+  // Фоновый рыночный шум — небольшое случайное колебание всех цен при каждом броске
+  // кубиков, чтобы рынок жил и между крупными биржевыми событиями (не только раз в 3 хода).
+  function ambientJitter(room) {
+    if (room.frozen) return;
+    COMPANIES.forEach((c) => {
+      const jitter = Math.random() * 3 - 1.5; // -1.5%..+1.5% до множителя волатильности тикера
+      applyPriceDelta(room, c.ticker, jitter);
+    });
   }
   function activePlayers(room) { return room.players.filter((p) => !p.bankrupt); }
 
@@ -220,7 +238,12 @@
     const active = activePlayers(room);
     if (room.players.length > 1 && active.length === 1 && room.phase !== "ended") {
       room.phase = "ended";
-      addLog(room, `🏆 Игра окончена! Победитель: ${active[0].name}.`, "win");
+      const winner = active[0];
+      // Очки — за победу начисляются пропорционально итоговому капиталу (сумме, с которой игрок выиграл).
+      const won = Math.round(netWorth(room, winner));
+      const pointsEarned = Math.max(1, Math.round(won / 1000));
+      winner.points = (winner.points || 0) + pointsEarned;
+      addLog(room, `🏆 Игра окончена! Победитель: ${winner.name} с капиталом ${fmt(won)} — начислено ${pointsEarned} очков (всего ${winner.points}).`, "win");
     }
   }
 
@@ -273,7 +296,7 @@
     let volPct = 0;
     if (roll <= 2) volPct = -5; else if (roll >= 5) volPct = 5;
     COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, volPct));
-    addLog(room, `Кубик волатильности: ${roll} → ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям`, "vol");
+    addLog(room, `Кубик волатильности: ${roll} → база ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям (фактически сильнее у волатильных тикеров)`, "vol");
 
     if (room.deckPos >= room.deckOrder.length) {
       room.deckOrder = shuffle(room.deckOrder);
@@ -346,21 +369,28 @@
   // ---------------------------------------------------------------------
   // Игроки
   // ---------------------------------------------------------------------
-  function addPlayer(room, name) {
+  function addPlayer(room, name, gender, avatar) {
     name = String(name || "").trim().slice(0, 20);
     if (!name) return { error: "Введите имя игрока." };
+    gender = String(gender || "").trim().slice(0, 24);
+    avatar = String(avatar || "").trim().slice(0, 8);
     let player = room.players.find((p) => p.name === name);
     if (player && player.connected) {
       return { error: "Это имя уже занято в этой комнате." };
     }
     if (player) {
       player.connected = true;
+      if (gender) player.gender = gender;
+      if (avatar) player.avatar = avatar;
       addLog(room, `Игрок «${name}» переподключился.`, "player");
     } else {
-      player = { id: room.nextPlayerId++, name, cash: 150000, holdings: {}, bankrupt: false, connected: true };
+      player = { id: room.nextPlayerId++, name, gender, avatar, points: 0, cash: 150000, holdings: {}, bankrupt: false, connected: true };
       room.players.push(player);
       room.turnOrder.push(player.id);
       addLog(room, `Игрок «${name}» присоединился со стартовым капиталом ${fmt(150000)}.`, "player");
+    }
+    if (room.phase === "lobby" && (!room.hostPlayerId || !room.players.some((x) => x.id === room.hostPlayerId && x.connected))) {
+      room.hostPlayerId = player.id;
     }
     return { ok: true, player };
   }
@@ -369,14 +399,43 @@
     const p = room.players.find((x) => x.id === playerId);
     if (!p) return;
     p.connected = connected;
-    if (!connected) addLog(room, `Игрок «${p.name}» отключился.`, "player");
+    if (!connected) {
+      addLog(room, `Игрок «${p.name}» отключился.`, "player");
+      if (room.phase === "lobby" && room.hostPlayerId === playerId) {
+        const next = room.players.find((x) => x.connected && x.id !== playerId);
+        room.hostPlayerId = next ? next.id : null;
+        if (next) addLog(room, `«${next.name}» теперь хост комнаты.`, "player");
+      }
+    }
+  }
+
+  function startGame(room, playerId) {
+    if (!room) return { error: "Комната не найдена." };
+    if (room.phase !== "lobby") return { error: "Игра уже началась." };
+    if (room.hostPlayerId !== playerId) return { error: "Начать игру может только хост комнаты." };
+    if (room.players.length < 2) return { error: "Нужно минимум 2 игрока." };
+    room.phase = "roll";
+    addLog(room, "🚀 Хост начал игру.", "header");
+    return { ok: true };
+  }
+
+  function sendChatMessage(room, playerId, text) {
+    if (!room) return { error: "Комната не найдена." };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p) return { error: "Недоступно." };
+    text = String(text || "").trim().slice(0, 300);
+    if (!text) return { error: "Пустое сообщение." };
+    room.chat.push({ id: room.nextChatId++, playerId, name: p.name, text, ts: Date.now() });
+    if (room.chat.length > 200) room.chat.shift();
+    return { ok: true };
   }
 
   function newGameKeepPlayers(room) {
-    const names = room.players.map((p) => p.name);
+    const prev = room.players.map((p) => ({ name: p.name, gender: p.gender, avatar: p.avatar, points: p.points || 0 }));
     const fresh = freshRoom(room.code, room.tradeWindowMs);
-    names.forEach((n) => {
-      const p = { id: fresh.nextPlayerId++, name: n, cash: 150000, holdings: {}, bankrupt: false, connected: true };
+    fresh.phase = "roll"; // реванш — сразу к игре, без комнаты ожидания
+    prev.forEach((pp) => {
+      const p = { id: fresh.nextPlayerId++, name: pp.name, gender: pp.gender, avatar: pp.avatar, points: pp.points, cash: 150000, holdings: {}, bankrupt: false, connected: true };
       fresh.players.push(p);
       fresh.turnOrder.push(p.id);
     });
@@ -391,6 +450,7 @@
     if (!room || room.phase !== "roll") return { error: "Сейчас фаза торгов — дождитесь её окончания." };
     if (currentPlayerId(room) !== playerId) return { error: "Сейчас не ваш ход." };
     if (room.pendingRoll) return { error: "Бросок уже сделан — выберите действие." };
+    ambientJitter(room);
     const row = 1 + Math.floor(Math.random() * 12);
     const col = 1 + Math.floor(Math.random() * 12);
     const ticker = BOARD[row - 1][col - 1];
@@ -666,6 +726,9 @@
       eventCount: room.eventCount,
       deckRemaining: room.deckOrder.length - room.deckPos,
       phase: room.phase,
+      hostPlayerId: room.hostPlayerId || null,
+      canStart: room.phase === "lobby" && room.hostPlayerId === youId && room.players.length >= 2,
+      chat: room.phase === "lobby" ? room.chat.slice(-100) : undefined,
       frozen: !!room.frozen,
       dividendMultiplier: room.dividendMultiplier || 1,
       tradeWindowEndsAt: room.tradeWindowEndsAt,
@@ -677,6 +740,7 @@
       pendingInsider: room.pendingInsider,
       companies: COMPANIES.map((c) => ({
         ticker: c.ticker, name: c.name, sector: c.sector, tier: c.tier,
+        volLabel: VOL_LABEL[c.tier] || "Средняя",
         price: room.companies[c.ticker].price,
         prevPrice: room.companies[c.ticker].prevPrice,
         owned: totalOwnedPct(room, c.ticker),
@@ -686,7 +750,8 @@
         lastPrEvent: room.companies[c.ticker].lastPrEvent,
       })),
       players: room.players.map((p) => ({
-        id: p.id, name: p.name, cash: p.cash, holdings: p.holdings, bankrupt: p.bankrupt, connected: p.connected,
+        id: p.id, name: p.name, gender: p.gender || "", avatar: p.avatar || "", points: p.points || 0,
+        cash: p.cash, holdings: p.holdings, bankrupt: p.bankrupt, connected: p.connected,
         netWorth: netWorth(room, p),
       })),
       log: room.log.slice(-60),
@@ -694,12 +759,12 @@
   }
 
   return {
-    DEFAULT_TRADE_WINDOW_MS, TIER_PRICE, COMPANIES, BOARD,
+    DEFAULT_TRADE_WINDOW_MS, TIER_PRICE, TIER_VOL, VOL_LABEL, COMPANIES, BOARD,
     companyByTicker, buildDeck, shuffle, fmt,
     freshRoom, addLog,
-    totalOwnedPct, ownerOfControl, controlledTickers, netWorth, applyPriceDelta, activePlayers, currentPlayerId,
+    totalOwnedPct, ownerOfControl, controlledTickers, netWorth, applyPriceDelta, ambientJitter, activePlayers, currentPlayerId,
     settleDebt, checkEndGame, resolveShorts, marketEvent, startTradeWindow, endTradeWindow, afterRollAction,
-    addPlayer, setConnected, newGameKeepPlayers,
+    addPlayer, setConnected, newGameKeepPlayers, startGame, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort,
     declareBankruptcy, forceEvent,

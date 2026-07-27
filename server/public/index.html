@@ -55,6 +55,10 @@
   tr:hover td{background:rgba(76,122,107,0.06);}
   tr.active-row td{background:rgba(76,122,107,.1);box-shadow:inset 0 0 0 1px var(--accent);}
   .sector-tag{font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
+  .vol-badge{font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);white-space:nowrap;font-weight:700;}
+  .vol-badge.vol-low{background:rgba(63,95,201,.14);color:#3f5fc9;}
+  .vol-badge.vol-med{background:rgba(209,120,63,.16);color:#a8611f;}
+  .vol-badge.vol-high{background:rgba(217,79,79,.16);color:#c23a3a;}
   .price{font-weight:700;font-family:var(--font-mono);}
   .up{color:var(--green);} .down{color:var(--red);}
   .owned-bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;}
@@ -74,6 +78,10 @@
   .badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:var(--radius-pill);margin-left:6px;}
   .badge.control{background:var(--amber);color:#4a3300;}
   .badge.offline{background:var(--red);color:#fff;}
+  .badge.online{background:var(--green);color:#fff;}
+  .lobby-player-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);margin-bottom:6px;font-size:13px;}
+  .lobby-player-row.you{border-color:var(--accent);}
+  .lobby-chat-log{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
   .net{font-weight:700;font-family:var(--font-mono);}
   .muted{color:var(--muted);}
   .event-banner{background:linear-gradient(120deg, rgba(255,214,168,.5), rgba(198,224,214,.5));border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text);}
@@ -99,7 +107,7 @@
   .ticker-track .up{color:#8fd6ac;} .ticker-track .down{color:#e39c8c;}
   @keyframes ticker-scroll{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
 
-  main{max-width:1300px;margin:0 auto;padding:14px 16px 110px;}
+  main{max-width:1300px;margin:0 auto;padding:14px 16px 24px;}
 
   .game-menu-btn{position:fixed;top:12px;right:12px;z-index:30;width:44px;height:44px;border-radius:50%;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);color:var(--text);font-size:18px;box-shadow:0 4px 16px rgba(36,31,26,.14);display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
   .game-menu-panel{position:fixed;top:62px;right:12px;z-index:30;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:14px;width:230px;max-width:calc(100vw - 24px);box-shadow:0 12px 40px rgba(36,31,26,.16);display:none;}
@@ -108,12 +116,25 @@
   .game-menu-panel a, .game-menu-panel button{display:block;width:100%;text-align:center;text-decoration:none;box-sizing:border-box;margin-bottom:8px;}
   .game-menu-panel > *:last-child{margin-bottom:0;}
 
-  .tab-bar-wrap{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--glass-border);padding-bottom:env(safe-area-inset-bottom);}
-  .tab-bar{max-width:1300px;margin:0 auto;padding:7px 8px;display:flex;gap:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab-bar{max-width:1300px;margin:0 auto;padding:2px;display:flex;gap:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .tab-btn{flex:1 1 0;min-width:60px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:var(--radius-md);padding:8px 4px;font-size:11px;white-space:nowrap;}
   .tab-btn.active{background:var(--accent);color:#fff;}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
+  .tab-panel[data-panel="turn"]{display:block;} /* стол — всегда база под остальными вкладками */
+
+  /* Переключатель вкладок живёт прямо на столе — нижняя полоса внутри самой сцены */
+  .stage-tabbar{grid-area:tabs;width:100%;background:rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:2px 6px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  .stage-tabbar .tab-btn{color:rgba(243,238,228,.7);}
+  .stage-tabbar .tab-btn.active{background:rgba(255,255,255,.22);color:#fff;}
+
+  /* Биржа/Капитал/Контроль/Лента открываются поверх стола оверлеем, а не заменяют экран */
+  .overlay-panel.active{
+    position:fixed;inset:0;z-index:22;display:block;overflow-y:auto;
+    background:rgba(20,14,9,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    padding:16px 16px 24px;
+  }
+  .overlay-panel-close{position:sticky;top:0;z-index:2;width:100%;margin-bottom:10px;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:4px 6px;}
 
   .mini-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;}
   .mini-card h3{font-size:12px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
@@ -170,6 +191,10 @@
   .room-list-box{max-height:200px;overflow-y:auto;}
   .offline-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:4px 6px 4px 12px;margin:4px 6px 4px 0;font-size:12.5px;}
   .offline-chip button{padding:2px 7px;font-size:11px;background:transparent;color:var(--red);}
+  .avatar-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+  .avatar-opt{width:36px;height:36px;border-radius:50%;background:var(--panel2);border:2px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;padding:0;line-height:1;}
+  .avatar-opt.selected{border-color:var(--accent);background:rgba(76,122,107,.18);}
+  .points-badge{background:var(--amber);color:#4a3300;}
 
   .co-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:var(--panel2);border:1px solid var(--glass-border);overflow:hidden;flex:none;vertical-align:middle;margin-right:8px;}
   .co-logo img{width:70%;height:70%;object-fit:contain;}
@@ -182,13 +207,14 @@
     box-shadow:0 20px 50px rgba(0,0,0,.35);
     display:grid;
     grid-template-columns:minmax(130px,1fr) minmax(240px,3fr) minmax(130px,1fr);
-    grid-template-rows:auto auto 1fr auto;
+    grid-template-rows:auto auto 1fr auto auto;
     gap:10px 12px;
     grid-template-areas:
       "ticker ticker ticker"
       "tl     board  tr"
       ".      board  ."
-      "bl     board  br";
+      "bl     board  br"
+      "tabs   tabs   tabs";
   }
   .stage-ticker{grid-area:ticker;}
   .stage-corner{z-index:6;max-width:100%;}
@@ -244,7 +270,7 @@
   .sec-finance{background:#2f9e6d;}
 
   @media (max-width:480px){
-    main{padding:10px 10px 108px;}
+    main{padding:10px 10px 20px;}
     section{padding:14px;border-radius:16px;margin-bottom:14px;}
     .join-box{padding:20px;}
     .control-card .row-inline{flex-direction:column;align-items:stretch;}
@@ -254,12 +280,13 @@
     .mini-card{padding:10px 12px;}
     .stage{padding:9px;min-height:auto;gap:8px;
       grid-template-columns:1fr 1fr;
-      grid-template-rows:auto auto auto auto;
+      grid-template-rows:auto auto auto auto auto;
       grid-template-areas:
         "ticker ticker"
         "tl     tr"
         "board  board"
-        "bl     br";
+        "bl     br"
+        "tabs   tabs";
     }
     .stage-corner{max-width:100%;}
     .stage-panel{padding:7px 9px;font-size:10.5px;}
@@ -299,6 +326,19 @@
     <label>Ваш ник</label>
     <input id="joinName" placeholder="например Игрок1" maxlength="20">
 
+    <label>Пол</label>
+    <select id="joinGender">
+      <option value="">Не указывать</option>
+      <option value="male">Мужской</option>
+      <option value="female">Женский</option>
+      <option value="nonbinary">Небинарный</option>
+      <option value="other">Другое</option>
+    </select>
+    <input id="joinGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+
+    <label>Аватар</label>
+    <div class="avatar-picker" id="joinAvatarPicker"></div>
+
     <label>Активные комнаты</label>
     <div class="room-list-box" id="roomList"></div>
     <div class="muted" id="roomListEmpty" style="font-size:12px;display:none;">Пока нет активных комнат — создайте новую ниже.</div>
@@ -334,11 +374,39 @@
     <div id="offlinePlayersBox"></div>
     <div class="row-inline" style="margin-top:6px;">
       <input id="offlineNewName" placeholder="Имя игрока" maxlength="20" style="flex:1;">
-      <button class="small secondary" id="btnAddOfflinePlayer">Добавить</button>
     </div>
+    <label style="margin-top:6px;">Пол</label>
+    <select id="offlineNewGender">
+      <option value="">Не указывать</option>
+      <option value="male">Мужской</option>
+      <option value="female">Женский</option>
+      <option value="nonbinary">Небинарный</option>
+      <option value="other">Другое</option>
+    </select>
+    <input id="offlineNewGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+    <label>Аватар</label>
+    <div class="avatar-picker" id="offlineAvatarPicker"></div>
+    <button class="small secondary" style="width:100%;margin-top:8px;" id="btnAddOfflinePlayer">Добавить игрока</button>
     <div class="err" id="offlineErr"></div>
     <button style="width:100%;margin-top:16px;" id="btnStartOffline">Начать игру</button>
     <button class="secondary" style="width:100%;margin-top:8px;" id="btnBackFromOffline">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="lobbyScreen" style="display:none;">
+  <div class="join-box" style="width:420px;">
+    <h1>🕓 Комната ожидания</h1>
+    <p>Код комнаты: <b id="lobbyRoomCode" style="font-family:var(--font-mono);"></b> — дождитесь остальных игроков, затем хост начинает партию.</p>
+    <label>Игроки</label>
+    <div id="lobbyPlayers" style="margin-bottom:6px;"></div>
+    <div id="lobbyStartArea" style="margin-bottom:14px;"></div>
+    <label>Чат комнаты</label>
+    <div class="lobby-chat-log" id="lobbyChatLog"></div>
+    <div class="row-inline" style="margin-top:8px;">
+      <input id="lobbyChatInput" placeholder="Написать в чат…" maxlength="300" style="flex:1;">
+      <button class="small" id="btnLobbyChatSend">Отправить</button>
+    </div>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnLeaveLobby">← Покинуть комнату</button>
   </div>
 </div>
 
@@ -362,23 +430,50 @@
       <div id="tableBody"></div>
       <div class="stage-corner corner-bl" id="cornerAction"></div>
       <div class="stage-corner corner-br" id="cornerRating"></div>
+      <div class="stage-tabbar" id="stageTabbar">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="turn">🎯 Ход</button>
+          <button class="tab-btn" data-tab="market">💹 Биржа</button>
+          <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+          <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
+          <button class="tab-btn" data-tab="log">📡 Лента</button>
+        </div>
+      </div>
       <div class="context-popup" id="contextPopup"></div>
     </div>
   </div>
 
-  <div class="tab-panel" data-panel="market">
+  <div class="tab-panel overlay-panel" data-panel="market">
+    <div class="overlay-panel-close">
+      <div class="tab-bar">
+        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
+        <button class="tab-btn active" data-tab="market">💹 Биржа</button>
+        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
+        <button class="tab-btn" data-tab="log">📡 Лента</button>
+      </div>
+    </div>
     <section>
       <h2>💹 Биржа</h2>
       <div class="table-scroll">
       <table id="marketTable">
-        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th>В руках игроков</th></tr></thead>
+        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
       </table>
       </div>
     </section>
   </div>
 
-  <div class="tab-panel" data-panel="capital">
+  <div class="tab-panel overlay-panel" data-panel="capital">
+    <div class="overlay-panel-close">
+      <div class="tab-bar">
+        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
+        <button class="tab-btn" data-tab="market">💹 Биржа</button>
+        <button class="tab-btn active" data-tab="capital">💰 Капитал</button>
+        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
+        <button class="tab-btn" data-tab="log">📡 Лента</button>
+      </div>
+    </div>
     <section>
       <h2>💰 Капитал</h2>
       <div id="capitalBody"></div>
@@ -390,14 +485,32 @@
     </section>
   </div>
 
-  <div class="tab-panel" data-panel="control">
+  <div class="tab-panel overlay-panel" data-panel="control">
+    <div class="overlay-panel-close">
+      <div class="tab-bar">
+        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
+        <button class="tab-btn" data-tab="market">💹 Биржа</button>
+        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
+        <button class="tab-btn" data-tab="log">📡 Лента</button>
+      </div>
+    </div>
     <section>
       <h2>👑 Контрольный пакет</h2>
       <div id="controlBody"></div>
     </section>
   </div>
 
-  <div class="tab-panel" data-panel="log">
+  <div class="tab-panel overlay-panel" data-panel="log">
+    <div class="overlay-panel-close">
+      <div class="tab-bar">
+        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
+        <button class="tab-btn" data-tab="market">💹 Биржа</button>
+        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
+        <button class="tab-btn active" data-tab="log">📡 Лента</button>
+      </div>
+    </div>
     <section>
       <h2>📡 Лента событий</h2>
       <div class="log" id="log"></div>
@@ -406,7 +519,7 @@
       <h2>Подсказки</h2>
       <details class="tips" open>
         <summary>Как ходить</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">когда наступает ваш ход, нажмите «Бросить 2×d12» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">когда наступает ваш ход, нажмите «Бросить кубики» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.</div>
       </details>
       <details class="tips">
         <summary>Фаза торгов</summary>
@@ -428,16 +541,6 @@
   </div>
 </main>
 <div class="footer-note" id="footerNote">Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.</div>
-
-<div class="tab-bar-wrap">
-  <div class="tab-bar" id="tabBar">
-    <button class="tab-btn active" data-tab="turn">🎯 Ход</button>
-    <button class="tab-btn" data-tab="market">💹 Биржа</button>
-    <button class="tab-btn" data-tab="capital">💰 Капитал</button>
-    <button class="tab-btn" data-tab="control" id="tabBtnControl" style="display:none;">👑 Контроль</button>
-    <button class="tab-btn" data-tab="log">📡 Лента</button>
-  </div>
-</div>
 </div>
 
 <script src="/engine.js"></script>
@@ -455,7 +558,62 @@ let roomListPollTimer = null;
 // офлайн-режим
 let localRoom = null;
 let viewAs = null;
-let offlinePlayerNames = [];
+let offlinePlayerNames = []; // {name, gender, avatar}[]
+let offlineNewAvatar = "";
+let joinAvatar = "";
+const AVATAR_SET = ["🧑","👩","👨","🧔","👩‍🦱","👨‍🦱","🧕","👳","🦸","🧙","🥷","🐱","🐶","🦊","🐼","🐸"];
+const GENDER_LABEL = { male:"Мужской", female:"Женский", nonbinary:"Небинарный" };
+function genderLabel(p){
+  if(!p || !p.gender) return "";
+  return GENDER_LABEL[p.gender] || p.gender;
+}
+function buildAvatarPicker(containerId, selected, onPick){
+  const box = document.getElementById(containerId);
+  if(!box) return;
+  box.innerHTML = AVATAR_SET.map(a=>`<button type="button" class="avatar-opt${a===selected?" selected":""}" data-avatar="${a}">${a}</button>`).join("");
+  box.querySelectorAll(".avatar-opt").forEach(btn=>{
+    btn.onclick = ()=>{
+      box.querySelectorAll(".avatar-opt").forEach(b=>b.classList.remove("selected"));
+      btn.classList.add("selected");
+      onPick(btn.dataset.avatar);
+    };
+  });
+}
+function currentJoinGender(){
+  const sel = document.getElementById("joinGender").value;
+  if(sel === "other") return document.getElementById("joinGenderOther").value.trim().slice(0,24);
+  return sel;
+}
+function saveProfileLocal(name, gender, genderOtherRaw, avatar){
+  try { localStorage.setItem("tm_profile", JSON.stringify({name, gender, genderOther: genderOtherRaw||"", avatar: avatar||""})); } catch(e){}
+}
+function initProfileUI(){
+  const joinGenderSel = document.getElementById("joinGender");
+  const joinGenderOther = document.getElementById("joinGenderOther");
+  if(joinGenderSel) joinGenderSel.addEventListener("change", ()=>{
+    joinGenderOther.style.display = joinGenderSel.value === "other" ? "block" : "none";
+  });
+  const offlineGenderSel = document.getElementById("offlineNewGender");
+  const offlineGenderOther = document.getElementById("offlineNewGenderOther");
+  if(offlineGenderSel) offlineGenderSel.addEventListener("change", ()=>{
+    offlineGenderOther.style.display = offlineGenderSel.value === "other" ? "block" : "none";
+  });
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("tm_profile") || "null");
+    if(saved){
+      if(saved.name) document.getElementById("joinName").value = saved.name;
+      if(saved.gender){
+        joinGenderSel.value = saved.gender;
+        if(saved.gender === "other"){ joinGenderOther.style.display = "block"; joinGenderOther.value = saved.genderOther || ""; }
+      }
+      if(saved.avatar) joinAvatar = saved.avatar;
+    }
+  } catch(e){}
+
+  buildAvatarPicker("joinAvatarPicker", joinAvatar, a=> joinAvatar = a);
+  buildAvatarPicker("offlineAvatarPicker", offlineNewAvatar, a=> offlineNewAvatar = a);
+}
 let expandedTicker = null;
 let lastAnimatedRollKey = null;
 
@@ -480,9 +638,12 @@ function wsUrl(){
   return `${proto}//${location.host}`;
 }
 function showOnly(id){
-  ["mainMenu","onlineScreen","offlineSetup","app"].forEach(x=>{
+  ["mainMenu","onlineScreen","offlineSetup","lobbyScreen","app"].forEach(x=>{
     document.getElementById(x).style.display = (x===id) ? (x==="app"?"block":"flex") : "none";
   });
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
 
 // ---------------------------------------------------------------------
@@ -524,7 +685,7 @@ function refreshRoomList(){
     empty.style.display = "none";
     list.forEach(r=>{
       const speed = r.tradeWindowMs===30000?"быстрые торги":r.tradeWindowMs===180000?"долгие торги":"стандартные торги";
-      const phaseLabel = r.phase==="ended" ? "игра окончена" : (r.phase==="trade" ? "фаза торгов" : "фаза ходов");
+      const phaseLabel = r.phase==="ended" ? "игра окончена" : (r.phase==="trade" ? "фаза торгов" : (r.phase==="lobby" ? "ожидание игроков" : "фаза ходов"));
       const div = document.createElement("div");
       div.className = "room-card";
       div.innerHTML = `<b>${r.code}</b> <span class="muted">— ${r.activeCount}/${r.totalPlayers} игроков · ${phaseLabel} · ${speed}</span>`;
@@ -537,7 +698,9 @@ function doJoin(code){
   const name = document.getElementById("joinName").value.trim();
   if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
   document.getElementById("joinErr").textContent = "";
-  connectOnline(code, name);
+  const gender = currentJoinGender();
+  saveProfileLocal(name, document.getElementById("joinGender").value, document.getElementById("joinGenderOther").value, joinAvatar);
+  connectOnline(code, name, undefined, gender, joinAvatar);
 }
 document.getElementById("btnCreateRoom").onclick = ()=>{
   const name = document.getElementById("joinName").value.trim();
@@ -545,32 +708,41 @@ document.getElementById("btnCreateRoom").onclick = ()=>{
   const room = document.getElementById("joinRoom").value.trim() || ("R" + Math.random().toString(36).slice(2,6).toUpperCase());
   document.getElementById("joinErr").textContent = "";
   const tradeWindowMs = parseInt(document.getElementById("createTradeSpeed").value);
-  connectOnline(room, name, tradeWindowMs);
+  const gender = currentJoinGender();
+  saveProfileLocal(name, document.getElementById("joinGender").value, document.getElementById("joinGenderOther").value, joinAvatar);
+  connectOnline(room, name, tradeWindowMs, gender, joinAvatar);
 };
 document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
 
-function connectOnline(room, name, tradeWindowMs){
+function connectOnline(room, name, tradeWindowMs, gender, avatar){
   mode = "online";
   roomCode = room; myName = name;
   ws = new WebSocket(wsUrl());
-  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name, tradeWindowMs})); };
+  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name, tradeWindowMs, gender, avatar})); };
   ws.onmessage = (ev)=>{
     const msg = JSON.parse(ev.data);
     if(msg.type === "joined"){
       you = msg.playerId;
       if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
-      showOnly("app");
-      document.getElementById("footerNote").textContent = "Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.";
     } else if(msg.type === "state"){
       you = msg.you;
       latest = msg;
-      render();
+      if(msg.phase === "lobby"){
+        showOnly("lobbyScreen");
+        renderLobby(msg);
+      } else {
+        showOnly("app");
+        document.getElementById("footerNote").textContent = "Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.";
+        render();
+      }
     } else if(msg.type === "insiderCard"){
       pendingInsiderCard = msg.card;
       if(latest) renderControlPanel(latest);
     } else if(msg.type === "error"){
-      if(document.getElementById("app").style.display === "none"){
+      if(!latest){
         document.getElementById("joinErr").textContent = msg.message;
+      } else if(latest.phase === "lobby"){
+        flashLobbyError(msg.message);
       } else {
         flashError(msg.message);
       }
@@ -584,18 +756,28 @@ function connectOnline(room, name, tradeWindowMs){
 // ---------------------------------------------------------------------
 function renderOfflinePlayersBox(){
   const box = document.getElementById("offlinePlayersBox");
-  box.innerHTML = offlinePlayerNames.map((n,i)=>`<span class="offline-chip">${n}<button onclick="removeOfflinePlayer(${i})">✕</button></span>`).join("") || `<div class="muted" style="font-size:12px;">Пока никого не добавили.</div>`;
+  box.innerHTML = offlinePlayerNames.map((p,i)=>`<span class="offline-chip">${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}<button onclick="removeOfflinePlayer(${i})">✕</button></span>`).join("") || `<div class="muted" style="font-size:12px;">Пока никого не добавили.</div>`;
 }
 function removeOfflinePlayer(i){ offlinePlayerNames.splice(i,1); renderOfflinePlayersBox(); }
+function currentOfflineGender(){
+  const sel = document.getElementById("offlineNewGender").value;
+  if(sel === "other") return document.getElementById("offlineNewGenderOther").value.trim().slice(0,24);
+  return sel;
+}
 function addOfflinePlayer(){
   const el = document.getElementById("offlineNewName");
   const name = el.value.trim();
   if(!name) return;
   if(offlinePlayerNames.length >= 6){ document.getElementById("offlineErr").textContent = "Максимум 6 игроков."; return; }
-  if(offlinePlayerNames.includes(name)){ document.getElementById("offlineErr").textContent = "Такое имя уже добавлено."; return; }
+  if(offlinePlayerNames.some(p=>p.name === name)){ document.getElementById("offlineErr").textContent = "Такое имя уже добавлено."; return; }
   document.getElementById("offlineErr").textContent = "";
-  offlinePlayerNames.push(name);
+  offlinePlayerNames.push({ name, gender: currentOfflineGender(), avatar: offlineNewAvatar });
   el.value = "";
+  document.getElementById("offlineNewGender").value = "";
+  document.getElementById("offlineNewGenderOther").value = "";
+  document.getElementById("offlineNewGenderOther").style.display = "none";
+  offlineNewAvatar = "";
+  buildAvatarPicker("offlineAvatarPicker", "", a=> offlineNewAvatar = a);
   renderOfflinePlayersBox();
 }
 document.getElementById("btnAddOfflinePlayer").onclick = addOfflinePlayer;
@@ -606,7 +788,8 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   document.getElementById("offlineErr").textContent = "";
   mode = "offline";
   localRoom = GameEngine.freshRoom("OFFLINE");
-  offlinePlayerNames.forEach(n=>{ const r = GameEngine.addPlayer(localRoom, n); viewAs = viewAs || (r.ok && r.player.id); });
+  offlinePlayerNames.forEach(p=>{ const r = GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar); viewAs = viewAs || (r.player && r.player.id); });
+  localRoom.phase = "roll"; // офлайн хот-сит — без комнаты ожидания, сразу к игре
   viewAs = localRoom.players[0].id;
   showOnly("app");
   document.getElementById("footerNote").textContent = "Офлайн-партия хранится только в этой вкладке браузера и не сохраняется на сервере.";
@@ -690,6 +873,60 @@ function flashError(text){
   log.prepend(div);
 }
 
+// ---------------------------------------------------------------------
+// Онлайн: комната ожидания (лобби) с чатом
+// ---------------------------------------------------------------------
+function renderLobby(s){
+  document.getElementById("lobbyRoomCode").textContent = s.room;
+  const playersHtml = s.players.map(p=>{
+    const isHost = p.id === s.hostPlayerId;
+    const isYou = p.id === s.you;
+    return `<div class="lobby-player-row${isYou?" you":""}">
+      <span>${isHost?"👑 ":""}${escapeHtml(p.name)}${isYou?' <span class="muted">(вы)</span>':""}</span>
+      <span class="badge ${p.connected?"online":"offline"}">${p.connected?"в сети":"офлайн"}</span>
+    </div>`;
+  }).join("");
+  document.getElementById("lobbyPlayers").innerHTML = playersHtml || `<div class="muted" style="font-size:12px;">Пока никого нет.</div>`;
+
+  const startArea = document.getElementById("lobbyStartArea");
+  if(s.hostPlayerId === s.you){
+    const enough = s.players.length >= 2;
+    startArea.innerHTML = `<button style="width:100%;" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"🚀 Начать игру":"Нужно минимум 2 игрока"}</button>`;
+    document.getElementById("btnStartLobby").onclick = ()=> send({type:"startGame"});
+  } else {
+    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">Ждите, пока хост начнёт игру…</div>`;
+  }
+
+  const chatLog = document.getElementById("lobbyChatLog");
+  chatLog.innerHTML = (s.chat||[]).map(m=>`<div class="log-entry"><b>${escapeHtml(m.name)}:</b> ${escapeHtml(m.text)}</div>`).join("") || `<div class="muted" style="font-size:12px;">Сообщений пока нет.</div>`;
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+function flashLobbyError(text){
+  const chatLog = document.getElementById("lobbyChatLog");
+  if(!chatLog) return;
+  const div = document.createElement("div");
+  div.className = "log-entry";
+  div.style.borderLeft = "3px solid var(--red)";
+  div.textContent = text;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+function sendLobbyChat(){
+  const el = document.getElementById("lobbyChatInput");
+  const text = el.value.trim();
+  if(!text) return;
+  send({type:"chat", text});
+  el.value = "";
+}
+document.getElementById("btnLobbyChatSend").onclick = sendLobbyChat;
+document.getElementById("lobbyChatInput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); sendLobbyChat(); } });
+document.getElementById("btnLeaveLobby").onclick = ()=>{
+  if(ws){ ws.onclose = null; ws.close(); ws = null; }
+  mode = null; latest = null; you = null;
+  if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
+  showOnly("mainMenu");
+};
+
 document.getElementById("btnNewGame").onclick = ()=>{
   closeGameMenu();
   if(confirm("Начать новую партию? Все данные текущей партии будут потеряны.")) send({type:"newGame"});
@@ -718,9 +955,20 @@ function closeGameMenu(){ document.getElementById("gameMenuPanel").classList.rem
 // Вкладки
 // ---------------------------------------------------------------------
 function switchTab(name){
-  activeTab = name;
-  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===name));
-  document.querySelectorAll(".tab-panel").forEach(p=> p.classList.toggle("active", p.dataset.panel===name));
+  // "Ход" — постоянная база (стол виден всегда). Остальные вкладки открываются
+  // оверлеем поверх стола, чтобы бросок кубиков и стол оставались доступны
+  // из единого интерфейса, а не отдельным экраном.
+  if(name === "turn"){
+    activeTab = "turn";
+    document.querySelectorAll(".overlay-panel").forEach(p=> p.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab==="turn"));
+    return;
+  }
+  const panel = document.querySelector(`.overlay-panel[data-panel="${name}"]`);
+  const willOpen = !!panel && !panel.classList.contains("active");
+  document.querySelectorAll(".overlay-panel").forEach(p=> p.classList.toggle("active", p===panel && willOpen));
+  activeTab = willOpen ? name : "turn";
+  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===activeTab));
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.onclick = ()=> switchTab(b.dataset.tab));
 
@@ -745,6 +993,7 @@ function render(){
       <td><span class="sector-tag">${c.sector}</span></td>
       <td class="price">${fmt(c.price)}</td>
       <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
+      <td><span class="vol-badge vol-${c.volLabel==='Низкая'?'low':c.volLabel==='Высокая'?'high':'med'}">${c.volLabel}</span></td>
       <td><span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="muted">${c.owned.toFixed(0)}%</span></td>
     `;
     body.appendChild(tr);
@@ -758,12 +1007,13 @@ function render(){
     div.className = "player-card" + (p.bankrupt?" bankrupt":"") + (p.id===you?" you":"") + (p.id===s.currentPlayerId && s.phase==="roll" ?" turn":"");
     const holdingsStr = Object.entries(p.holdings).filter(([,v])=>v>0)
       .map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`;
+    const gLabel = genderLabel(p);
     div.innerHTML = `
       <div class="player-head">
-        <b>${p.name}${p.bankrupt?" 💀":""}${p.id===you?" (вы)":""}</b>
+        <b>${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}${p.bankrupt?" 💀":""}${p.id===you?" (вы)":""}</b>
         <span class="net">${fmt(p.netWorth)}</span>
       </div>
-      <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span> ${p.connected?"":'<span class="badge offline">офлайн</span>'}</div>
+      <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span> ${p.connected?"":'<span class="badge offline">офлайн</span>'} ${p.points?`<span class="badge points-badge">🏆 ${p.points}</span>`:""} ${gLabel?`<span class="muted">· ${gLabel}</span>`:""}</div>
       <div class="holdings">${holdingsStr}</div>
     `;
     playersList.appendChild(div);
@@ -838,9 +1088,10 @@ function renderStageBoard(s){
     const top = 50 + radius*Math.sin(angle);
     const isTurn = p.id === s.currentPlayerId && s.phase === "roll";
     const initial = (p.name.trim().charAt(0) || "?").toUpperCase();
+    const avatarGlyph = p.bankrupt ? "💀" : (p.avatar || initial);
     return `<div class="table-avatar${isTurn?" turn":""}${p.bankrupt?" bankrupt":""}" style="top:${top}%;left:${left}%;">
-      <div class="av-circle">${p.bankrupt?"💀":initial}</div>
-      <div class="av-name">${p.name}${p.id===you?' <span class="muted">(вы)</span>':''}</div>
+      <div class="av-circle">${avatarGlyph}</div>
+      <div class="av-name">${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':''}${p.points?` <span class="muted">🏆${p.points}</span>`:""}</div>
     </div>`;
   }).join("");
   el.innerHTML = `<div class="stage-board-outer">
@@ -895,20 +1146,20 @@ function renderCapital(s){
 
 function renderControlPanel(s){
   const el = document.getElementById("controlBody");
-  const tabBtn = document.getElementById("tabBtnControl");
+  const tabBtns = document.querySelectorAll(".tab-btn-control");
   const me = s.players.find(p=>p.id===you);
   if(!me || me.bankrupt){
-    tabBtn.style.display = "none";
+    tabBtns.forEach(b=> b.style.display = "none");
     if(activeTab === "control") switchTab("turn");
     return;
   }
   const myControlled = s.companies.filter(c => (me.holdings[c.ticker]||0) > 50);
   if(myControlled.length === 0 && !pendingInsiderCard){
-    tabBtn.style.display = "none";
+    tabBtns.forEach(b=> b.style.display = "none");
     if(activeTab === "control") switchTab("turn");
     return;
   }
-  tabBtn.style.display = "inline-block";
+  tabBtns.forEach(b=> b.style.display = "inline-block");
 
   if(pendingInsiderCard){
     const card = pendingInsiderCard;
@@ -1185,7 +1436,7 @@ function renderStage(s){
       return;
     }
     if(!s.pendingRoll){
-      cornerAction.innerHTML = `<button class="roll-btn stage-roll-btn" onclick="doRoll(this)"><span class="dice-emoji">🎲</span> Бросить 2×d12</button>`;
+      cornerAction.innerHTML = `<button class="roll-btn stage-roll-btn" onclick="doRoll(this)"><span class="dice-emoji">🎲</span> Бросить кубики</button>`;
       popup.style.display = "none";
       return;
     }
@@ -1239,6 +1490,8 @@ function doCtrlInsiderResolve(action){
   send({type:"ctrlInsiderResolve", action});
   pendingInsiderCard = null;
 }
+
+initProfileUI();
 </script>
 </body>
 </html>
