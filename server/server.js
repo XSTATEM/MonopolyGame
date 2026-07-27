@@ -103,7 +103,7 @@ function handleJoin(ws, msg) {
   const twm = ALLOWED_TRADE_WINDOWS.includes(Number(msg.tradeWindowMs)) ? Number(msg.tradeWindowMs) : undefined;
   const room = isNew ? getOrCreateRoom(code, twm) : getOrCreateRoom(code);
 
-  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points);
+  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points, profile.equippedBoardSkin);
   if (result.error) return sendTo(ws, { type: "error", message: result.error });
 
   connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name: profile.username, accountUsername: profile.username });
@@ -124,6 +124,8 @@ function handleMessage(ws, raw) {
     case "roll": return run(conn, engine.rollDice(room, conn.playerId));
     case "buyFromRoll": return run(conn, engine.buyFromRoll(room, conn.playerId, msg.pct));
     case "dividendFromRoll": return run(conn, engine.dividendFromRoll(room, conn.playerId));
+    case "setForcedPrice": return run(conn, engine.setForcedPrice(room, conn.playerId, msg.amount));
+    case "payForcedPrice": return run(conn, engine.payForcedPrice(room, conn.playerId));
     case "skipRoll": return run(conn, engine.skipRoll(room, conn.playerId));
     case "buyBank": return run(conn, engine.buyBank());
     case "sellBank": return run(conn, engine.sellBank(room, conn.playerId, msg.ticker, msg.pct));
@@ -147,6 +149,13 @@ function handleMessage(ws, raw) {
     case "ctrlInsiderResolve": return run(conn, engine.ctrlInsiderResolve(room, conn.playerId, msg.action));
     case "ctrlSqueezeOut": return run(conn, engine.ctrlSqueezeOut(room, conn.playerId, msg.ticker));
     case "ctrlShort": return run(conn, engine.ctrlShort(room, conn.playerId, msg.ticker));
+    case "takeLoan": return run(conn, engine.takeLoan(room, conn.playerId, msg.amount));
+    case "repayLoan": return run(conn, engine.repayLoan(room, conn.playerId, msg.amount));
+    case "buyRealEstateFromRoll": return run(conn, engine.buyRealEstateFromRoll(room, conn.playerId));
+    case "upgradeRealEstateFromRoll": return run(conn, engine.upgradeRealEstateFromRoll(room, conn.playerId));
+    case "payRealEstateRentFromRoll": return run(conn, engine.payRealEstateRentFromRoll(room, conn.playerId));
+    case "ctrlEspionage": return run(conn, engine.ctrlEspionage(room, conn.playerId, msg.target));
+    case "ctrlDiscredit": return run(conn, engine.ctrlDiscredit(room, conn.playerId, msg.target));
   }
 }
 
@@ -172,6 +181,36 @@ function handleNewGame(conn) {
 const PUBLIC_DIR = path.join(__dirname, "public");
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png", ".ico": "image/x-icon" };
 
+// Читает и парсит JSON-тело POST-запроса (без внешних зависимостей типа
+// body-parser — сервер намеренно минималистичный, только встроенный http).
+function readJsonBody(req, maxLen) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    let len = 0;
+    req.on("data", (chunk) => {
+      len += chunk.length;
+      if (len > (maxLen || 1000000)) { reject(new Error("Тело запроса слишком большое.")); req.destroy(); return; }
+      data += chunk;
+    });
+    req.on("end", () => {
+      try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(new Error("Некорректный JSON.")); }
+    });
+    req.on("error", reject);
+  });
+}
+function sendJson(res, status, obj) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(obj));
+}
+function handleApiPost(req, res, fn) {
+  readJsonBody(req, 800000)
+    .then((body) => {
+      const result = fn(body) || {};
+      sendJson(res, result.error ? 400 : 200, result);
+    })
+    .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
+}
+
 const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split("?")[0]);
 
@@ -191,6 +230,29 @@ const server = http.createServer((req, res) => {
       .sort((a, b) => b.createdAt - a.createdAt);
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     return res.end(JSON.stringify(list));
+  }
+
+  if (reqPath === "/api/leaderboard" && req.method === "GET") {
+    return sendJson(res, 200, users.getLeaderboard(50));
+  }
+
+  if (reqPath === "/api/login" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.login(b.username, b.password));
+  }
+  if (reqPath === "/api/profile/update" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.updateProfile(b.username, b.password, b.gender, b.avatar));
+  }
+  if (reqPath === "/api/profile/password" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.changePassword(b.username, b.password, b.newPassword));
+  }
+  if (reqPath === "/api/profile/photo" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl));
+  }
+  if (reqPath === "/api/skins/buy" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind));
+  }
+  if (reqPath === "/api/skins/equip" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind));
   }
 
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";

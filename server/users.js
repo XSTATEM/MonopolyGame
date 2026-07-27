@@ -7,9 +7,11 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const Skins = require("./public/skins.js");
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const MAX_PHOTO_LEN = 400000; // ~300KB исходника после base64 — клиент обязан ужать фото перед отправкой
 
 function loadUsers() {
   try {
@@ -36,7 +38,17 @@ function hashPassword(password, salt) {
 }
 
 function publicProfile(rec) {
-  return { username: rec.username, gender: rec.gender || "", avatar: rec.avatar || "", points: rec.points || 0 };
+  return {
+    username: rec.username,
+    gender: rec.gender || "",
+    avatar: rec.avatar || "",
+    avatarPhoto: rec.avatarPhoto || null,
+    points: rec.points || 0,
+    ownedAvatarPacks: rec.ownedAvatarPacks || ["base"],
+    ownedBoardSkins: rec.ownedBoardSkins || ["default"],
+    equippedAvatarPack: rec.equippedAvatarPack || "base",
+    equippedBoardSkin: rec.equippedBoardSkin || "default",
+  };
 }
 
 function register(username, password, gender, avatar) {
@@ -52,7 +64,12 @@ function register(username, password, gender, avatar) {
     username, salt, hash,
     gender: String(gender || "").trim().slice(0, 24),
     avatar: String(avatar || "").trim().slice(0, 8),
+    avatarPhoto: null,
     points: 0,
+    ownedAvatarPacks: ["base"],
+    ownedBoardSkins: ["default"],
+    equippedAvatarPack: "base",
+    equippedBoardSkin: "default",
     createdAt: Date.now(),
   };
   users[key] = rec;
@@ -69,6 +86,19 @@ function login(username, password) {
   return { ok: true, user: publicProfile(rec) };
 }
 
+// Общий помощник: проверяет пароль и возвращает запись пользователя или
+// {error}. Используется всеми HTTP-эндпойнтами управления профилем — они
+// не хранят сессий, поэтому каждый запрос заново подтверждается паролем
+// (та же модель доверия, что и при входе в комнату по ws).
+function authenticate(username, password) {
+  const key = usernameKey(username);
+  const rec = users[key];
+  if (!rec) return { error: "Аккаунт не найден." };
+  const { hash } = hashPassword(String(password || ""), rec.salt);
+  if (hash !== rec.hash) return { error: "Неверный пароль." };
+  return { ok: true, rec };
+}
+
 function addPoints(username, amount) {
   const key = usernameKey(username);
   const rec = users[key];
@@ -78,4 +108,91 @@ function addPoints(username, amount) {
   return rec.points;
 }
 
-module.exports = { register, login, addPoints, publicProfile };
+function getLeaderboard(limit) {
+  return Object.values(users)
+    .map(publicProfile)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, limit || 50);
+}
+
+function updateProfile(username, password, gender, avatar) {
+  const auth = authenticate(username, password);
+  if (auth.error) return auth;
+  const rec = auth.rec;
+  if (gender != null) rec.gender = String(gender || "").trim().slice(0, 24);
+  if (avatar != null) {
+    avatar = String(avatar || "").trim().slice(0, 8);
+    // "PHOTO" — зарезервированное значение: показывать avatarPhoto вместо эмодзи.
+    if (avatar !== "PHOTO") {
+      const owned = rec.ownedAvatarPacks || ["base"];
+      const allowed = Skins.AVATAR_PACKS.filter((p) => owned.includes(p.id)).some((p) => p.emojis.includes(avatar));
+      if (!allowed) return { error: "Этот аватар вам ещё недоступен." };
+    } else if (!rec.avatarPhoto) {
+      return { error: "Сначала загрузите фото." };
+    }
+    rec.avatar = avatar;
+  }
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+
+function changePassword(username, password, newPassword) {
+  const auth = authenticate(username, password);
+  if (auth.error) return auth;
+  newPassword = String(newPassword || "");
+  if (newPassword.length < 4) return { error: "Новый пароль должен быть не короче 4 символов." };
+  const rec = auth.rec;
+  const { salt, hash } = hashPassword(newPassword);
+  rec.salt = salt; rec.hash = hash;
+  saveUsers();
+  return { ok: true };
+}
+
+function setPhoto(username, password, photoDataUrl) {
+  const auth = authenticate(username, password);
+  if (auth.error) return auth;
+  photoDataUrl = String(photoDataUrl || "");
+  if (!/^data:image\/(png|jpeg|jpg|webp);base64,/.test(photoDataUrl)) return { error: "Неверный формат изображения." };
+  if (photoDataUrl.length > MAX_PHOTO_LEN) return { error: "Фото слишком большое — уменьшите размер." };
+  const rec = auth.rec;
+  rec.avatarPhoto = photoDataUrl;
+  rec.avatar = "PHOTO";
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+
+function buySkin(username, password, skinId, kind) {
+  const auth = authenticate(username, password);
+  if (auth.error) return auth;
+  const rec = auth.rec;
+  const catalog = kind === "boardSkin" ? Skins.BOARD_SKINS : kind === "avatarPack" ? Skins.AVATAR_PACKS : null;
+  if (!catalog) return { error: "Неизвестный тип скина." };
+  const skin = catalog.find((s) => s.id === skinId);
+  if (!skin) return { error: "Скин не найден." };
+  const ownedKey = kind === "boardSkin" ? "ownedBoardSkins" : "ownedAvatarPacks";
+  if (!rec[ownedKey]) rec[ownedKey] = kind === "boardSkin" ? ["default"] : ["base"];
+  if (rec[ownedKey].includes(skinId)) return { error: "Этот скин уже куплен." };
+  if ((rec.points || 0) < skin.cost) return { error: "Недостаточно очков рейтинга." };
+  rec.points -= skin.cost;
+  rec[ownedKey].push(skinId);
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+
+function equipSkin(username, password, skinId, kind) {
+  const auth = authenticate(username, password);
+  if (auth.error) return auth;
+  const rec = auth.rec;
+  const ownedKey = kind === "boardSkin" ? "ownedBoardSkins" : kind === "avatarPack" ? "ownedAvatarPacks" : null;
+  if (!ownedKey) return { error: "Неизвестный тип скина." };
+  const owned = rec[ownedKey] || (kind === "boardSkin" ? ["default"] : ["base"]);
+  if (!owned.includes(skinId)) return { error: "Этот скин ещё не куплен." };
+  if (kind === "boardSkin") rec.equippedBoardSkin = skinId; else rec.equippedAvatarPack = skinId;
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+
+module.exports = {
+  register, login, addPoints, publicProfile, getLeaderboard,
+  updateProfile, changePassword, setPhoto, buySkin, equipSkin,
+};

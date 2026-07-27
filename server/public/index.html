@@ -24,8 +24,27 @@
     --radius-md:14px; --radius-lg:24px; --radius-pill:999px;
     --font-ui:'Manrope',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
     --font-mono:'JetBrains Mono',monospace;
+    /* Тема стола (скины) переопределяет только эти три точки радиального градиента
+       и акцент подсветки самой сцены — см. skins.js BOARD_SKINS и applyBoardSkin(). */
+    --stage-c1:#4a3323; --stage-c2:#241a12; --stage-c3:#140e09; --stage-accent:#8fd6ac;
   }
+  body.theme-emerald{ --stage-c1:#1f4a3a; --stage-c2:#0e2119; --stage-c3:#081410; --stage-accent:#4fe3a8; }
+  body.theme-midnight{ --stage-c1:#2a2f5c; --stage-c2:#141733; --stage-c3:#0a0b1c; --stage-accent:#8fa8ff; }
+  body.theme-royal{ --stage-c1:#5c2438; --stage-c2:#2b0f1b; --stage-c3:#170810; --stage-accent:#e3b34f; }
   *{box-sizing:border-box;}
+  body.reduce-motion *{animation-duration:0.001s !important;transition-duration:0.001s !important;}
+  /* Минималистичные скроллбары везде — тонкая полупрозрачная полоска без стрелок/рамок,
+     вместо массивного системного скроллбара по умолчанию. */
+  *{scrollbar-width:thin;scrollbar-color:rgba(36,31,26,.28) transparent;}
+  *::-webkit-scrollbar{width:7px;height:7px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  *::-webkit-scrollbar-thumb{background:rgba(36,31,26,.26);border-radius:8px;}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(36,31,26,.42);}
+  *::-webkit-scrollbar-corner{background:transparent;}
+  /* На тёмной сцене/оверлеях светлый скроллбар — тёмный был бы не виден на тёмном фоне. */
+  .stage, .overlay-panel.active{scrollbar-color:rgba(243,238,228,.32) transparent;}
+  .stage::-webkit-scrollbar-thumb, .overlay-panel.active::-webkit-scrollbar-thumb{background:rgba(243,238,228,.26);}
+  .stage::-webkit-scrollbar-thumb:hover, .overlay-panel.active::-webkit-scrollbar-thumb:hover{background:rgba(243,238,228,.42);}
   body{margin:0;font-family:var(--font-ui);color:var(--text);overflow-x:hidden;min-height:100vh;
     background:
       radial-gradient(circle at 12% 18%, var(--patch1) 0%, transparent 40%),
@@ -49,7 +68,7 @@
   section{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:18px;margin-bottom:20px;box-shadow:0 6px 24px rgba(36,31,26,.06);}
   h2{font-size:13px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  table{width:100%;min-width:480px;border-collapse:collapse;font-size:13px;}
+  table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px;}
   th{text-align:left;color:var(--muted);font-weight:700;padding:8px;border-bottom:1px solid var(--line);}
   td{padding:8px;border-bottom:1px solid var(--line);}
   tr:hover td{background:rgba(76,122,107,0.06);}
@@ -122,22 +141,30 @@
   .tab-panel.active{display:block;}
   .tab-panel[data-panel="turn"]{display:block;} /* стол — всегда база под остальными вкладками */
 
-  /* Переключатель вкладок живёт прямо на столе — нижняя полоса внутри самой сцены */
-  .stage-tabbar{grid-area:tabs;width:100%;background:rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:2px 6px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  /* Переключатель вкладок — ОДНА закреплённая снизу панель на весь экран, общая для
+     стола и для оверлеев (Биржа/Капитал/Контроль/Лента). Важно: это единственный
+     экземпляр в DOM и он лежит вне .stage/.overlay-panel — если разместить fixed-панель
+     внутри элемента с backdrop-filter (у оверлеев есть свой blur), браузер создаёт для
+     неё новый containing block, и «закреплённая» панель на самом деле начинает
+     прокручиваться вместе с содержимым этого блока вместо истинного окна браузера. */
+  .stage-tabbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:23;width:100%;margin:0;
+    background:rgba(255,255,255,.10);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-top:1px solid rgba(255,255,255,.16);border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    padding:6px 10px calc(6px + env(safe-area-inset-bottom));
+    box-shadow:0 -10px 28px rgba(0,0,0,.35);
+  }
   .stage-tabbar .tab-btn{color:rgba(243,238,228,.7);}
   .stage-tabbar .tab-btn.active{background:rgba(255,255,255,.22);color:#fff;}
 
   /* Биржа/Капитал/Контроль/Лента открываются поверх стола оверлеем, а не заменяют экран.
-     Переключатель вкладок остаётся закреплён снизу — так же, как на столе — чтобы
-     при переходе на любую вкладку он не «прыгал» наверх экрана. */
+     Нижний отступ резервирует место под закреплённую панель вкладок, чтобы контент
+     списков не заезжал под неё. */
   .overlay-panel.active{
     position:fixed;inset:0;z-index:22;display:block;overflow-y:auto;
     background:rgba(20,14,9,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    padding:16px 16px 88px;
+    padding:16px 16px calc(92px + env(safe-area-inset-bottom));
   }
-  .overlay-panel-close{position:fixed;left:12px;right:12px;bottom:12px;z-index:23;width:auto;margin-bottom:0;background:rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:2px 6px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
-  .overlay-panel-close .tab-btn{color:rgba(243,238,228,.7);}
-  .overlay-panel-close .tab-btn.active{background:rgba(255,255,255,.22);color:#fff;}
 
   .mini-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;}
   .mini-card h3{font-size:12px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
@@ -151,6 +178,15 @@
   .cap-mini-row{display:flex;gap:8px;flex-wrap:wrap;}
   .cap-mini{flex:1;min-width:88px;background:var(--panel);border-radius:10px;padding:8px 10px;font-size:11px;color:var(--muted);}
   .cap-mini b{display:block;font-family:var(--font-mono);font-size:14px;color:var(--text);margin-top:2px;}
+  .rep-badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .rep-badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:var(--radius-pill);background:var(--panel);color:var(--muted);}
+  .rep-badge.rep-high{background:rgba(62,115,88,.18);color:var(--green);}
+  .rep-badge.rep-mid{background:rgba(224,177,104,.22);color:#7a5300;}
+  .rep-badge.rep-low, .rep-badge.rep-crit{background:rgba(168,84,62,.18);color:var(--red);}
+  .rep-badge.loan{background:rgba(168,84,62,.12);color:var(--red);}
+  .rep-high{color:var(--green);}
+  .rep-mid{color:#7a5300;}
+  .rep-low, .rep-crit{color:var(--red);}
   .stock-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);background:var(--panel);border:1px solid var(--line);margin-bottom:6px;cursor:pointer;font-size:13px;}
   .stock-row:active{opacity:.85;}
   .stock-row .stk-name{flex:1;min-width:0;}
@@ -199,25 +235,75 @@
   .avatar-opt.selected{border-color:var(--accent);background:rgba(76,122,107,.18);}
   .points-badge{background:var(--amber);color:#4a3300;}
 
+  .menu-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px;}
+  .menu-tile{background:var(--panel2);color:var(--text);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;}
+  .menu-tile span{white-space:nowrap;}
+  @media (max-width:420px){ .menu-grid{grid-template-columns:repeat(3,1fr);} }
+
+  .rating-list{max-height:340px;overflow-y:auto;margin-top:10px;}
+  .rating-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .rating-row:last-child{border-bottom:none;}
+  .rating-rank{width:22px;text-align:center;font-weight:800;color:var(--muted);flex:none;}
+  .rating-row .avatar-opt{width:28px;height:28px;font-size:14px;flex:none;}
+  .rating-name{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rating-points{font-family:var(--font-mono);font-weight:700;color:var(--accent);}
+
+  .profile-photo-preview{width:52px;height:52px;border-radius:50%;background:var(--panel2);border:2px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex:none;}
+  .profile-photo-preview img{width:100%;height:100%;object-fit:cover;}
+
+  .skins-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  @media (max-width:460px){ .skins-grid{grid-template-columns:1fr;} }
+  .skin-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+  .skin-card .skin-name{font-weight:700;font-size:12.5px;}
+  .skin-card .skin-preview{display:flex;gap:3px;}
+  .skin-swatch{width:16px;height:16px;border-radius:5px;border:1px solid rgba(0,0,0,.15);}
+  .skin-emoji-row{font-size:15px;letter-spacing:2px;}
+  .skin-card button{width:100%;font-size:11.5px;padding:6px 8px;}
+
+  .rules-p{font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;}
+
+  .company-modal-overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(10,8,6,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+  .company-modal{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.5);max-width:480px;width:100%;max-height:88vh;overflow-y:auto;}
+  .company-modal-head{display:flex;align-items:center;gap:12px;}
+  .company-modal-head h2{margin:0;font-size:17px;}
+  .company-modal-head .muted{font-size:12px;}
+  .company-modal-close{margin-left:auto;background:var(--panel2);color:var(--text);border:1px solid var(--glass-border);width:30px;height:30px;padding:0;border-radius:50%;font-size:15px;flex:none;}
+  .company-modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;}
+  .company-modal-stats .cap-mini{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px;}
+  .company-modal-stats .cap-mini span{display:block;font-size:11px;color:var(--muted);}
+  .company-modal-stats .cap-mini b{font-size:14px;}
+  .full-chart-wrap{margin:12px 0;}
+  .full-chart-wrap svg{display:block;width:100%;height:140px;}
+  .full-chart-minmax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .market-filters{margin-bottom:12px;}
+  .filter-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+  .filter-group:last-child{margin-bottom:0;}
+  .chip{background:var(--panel2);border:1px solid var(--glass-border);color:var(--muted);border-radius:var(--radius-pill);padding:5px 12px;font-size:11.5px;font-weight:700;}
+  .chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .spark{display:block;}
+  .col-spark{white-space:nowrap;}
+
   .co-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:var(--panel2);border:1px solid var(--glass-border);overflow:hidden;flex:none;vertical-align:middle;margin-right:8px;}
   .co-logo img{width:70%;height:70%;object-fit:contain;}
-  .co-logo .co-logo-fb{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:800;font-size:9px;color:var(--text);}
+  .co-logo .co-logo-fb{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:800;font-size:10px;letter-spacing:-.3px;color:var(--text);}
   .cell-logo-name{display:inline-flex;align-items:center;}
 
-  /* Игровой стол: тёмная сцена по центру экрана, полупрозрачные виджеты по углам, контекстные попапы */
-  .stage{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:14px;min-height:clamp(520px, calc(100vh - 38px), 900px);
-    background:radial-gradient(ellipse at 50% 26%, #4a3323 0%, #241a12 60%, #140e09 100%);
-    box-shadow:0 20px 50px rgba(0,0,0,.35);
+  /* Игровой стол: тёмная сцена во весь экран (edge-to-edge, без полей и скруглений),
+     полупрозрачные виджеты по углам, контекстные попапы. Панель вкладок снизу теперь
+     закреплена независимо (.stage-tabbar, см. выше) и не входит в сетку сцены. */
+  .stage{position:fixed;inset:0;z-index:1;overflow-y:auto;border-radius:0;
+    padding:14px 14px calc(78px + env(safe-area-inset-bottom)) 14px;
+    background:radial-gradient(ellipse at 50% 26%, var(--stage-c1) 0%, var(--stage-c2) 60%, var(--stage-c3) 100%);
     display:grid;
     grid-template-columns:minmax(130px,1fr) minmax(240px,3fr) minmax(130px,1fr);
-    grid-template-rows:auto auto 1fr auto auto;
+    grid-template-rows:auto auto 1fr auto;
     gap:10px 12px;
     grid-template-areas:
       "ticker ticker ticker"
       "tl     board  tr"
       ".      board  ."
-      "bl     board  br"
-      "tabs   tabs   tabs";
+      "bl     board  br";
   }
   .stage-ticker{grid-area:ticker;}
   .stage-corner{z-index:6;max-width:100%;}
@@ -272,6 +358,12 @@
   .sec-industrial{background:#5b6b73;}
   .sec-finance{background:#2f9e6d;}
 
+  .re-badge{background:linear-gradient(160deg,#3a6b45,#234a2c);flex-direction:column;gap:0;}
+  .re-icon{font-size:9px;line-height:1;}
+  .re-owner{position:absolute;top:1px;right:1px;font-size:6px;line-height:1;background:rgba(0,0,0,.55);border-radius:50%;width:8px;height:8px;display:flex;align-items:center;justify-content:center;color:#fff;}
+  .re-stars{position:absolute;bottom:0;left:0;right:0;font-size:5px;line-height:1;text-align:center;color:#ffd76b;text-shadow:0 0 2px rgba(0,0,0,.8);}
+  .re-cell.re-owned .stage-cell-badge{box-shadow:0 0 0 1px rgba(255,255,255,.5), 0 1px 2px rgba(0,0,0,.3);}
+
   @media (max-width:480px){
     main{padding:10px 10px 20px;}
     section{padding:14px;border-radius:16px;margin-bottom:14px;}
@@ -279,28 +371,60 @@
     .control-card .row-inline{flex-direction:column;align-items:stretch;}
     .control-card .row-inline select, .control-card .row-inline button{width:100%;}
     table{min-width:420px;}
+    .col-spark{display:none;}
+    .filter-group{gap:5px;}
+    .chip{font-size:10.5px;padding:4px 10px;}
     .tab-btn{font-size:10px;padding:7px 3px;}
     .mini-card{padding:10px 12px;}
-    .stage{padding:9px;min-height:auto;gap:8px;
+    .stage{padding:9px 9px calc(74px + env(safe-area-inset-bottom)) 9px;gap:8px;
       grid-template-columns:1fr 1fr;
-      grid-template-rows:auto auto auto auto auto;
+      grid-template-rows:auto auto auto auto;
       grid-template-areas:
         "ticker ticker"
         "tl     tr"
         "board  board"
-        "bl     br"
-        "tabs   tabs";
+        "bl     br";
     }
     .stage-corner{max-width:100%;}
     .stage-panel{padding:7px 9px;font-size:10.5px;}
-    .cap-mini-row{gap:5px;}
+    .cap-mini-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
     .cap-mini{min-width:0;padding:6px 7px;font-size:10px;}
-    .cap-mini b{font-size:12px;}
+    .cap-mini b{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .cap-mini-row .cap-mini:last-child:nth-child(odd){grid-column:1 / -1;}
     .stage-board-outer{width:min(74vw,320px);margin:6px auto;}
     .table-avatar{width:46px;}
     .table-avatar .av-circle{width:30px;height:30px;font-size:12px;}
     .table-avatar .av-name{font-size:9px;padding:1px 5px;}
     .popup-card{padding:12px 14px;}
+  }
+
+  /* Мобильный ландшафт (телефон повёрнут набок): мало высоты, много ширины —
+     убираем пустую распорную строку сетки, сжимаем доску по высоте вьюпорта,
+     а не по ширине, и делаем угловые панели/панель вкладок компактнее. */
+  @media (orientation:landscape) and (max-height:520px){
+    main{padding:8px 10px 16px;}
+    .stage{padding:8px 10px calc(56px + env(safe-area-inset-bottom)) 10px;gap:6px 10px;
+      grid-template-columns:minmax(96px,1fr) minmax(180px,2fr) minmax(96px,1fr);
+      grid-template-rows:auto 1fr auto;
+      grid-template-areas:
+        "ticker ticker ticker"
+        "tl     board  tr"
+        "bl     board  br";
+    }
+    .stage-corner{max-width:150px;}
+    /* Кнопка меню (☰) закреплена в правом верхнем углу поверх всего экрана — в ландшафте
+       угловая панель капитала слишком высокая, чтобы начинаться ниже неё, поэтому просто
+       резервируем отступ сверху под саму кнопку, чтобы текст не прятался под ней. */
+    .corner-tr .mini-card{padding-top:40px;}
+    .stage-panel{padding:6px 8px;font-size:10px;}
+    .stage-board-outer{width:min(48vh,320px);margin:0 auto;}
+    .table-avatar{width:38px;gap:2px;}
+    .table-avatar .av-circle{width:26px;height:26px;font-size:11px;}
+    .table-avatar .av-name{font-size:8px;padding:1px 4px;}
+    .stage-tabbar{padding:3px 8px calc(3px + env(safe-area-inset-bottom));}
+    .stage-tabbar .tab-btn{padding:5px 3px;font-size:9.5px;}
+    .overlay-panel.active{padding:10px 12px calc(58px + env(safe-area-inset-bottom));}
+    .popup-card{max-height:calc(100% - 12px);padding:10px 12px;}
   }
 </style>
 </head>
@@ -314,11 +438,174 @@
       <button style="width:100%;" id="btnGoOnline">🌐 Играть онлайн</button>
       <button class="secondary" style="width:100%;" id="btnGoOffline">🎮 Офлайн (хот-сит на одном устройстве)</button>
     </div>
+    <div class="menu-grid">
+      <button type="button" class="menu-tile" id="btnGoRating">🏆<span>Рейтинг</span></button>
+      <button type="button" class="menu-tile" id="btnGoProfile">👤<span>Профиль</span></button>
+      <button type="button" class="menu-tile" id="btnGoSkins">🎨<span>Скины</span></button>
+      <button type="button" class="menu-tile" id="btnGoSettings">⚙️<span>Настройки</span></button>
+      <button type="button" class="menu-tile" id="btnGoRules">📖<span>Правила</span></button>
+    </div>
     <div style="text-align:center;margin-top:18px;font-size:12px;">
       <a href="/app.html" style="color:var(--muted);">📊 Офлайн-калькулятор</a>
       &nbsp;·&nbsp;
       <a href="/cards.html" style="color:var(--muted);">🃏 Карточки для печати</a>
     </div>
+  </div>
+</div>
+
+<div class="center-screen" id="ratingScreen" style="display:none;">
+  <div class="join-box" style="width:400px;">
+    <h1>🏆 Рейтинг игроков</h1>
+    <p>Топ игроков по очкам рейтинга, заработанным в онлайн-играх.</p>
+    <div id="ratingList" class="rating-list"></div>
+    <div class="muted" id="ratingEmpty" style="font-size:12px;display:none;text-align:center;padding:10px 0;">Пока никто не заработал очков.</div>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromRating">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="profileScreen" style="display:none;">
+  <div class="join-box" style="width:400px;">
+    <h1>👤 Профиль</h1>
+    <div id="profileGate">
+      <p>Войдите в свой аккаунт, чтобы изменить профиль.</p>
+      <label>Ник</label>
+      <input id="profileLoginName" placeholder="ваш ник" maxlength="20" autocomplete="username">
+      <label>Пароль</label>
+      <input id="profileLoginPassword" type="password" placeholder="пароль" autocomplete="current-password">
+      <button style="width:100%;margin-top:14px;" id="profileLoginBtn">Войти</button>
+      <div class="err" id="profileLoginErr"></div>
+    </div>
+    <div id="profileContent" style="display:none;">
+      <div class="row-inline" style="justify-content:space-between;">
+        <div><b id="profileWhoName"></b> <span class="chip" id="profileWhoPoints"></span></div>
+        <button type="button" class="secondary small" id="profileLogoutBtn">Выйти</button>
+      </div>
+
+      <label>Фото профиля</label>
+      <div class="row-inline" style="align-items:center;">
+        <div id="profilePhotoPreview" class="profile-photo-preview"></div>
+        <input type="file" id="profilePhotoFile" accept="image/*" style="display:none;">
+        <button type="button" class="secondary small" id="profilePhotoBtn">Загрузить фото</button>
+      </div>
+
+      <label>Пол</label>
+      <select id="profileGender">
+        <option value="">Не указывать</option>
+        <option value="male">Мужской</option>
+        <option value="female">Женский</option>
+        <option value="nonbinary">Небинарный</option>
+        <option value="other">Другое</option>
+      </select>
+
+      <label>Аватар</label>
+      <div class="avatar-picker" id="profileAvatarPicker"></div>
+
+      <button style="width:100%;margin-top:16px;" id="profileSaveBtn">Сохранить профиль</button>
+      <div class="err" id="profileSaveErr"></div>
+      <div class="muted" id="profileSaveOk" style="font-size:12px;min-height:1em;"></div>
+
+      <details class="tips" style="margin-top:16px;">
+        <summary>Сменить пароль</summary>
+        <div style="padding:10px 0 0 4px;">
+          <label style="margin-top:0;">Новый пароль</label>
+          <input id="profileNewPassword" type="password" placeholder="не короче 4 символов" autocomplete="new-password">
+          <button class="secondary" style="width:100%;margin-top:10px;" id="profileChangePassBtn">Сменить пароль</button>
+          <div class="err" id="profilePassErr"></div>
+        </div>
+      </details>
+    </div>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromProfile">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="skinsScreen" style="display:none;">
+  <div class="join-box" style="width:460px;">
+    <h1>🎨 Скины</h1>
+    <div id="skinsGate">
+      <p>Войдите в свой аккаунт, чтобы покупать и применять скины за очки рейтинга.</p>
+      <label>Ник</label>
+      <input id="skinsLoginName" placeholder="ваш ник" maxlength="20" autocomplete="username">
+      <label>Пароль</label>
+      <input id="skinsLoginPassword" type="password" placeholder="пароль" autocomplete="current-password">
+      <button style="width:100%;margin-top:14px;" id="skinsLoginBtn">Войти</button>
+      <div class="err" id="skinsLoginErr"></div>
+    </div>
+    <div id="skinsContent" style="display:none;">
+      <div class="row-inline" style="justify-content:space-between;">
+        <div>Баланс: <span class="chip" id="skinsBalance"></span></div>
+        <button type="button" class="secondary small" id="skinsLogoutBtn">Выйти</button>
+      </div>
+      <h2 style="font-size:14px;margin:14px 0 6px;">Аватар-паки</h2>
+      <div id="skinsAvatarPacks" class="skins-grid"></div>
+      <h2 style="font-size:14px;margin:14px 0 6px;">Темы стола</h2>
+      <div id="skinsBoardSkins" class="skins-grid"></div>
+      <div class="err" id="skinsErr"></div>
+    </div>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromSkins">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="settingsScreen" style="display:none;">
+  <div class="join-box">
+    <h1>⚙️ Настройки</h1>
+    <p>Локальные настройки этого устройства — не влияют на других игроков.</p>
+    <label class="row-inline" style="justify-content:space-between;cursor:pointer;">
+      <span>Сократить анимации</span>
+      <input type="checkbox" id="settingReduceMotion">
+    </label>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="settingsClearLogin">Забыть сохранённый ник</button>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromSettings">← Назад в меню</button>
+  </div>
+</div>
+
+<div class="center-screen" id="rulesScreen" style="display:none;">
+  <div class="join-box" style="width:480px;max-height:86vh;overflow-y:auto;">
+    <h1>📖 Правила и возможности</h1>
+    <details class="tips" open>
+      <summary>Цель игры</summary>
+      <div class="muted rules-p">Игроки ходят по кругу, покупая акции компаний на полях, куда попадает фишка. Побеждает тот, у кого больше капитал (наличные + акции по текущей цене + недвижимость) к концу партии или последний неразорившийся игрок.</div>
+    </details>
+    <details class="tips">
+      <summary>Ход и покупка акций</summary>
+      <div class="muted rules-p">На своём ходу бросьте кубики — фишка встанет на компанию по сумме очков. Если у компании ещё есть акции в банке, вам предложат купить одну или несколько по текущей цене. Если акции уже разобраны другими игроками, вместо этого можно получить дивиденды с держателя контрольного пакета.</div>
+    </details>
+    <details class="tips">
+      <summary>Фаза торгов</summary>
+      <div class="muted rules-p">Каждый 3-й ход открывается общее окно торгов на ограниченное время. В это окно нельзя покупать акции у банка — только продавать их банку по текущей цене или заключать прямые сделки с другими игроками по договорной цене.</div>
+    </details>
+    <details class="tips">
+      <summary>Волатильность цен</summary>
+      <div class="muted rules-p">Цены акций каждой компании колеблются во времени независимо от игроков — на графике компании видна история изменений. Покупайте, когда цена низкая, и продавайте на пике.</div>
+    </details>
+    <details class="tips">
+      <summary>Контрольный пакет (&gt;50%)</summary>
+      <div class="muted rules-p">Игрок, владеющий больше 50% акций компании, получает доступ к особым действиям: вброс негативной информации о компании, PR-кампания или байбэк собственных акций, инсайдерская информация о других компаниях, принудительный выкуп миноритариев при пакете &gt;75%, и игра в шорт (ставка на падение цены).</div>
+    </details>
+    <details class="tips">
+      <summary>Репутация и банк</summary>
+      <div class="muted rules-p">У каждого игрока есть репутация — влияет на условия кредитов и комиссии банка. Слишком агрессивные действия (шпионаж, дискредитация конкурентов) могут её снижать.</div>
+    </details>
+    <details class="tips">
+      <summary>Кредиты</summary>
+      <div class="muted rules-p">Не хватает наличных на покупку или обязательный платёж — можно взять кредит у банка. Ставка и лимит зависят от репутации и текущей закредитованности игрока.</div>
+    </details>
+    <details class="tips">
+      <summary>Шпионаж</summary>
+      <div class="muted rules-p">Держатели контрольных пакетов могут использовать инсайдерскую информацию и дискредитацию, чтобы влиять на цены акций конкурентов — рискованно и может повредить репутации при раскрытии.</div>
+    </details>
+    <details class="tips">
+      <summary>Недвижимость</summary>
+      <div class="muted rules-p">Отдельный класс активов помимо акций компаний — приносит стабильный доход и увеличивает итоговый капитал независимо от колебаний биржи.</div>
+    </details>
+    <details class="tips">
+      <summary>Банкротство</summary>
+      <div class="muted rules-p">Наступает, если игрок не может оплатить обязательный платёж, даже продав все акции банку — игра выполнит это автоматически и выведет игрока из партии.</div>
+    </details>
+    <details class="tips">
+      <summary>Очки рейтинга и скины</summary>
+      <div class="muted rules-p">За победы в онлайн-играх начисляются очки рейтинга — на них в разделе «Скины» можно приобрести дополнительные аватарки и цветовые темы игрового стола, которые сохраняются на вашем аккаунте.</div>
+    </details>
+    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromRules">← Назад в меню</button>
   </div>
 </div>
 
@@ -444,34 +731,25 @@
       <div id="tableBody"></div>
       <div class="stage-corner corner-bl" id="cornerAction"></div>
       <div class="stage-corner corner-br" id="cornerRating"></div>
-      <div class="stage-tabbar" id="stageTabbar">
-        <div class="tab-bar">
-          <button class="tab-btn active" data-tab="turn">🎯 Ход</button>
-          <button class="tab-btn" data-tab="market">💹 Биржа</button>
-          <button class="tab-btn" data-tab="capital">💰 Капитал</button>
-          <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
-          <button class="tab-btn" data-tab="log">📡 Лента</button>
-        </div>
-      </div>
       <div class="context-popup" id="contextPopup"></div>
     </div>
   </div>
 
   <div class="tab-panel overlay-panel" data-panel="market">
-    <div class="overlay-panel-close">
-      <div class="tab-bar">
-        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
-        <button class="tab-btn active" data-tab="market">💹 Биржа</button>
-        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
-        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
-        <button class="tab-btn" data-tab="log">📡 Лента</button>
-      </div>
-    </div>
     <section>
       <h2>💹 Биржа</h2>
+      <div class="market-filters" id="marketFilters">
+        <div class="filter-group" id="marketSectorFilters"></div>
+        <div class="filter-group" id="marketOwnFilters">
+          <button type="button" class="chip active" data-own="all">Все</button>
+          <button type="button" class="chip" data-own="free">Свободные</button>
+          <button type="button" class="chip" data-own="mine">Мои</button>
+          <button type="button" class="chip" data-own="control">Под контролем</button>
+        </div>
+      </div>
       <div class="table-scroll">
       <table id="marketTable">
-        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
+        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th class="col-spark" title="История цены с начала сессии">График</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
       </table>
       </div>
@@ -479,15 +757,6 @@
   </div>
 
   <div class="tab-panel overlay-panel" data-panel="capital">
-    <div class="overlay-panel-close">
-      <div class="tab-bar">
-        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
-        <button class="tab-btn" data-tab="market">💹 Биржа</button>
-        <button class="tab-btn active" data-tab="capital">💰 Капитал</button>
-        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
-        <button class="tab-btn" data-tab="log">📡 Лента</button>
-      </div>
-    </div>
     <section>
       <h2>💰 Капитал</h2>
       <div id="capitalBody"></div>
@@ -500,31 +769,13 @@
   </div>
 
   <div class="tab-panel overlay-panel" data-panel="control">
-    <div class="overlay-panel-close">
-      <div class="tab-bar">
-        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
-        <button class="tab-btn" data-tab="market">💹 Биржа</button>
-        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
-        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
-        <button class="tab-btn" data-tab="log">📡 Лента</button>
-      </div>
-    </div>
     <section>
-      <h2>👑 Контрольный пакет</h2>
+      <h2>🕵️ Контроль, шпионаж и дискредитация</h2>
       <div id="controlBody"></div>
     </section>
   </div>
 
   <div class="tab-panel overlay-panel" data-panel="log">
-    <div class="overlay-panel-close">
-      <div class="tab-bar">
-        <button class="tab-btn" data-tab="turn">🎯 Ход</button>
-        <button class="tab-btn" data-tab="market">💹 Биржа</button>
-        <button class="tab-btn" data-tab="capital">💰 Капитал</button>
-        <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">👑 Контроль</button>
-        <button class="tab-btn active" data-tab="log">📡 Лента</button>
-      </div>
-    </div>
     <section>
       <h2>📡 Лента событий</h2>
       <div class="log" id="log"></div>
@@ -553,10 +804,25 @@
       </details>
     </section>
   </div>
+
+  <div class="stage-tabbar" id="stageTabbar">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="turn">🎯 Ход</button>
+      <button class="tab-btn" data-tab="market">💹 Биржа</button>
+      <button class="tab-btn" data-tab="capital">💰 Капитал</button>
+      <button class="tab-btn tab-btn-control" data-tab="control" style="display:none;">🕵️ Контроль</button>
+      <button class="tab-btn" data-tab="log">📡 Лента</button>
+    </div>
+  </div>
 </main>
+
+<div class="company-modal-overlay" id="companyModalOverlay" onclick="if(event.target===this) closeCompanyModal();">
+  <div class="company-modal" id="companyModalCard"></div>
+</div>
 </div>
 
 <script src="/engine.js"></script>
+<script src="/skins.js"></script>
 <script>
 let mode = null; // 'online' | 'offline'
 let ws = null;
@@ -639,29 +905,58 @@ function initProfileUI(){
 }
 let expandedTicker = null;
 let lastAnimatedRollKey = null;
+let capitalSubTab = "stocks";
+function switchCapitalSubTab(name){ capitalSubTab = name; if(latest) renderCapital(latest); }
 
 function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
 
+// Не все бренды есть в библиотеке simpleicons.org (нет Microsoft, IBM, Amazon,
+// Disney, Яндекс, Walmart, Durex, Сбербанк, Газпром, Магнит, МТС — проверено
+// напрямую по данным пакета simple-icons). Для них рисуем собственные цветные
+// бейджи с инициалами вместо серой заглушки, чтобы иконки выглядели завершёнными
+// у всех компаний, а не только у тех, что нашлись во внешнем CDN.
 const LOGO_SLUG = {
-  AAPL:"apple", MSFT:"microsoft", GOOGL:"google", NVDA:"nvidia", IBM:"ibm",
-  AMZN:"amazon", DIS:"disney", YDEX:"yandex", VKCO:"vk",
-  MCD:"mcdonalds", NKE:"nike", KO:"cocacola", WMT:"walmart", RKT:"durex",
-  BA:"boeing", MMM:"3m", AFLT:"aeroflot", SBER:"sberbank", GAZP:"gazprom",
-  MGNT:"magnit", MTSS:"mts",
+  AAPL:"apple", GOOGL:"google", NVDA:"nvidia", VKCO:"vk",
+  MCD:"mcdonalds", NKE:"nike", KO:"cocacola",
+  BA:"boeing", MMM:"3m", AFLT:"aeroflot",
+};
+const LOGO_FALLBACK = {
+  MSFT:{ bg:"#00A4EF", fg:"#ffffff", text:"MS" },
+  IBM:{ bg:"#1F70C1", fg:"#ffffff", text:"IB" },
+  AMZN:{ bg:"#FF9900", fg:"#131921", text:"AM" },
+  DIS:{ bg:"#113CCF", fg:"#ffffff", text:"DI" },
+  YDEX:{ bg:"#FC3F1D", fg:"#ffffff", text:"Я" },
+  WMT:{ bg:"#0071CE", fg:"#FFC220", text:"WM" },
+  RKT:{ bg:"#E6007E", fg:"#ffffff", text:"Du" },
+  SBER:{ bg:"#21A038", fg:"#ffffff", text:"Сб" },
+  GAZP:{ bg:"#0079C1", fg:"#ffffff", text:"Гп" },
+  MGNT:{ bg:"#E4032E", fg:"#ffffff", text:"Ма" },
+  MTSS:{ bg:"#E30611", fg:"#ffffff", text:"МТ" },
+  AAPL:{ bg:"#555555", fg:"#ffffff", text:"Ap" },
+  GOOGL:{ bg:"#4285F4", fg:"#ffffff", text:"Go" },
+  NVDA:{ bg:"#76B900", fg:"#0a1a00", text:"Nv" },
+  VKCO:{ bg:"#0077FF", fg:"#ffffff", text:"VK" },
+  MCD:{ bg:"#DA291C", fg:"#FFC72C", text:"Mc" },
+  NKE:{ bg:"#111111", fg:"#ffffff", text:"Nk" },
+  KO:{ bg:"#F40009", fg:"#ffffff", text:"KO" },
+  BA:{ bg:"#0039A6", fg:"#ffffff", text:"Ba" },
+  MMM:{ bg:"#FF0000", fg:"#ffffff", text:"3M" },
+  AFLT:{ bg:"#00256C", fg:"#ffffff", text:"Аэ" },
 };
 function logoHtml(ticker, size){
   size = size || 22;
   const slug = LOGO_SLUG[ticker];
-  const initials = ticker.slice(0,2);
+  const fb = LOGO_FALLBACK[ticker] || { bg:"var(--panel2)", fg:"var(--text)", text: ticker.slice(0,2) };
+  const fbStyle = `background:${fb.bg};color:${fb.fg};`;
   const imgHtml = slug ? `<img src="https://cdn.simpleicons.org/${slug}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : "";
-  return `<span class="co-logo" style="width:${size}px;height:${size}px;">${imgHtml}<span class="co-logo-fb" style="display:${slug?"none":"flex"};">${initials}</span></span>`;
+  return `<span class="co-logo" style="width:${size}px;height:${size}px;">${imgHtml}<span class="co-logo-fb" style="display:${slug?"none":"flex"};${fbStyle}">${fb.text}</span></span>`;
 }
 function wsUrl(){
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${location.host}`;
 }
 function showOnly(id){
-  ["mainMenu","onlineScreen","offlineSetup","lobbyScreen","app"].forEach(x=>{
+  ["mainMenu","onlineScreen","offlineSetup","lobbyScreen","app","ratingScreen","profileScreen","skinsScreen","settingsScreen","rulesScreen"].forEach(x=>{
     document.getElementById(x).style.display = (x===id) ? (x==="app"?"block":"flex") : "none";
   });
 }
@@ -688,6 +983,283 @@ document.getElementById("btnGoOffline").onclick = ()=>{
   showOnly("offlineSetup");
 };
 document.getElementById("btnBackFromOffline").onclick = ()=> showOnly("mainMenu");
+
+// ---------------------------------------------------------------------
+// Рейтинг / Профиль / Скины / Настройки / Правила — новые экраны меню.
+// Профиль и Скины используют общий "аккаунт-гейт": та же модель доверия,
+// что и у WS входа — ник+пароль подтверждаются на каждый запрос, сессий нет.
+// ---------------------------------------------------------------------
+let accountUser = null;     // publicProfile с сервера, если вошли в аккаунт
+let accountPassword = "";   // держим только в памяти вкладки, никогда не сохраняем
+
+async function apiPost(path, body){
+  try {
+    const res = await fetch(path, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body||{}) });
+    let data = {};
+    try { data = await res.json(); } catch(e){}
+    return data;
+  } catch(e){
+    return { error: "Не удалось связаться с сервером." };
+  }
+}
+
+document.getElementById("btnGoRating").onclick = ()=>{ showOnly("ratingScreen"); loadRating(); };
+document.getElementById("btnBackFromRating").onclick = ()=> showOnly("mainMenu");
+async function loadRating(){
+  const list = document.getElementById("ratingList");
+  const empty = document.getElementById("ratingEmpty");
+  list.innerHTML = `<div class="muted" style="text-align:center;padding:10px 0;">Загрузка...</div>`;
+  empty.style.display = "none";
+  let data = [];
+  try { data = await (await fetch("/api/leaderboard")).json(); } catch(e){ data = []; }
+  if(!Array.isArray(data) || !data.length){
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  list.innerHTML = data.map((p,i)=>{
+    const av = p.avatar === "PHOTO" && p.avatarPhoto
+      ? `<img src="${p.avatarPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      : (p.avatar || "🧑");
+    return `<div class="rating-row">
+      <div class="rating-rank">${i+1}</div>
+      <div class="avatar-opt" style="pointer-events:none;">${av}</div>
+      <div class="rating-name">${escapeHtml(p.username)}</div>
+      <div class="rating-points">${p.points||0}</div>
+    </div>`;
+  }).join("");
+}
+
+// --- Профиль ---
+document.getElementById("btnGoProfile").onclick = ()=>{ showOnly("profileScreen"); renderProfileScreen(); };
+document.getElementById("btnBackFromProfile").onclick = ()=> showOnly("mainMenu");
+function renderProfileScreen(){
+  const gate = document.getElementById("profileGate");
+  const content = document.getElementById("profileContent");
+  if(!accountUser){
+    gate.style.display = "block"; content.style.display = "none";
+    try { const saved = localStorage.getItem("tm_username"); if(saved) document.getElementById("profileLoginName").value = saved; } catch(e){}
+    return;
+  }
+  gate.style.display = "none"; content.style.display = "block";
+  document.getElementById("profileWhoName").textContent = accountUser.username;
+  document.getElementById("profileWhoPoints").textContent = `${accountUser.points||0} очков`;
+  document.getElementById("profileGender").value = accountUser.gender && GENDER_LABEL[accountUser.gender] ? accountUser.gender : (accountUser.gender ? "other" : "");
+  const photoPreview = document.getElementById("profilePhotoPreview");
+  photoPreview.innerHTML = (accountUser.avatar === "PHOTO" && accountUser.avatarPhoto)
+    ? `<img src="${accountUser.avatarPhoto}">`
+    : (accountUser.avatar || "🧑");
+  const ownedPacks = (window.Skins ? window.Skins.AVATAR_PACKS : []).filter(p => (accountUser.ownedAvatarPacks||["base"]).includes(p.id));
+  const ownedEmojis = [].concat(...ownedPacks.map(p=>p.emojis));
+  const emojiList = ownedEmojis.length ? ownedEmojis : AVATAR_SET;
+  const box = document.getElementById("profileAvatarPicker");
+  box.innerHTML = emojiList.map(a=>`<button type="button" class="avatar-opt${a===accountUser.avatar?" selected":""}" data-avatar="${a}">${a}</button>`).join("");
+  box.querySelectorAll(".avatar-opt").forEach(btn=>{
+    btn.onclick = async ()=>{
+      box.querySelectorAll(".avatar-opt").forEach(b=>b.classList.remove("selected"));
+      btn.classList.add("selected");
+      const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, avatar: btn.dataset.avatar });
+      if(!data.error) accountUser = data.user;
+    };
+  });
+  document.getElementById("profileSaveErr").textContent = "";
+  document.getElementById("profileSaveOk").textContent = "";
+  document.getElementById("profilePassErr").textContent = "";
+  document.getElementById("profileNewPassword").value = "";
+}
+function accountLoginErrEl(prefix){ return document.getElementById(prefix+"LoginErr"); }
+async function doAccountLogin(prefix){
+  const nameEl = document.getElementById(prefix+"LoginName");
+  const passEl = document.getElementById(prefix+"LoginPassword");
+  const errEl = accountLoginErrEl(prefix);
+  const btn = document.getElementById(prefix+"LoginBtn");
+  const username = nameEl.value.trim();
+  const password = passEl.value;
+  errEl.textContent = "";
+  if(!username || !password){ errEl.textContent = "Введите ник и пароль."; return; }
+  btn.disabled = true;
+  const data = await apiPost("/api/login", { username, password });
+  btn.disabled = false;
+  if(data.error){ errEl.textContent = data.error; return; }
+  accountUser = data.user;
+  accountPassword = password;
+  saveUsernameLocal(username);
+  renderProfileScreen();
+  renderSkinsScreen();
+}
+function doAccountLogout(){
+  accountUser = null;
+  accountPassword = "";
+  renderProfileScreen();
+  renderSkinsScreen();
+}
+document.getElementById("profileLoginBtn").onclick = ()=> doAccountLogin("profile");
+document.getElementById("skinsLoginBtn").onclick = ()=> doAccountLogin("skins");
+document.getElementById("profileLogoutBtn").onclick = doAccountLogout;
+document.getElementById("skinsLogoutBtn").onclick = doAccountLogout;
+
+document.getElementById("profileSaveBtn").onclick = async ()=>{
+  if(!accountUser) return;
+  const errEl = document.getElementById("profileSaveErr");
+  const okEl = document.getElementById("profileSaveOk");
+  errEl.textContent = ""; okEl.textContent = "";
+  const gender = document.getElementById("profileGender").value;
+  const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, gender });
+  if(data.error){ errEl.textContent = data.error; return; }
+  accountUser = data.user;
+  okEl.textContent = "Сохранено.";
+};
+document.getElementById("profileChangePassBtn").onclick = async ()=>{
+  if(!accountUser) return;
+  const errEl = document.getElementById("profilePassErr");
+  errEl.textContent = "";
+  const newPassword = document.getElementById("profileNewPassword").value;
+  const data = await apiPost("/api/profile/password", { username: accountUser.username, password: accountPassword, newPassword });
+  if(data.error){ errEl.textContent = data.error; return; }
+  accountPassword = newPassword;
+  document.getElementById("profileNewPassword").value = "";
+  errEl.style.color = "var(--green)";
+  errEl.textContent = "Пароль изменён.";
+  setTimeout(()=>{ errEl.style.color = ""; }, 10);
+};
+
+// Фото профиля: ужимаем на клиенте через canvas перед отправкой, чтобы не
+// превышать серверный лимит (MAX_PHOTO_LEN) и не гонять по сети мегабайты.
+document.getElementById("profilePhotoBtn").onclick = ()=> document.getElementById("profilePhotoFile").click();
+document.getElementById("profilePhotoFile").onchange = async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!file || !accountUser) return;
+  const errEl = document.getElementById("profileSaveErr");
+  errEl.textContent = "";
+  try {
+    const dataUrl = await resizePhotoFile(file, 256);
+    const data = await apiPost("/api/profile/photo", { username: accountUser.username, password: accountPassword, photoDataUrl: dataUrl });
+    if(data.error){ errEl.textContent = data.error; return; }
+    accountUser = data.user;
+    renderProfileScreen();
+  } catch(err){
+    errEl.textContent = "Не удалось обработать фото.";
+  }
+};
+function resizePhotoFile(file, maxSize){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ()=>{
+      img.onerror = reject;
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h){ if(w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; } }
+        else { if(h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; } }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// --- Скины ---
+document.getElementById("btnGoSkins").onclick = ()=>{ showOnly("skinsScreen"); renderSkinsScreen(); };
+document.getElementById("btnBackFromSkins").onclick = ()=> showOnly("mainMenu");
+function renderSkinsScreen(){
+  const gate = document.getElementById("skinsGate");
+  const content = document.getElementById("skinsContent");
+  if(!accountUser){
+    gate.style.display = "block"; content.style.display = "none";
+    try { const saved = localStorage.getItem("tm_username"); if(saved) document.getElementById("skinsLoginName").value = saved; } catch(e){}
+    return;
+  }
+  gate.style.display = "none"; content.style.display = "block";
+  document.getElementById("skinsBalance").textContent = `${accountUser.points||0} очков`;
+  document.getElementById("skinsErr").textContent = "";
+  const packsBox = document.getElementById("skinsAvatarPacks");
+  const ownedPacks = accountUser.ownedAvatarPacks || ["base"];
+  packsBox.innerHTML = (window.Skins ? window.Skins.AVATAR_PACKS : []).map(p=>{
+    const owned = ownedPacks.includes(p.id);
+    const equipped = accountUser.equippedAvatarPack === p.id;
+    const actionBtn = equipped
+      ? `<button type="button" class="secondary" disabled>Экипировано</button>`
+      : owned
+        ? `<button type="button" class="secondary" data-equip-pack="${p.id}">Экипировать</button>`
+        : `<button type="button" data-buy-pack="${p.id}">Купить за ${p.cost}</button>`;
+    return `<div class="skin-card">
+      <div class="skin-name">${escapeHtml(p.name)}</div>
+      <div class="skin-emoji-row">${p.emojis.slice(0,6).join("")}</div>
+      ${actionBtn}
+    </div>`;
+  }).join("");
+  const boardBox = document.getElementById("skinsBoardSkins");
+  const ownedBoards = accountUser.ownedBoardSkins || ["default"];
+  boardBox.innerHTML = (window.Skins ? window.Skins.BOARD_SKINS : []).map(s=>{
+    const owned = ownedBoards.includes(s.id);
+    const equipped = accountUser.equippedBoardSkin === s.id;
+    const actionBtn = equipped
+      ? `<button type="button" class="secondary" disabled>Экипировано</button>`
+      : owned
+        ? `<button type="button" class="secondary" data-equip-board="${s.id}">Экипировать</button>`
+        : `<button type="button" data-buy-board="${s.id}">Купить за ${s.cost}</button>`;
+    return `<div class="skin-card">
+      <div class="skin-name">${escapeHtml(s.name)}</div>
+      <div class="skin-preview">${s.stage.map(c=>`<span class="skin-swatch" style="background:${c};"></span>`).join("")}</div>
+      ${actionBtn}
+    </div>`;
+  }).join("");
+  packsBox.querySelectorAll("[data-buy-pack]").forEach(btn=> btn.onclick = ()=> buySkin(btn.dataset.buyPack, "avatarPack"));
+  packsBox.querySelectorAll("[data-equip-pack]").forEach(btn=> btn.onclick = ()=> equipSkinAction(btn.dataset.equipPack, "avatarPack"));
+  boardBox.querySelectorAll("[data-buy-board]").forEach(btn=> btn.onclick = ()=> buySkin(btn.dataset.buyBoard, "boardSkin"));
+  boardBox.querySelectorAll("[data-equip-board]").forEach(btn=> btn.onclick = ()=> equipSkinAction(btn.dataset.equipBoard, "boardSkin"));
+}
+async function buySkin(skinId, kind){
+  const errEl = document.getElementById("skinsErr");
+  errEl.textContent = "";
+  const data = await apiPost("/api/skins/buy", { username: accountUser.username, password: accountPassword, skinId, kind });
+  if(data.error){ errEl.textContent = data.error; return; }
+  accountUser = data.user;
+  renderSkinsScreen();
+}
+async function equipSkinAction(skinId, kind){
+  const errEl = document.getElementById("skinsErr");
+  errEl.textContent = "";
+  const data = await apiPost("/api/skins/equip", { username: accountUser.username, password: accountPassword, skinId, kind });
+  if(data.error){ errEl.textContent = data.error; return; }
+  accountUser = data.user;
+  renderSkinsScreen();
+  applyBoardSkin(accountUser.equippedBoardSkin);
+}
+function applyBoardSkin(skinId){
+  const skin = window.Skins ? window.Skins.boardSkinById(skinId) : null;
+  document.body.classList.remove("theme-emerald","theme-midnight","theme-royal");
+  if(skin && skin.cls) document.body.classList.add(skin.cls);
+}
+
+// --- Настройки ---
+document.getElementById("btnGoSettings").onclick = ()=>{
+  showOnly("settingsScreen");
+  try { document.getElementById("settingReduceMotion").checked = localStorage.getItem("tm_reduce_motion") === "1"; } catch(e){}
+};
+document.getElementById("btnBackFromSettings").onclick = ()=> showOnly("mainMenu");
+document.getElementById("settingReduceMotion").onchange = (e)=>{
+  try { localStorage.setItem("tm_reduce_motion", e.target.checked ? "1" : "0"); } catch(err){}
+  document.body.classList.toggle("reduce-motion", e.target.checked);
+};
+document.getElementById("settingsClearLogin").onclick = ()=>{
+  try { localStorage.removeItem("tm_username"); } catch(e){}
+  document.getElementById("joinName").value = "";
+};
+try {
+  if(localStorage.getItem("tm_reduce_motion") === "1") document.body.classList.add("reduce-motion");
+} catch(e){}
+
+// --- Правила ---
+document.getElementById("btnGoRules").onclick = ()=> showOnly("rulesScreen");
+document.getElementById("btnBackFromRules").onclick = ()=> showOnly("mainMenu");
+
 document.getElementById("btnExitToMenu").onclick = ()=>{
   if(mode === "online"){
     if(ws){ ws.onclose = null; ws.close(); ws = null; }
@@ -767,6 +1339,8 @@ function connectOnline(room, tradeWindowMs, auth){
     } else if(msg.type === "state"){
       you = msg.you;
       latest = msg;
+      const mePlayer = msg.players && msg.players.find(p=>p.id===you);
+      if(mePlayer) applyBoardSkin(mePlayer.equippedBoardSkin || "default");
       if(msg.phase === "lobby"){
         showOnly("lobbyScreen");
         renderLobby(msg);
@@ -830,6 +1404,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   offlinePlayerNames.forEach(p=>{ const r = GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar); viewAs = viewAs || (r.player && r.player.id); });
   localRoom.phase = "roll"; // офлайн хот-сит — без комнаты ожидания, сразу к игре
   viewAs = localRoom.players[0].id;
+  applyBoardSkin(accountUser ? (accountUser.equippedBoardSkin || "default") : "default");
   showOnly("app");
   refreshLocal();
 };
@@ -871,6 +1446,8 @@ function localDispatch(obj){
     case "roll": result = GameEngine.rollDice(localRoom, viewAs); break;
     case "buyFromRoll": result = GameEngine.buyFromRoll(localRoom, viewAs, obj.pct); break;
     case "dividendFromRoll": result = GameEngine.dividendFromRoll(localRoom, viewAs); break;
+    case "setForcedPrice": result = GameEngine.setForcedPrice(localRoom, viewAs, obj.amount); break;
+    case "payForcedPrice": result = GameEngine.payForcedPrice(localRoom, viewAs); break;
     case "skipRoll": result = GameEngine.skipRoll(localRoom, viewAs); break;
     case "buyBank": result = GameEngine.buyBank(); break;
     case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
@@ -895,6 +1472,13 @@ function localDispatch(obj){
     case "ctrlInsiderResolve": result = GameEngine.ctrlInsiderResolve(localRoom, viewAs, obj.action); break;
     case "ctrlSqueezeOut": result = GameEngine.ctrlSqueezeOut(localRoom, viewAs, obj.ticker); break;
     case "ctrlShort": result = GameEngine.ctrlShort(localRoom, viewAs, obj.ticker); break;
+    case "takeLoan": result = GameEngine.takeLoan(localRoom, viewAs, obj.amount); break;
+    case "repayLoan": result = GameEngine.repayLoan(localRoom, viewAs, obj.amount); break;
+    case "buyRealEstateFromRoll": result = GameEngine.buyRealEstateFromRoll(localRoom, viewAs); break;
+    case "upgradeRealEstateFromRoll": result = GameEngine.upgradeRealEstateFromRoll(localRoom, viewAs); break;
+    case "payRealEstateRentFromRoll": result = GameEngine.payRealEstateRentFromRoll(localRoom, viewAs); break;
+    case "ctrlEspionage": result = GameEngine.ctrlEspionage(localRoom, viewAs, obj.target); break;
+    case "ctrlDiscredit": result = GameEngine.ctrlDiscredit(localRoom, viewAs, obj.target); break;
     default: result = { error: "Неизвестное действие." };
   }
   if(result && result.error) flashError(result.error);
@@ -1010,6 +1594,108 @@ function switchTab(name){
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.onclick = ()=> switchTab(b.dataset.tab));
 
+// ---------------------------------------------------------------------
+// Биржа: мини-фильтры (сектор / наличие) + клиентские мини-графики цены
+// ---------------------------------------------------------------------
+let marketSectorFilter = "all";
+let marketOwnFilter = "all";
+const priceHistoryClient = {};
+const PRICE_HISTORY_MAX = 24;
+
+function recordPriceHistory(s){
+  (s.companies||[]).forEach(c=>{
+    const arr = priceHistoryClient[c.ticker] || (priceHistoryClient[c.ticker] = []);
+    if(arr.length === 0 || arr[arr.length-1] !== c.price){
+      arr.push(c.price);
+      if(arr.length > PRICE_HISTORY_MAX) arr.shift();
+    }
+  });
+}
+
+function sparklineSvg(ticker, currentPrice, delta){
+  const w = 64, h = 22, pad = 2;
+  const hist = priceHistoryClient[ticker] || [];
+  const color = delta>0 ? "#8fd6ac" : delta<0 ? "#e39c8c" : "rgba(243,238,228,.45)";
+  if(hist.length < 2){
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="3,3" opacity=".6"/></svg>`;
+  }
+  const min = Math.min(...hist), max = Math.max(...hist);
+  const span = (max - min) || 1;
+  const step = (w - pad*2) / (hist.length - 1);
+  const pts = hist.map((v,i)=>{
+    const x = pad + i*step;
+    const y = h - pad - ((v-min)/span) * (h - pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function renderMarketTable(s){
+  const body = document.getElementById("marketBody");
+  if(!body) return;
+  body.innerHTML = "";
+  const me = s.players.find(p=>p.id===you);
+  const rows = (s.companies||[]).filter(c=>{
+    if(marketSectorFilter !== "all" && c.sector !== marketSectorFilter) return false;
+    if(marketOwnFilter === "free" && c.owned !== 0) return false;
+    if(marketOwnFilter === "mine" && !(me && me.holdings && me.holdings[c.ticker] > 0)) return false;
+    if(marketOwnFilter === "control" && c.controllerId == null) return false;
+    return true;
+  });
+  if(rows.length === 0){
+    body.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:18px 0;">Нет компаний под выбранные фильтры</td></tr>`;
+    return;
+  }
+  rows.forEach(c=>{
+    const delta = c.price - c.prevPrice;
+    const deltaPct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
+    const controller = s.players.find(p=>p.id===c.controllerId);
+    const tr = document.createElement("tr");
+    if(s.pendingRoll && s.pendingRoll.ticker === c.ticker) tr.className = "active-row";
+    tr.style.cursor = "pointer";
+    tr.onclick = ()=> openCompanyModal(c.ticker);
+    tr.innerHTML = `
+      <td><span class="cell-logo-name">${logoHtml(c.ticker,24)}<span><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</span></span></td>
+      <td><span class="sector-tag">${c.sector}</span></td>
+      <td class="price">${fmt(c.price)}</td>
+      <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
+      <td class="col-spark">${sparklineSvg(c.ticker, c.price, delta)}</td>
+      <td><span class="vol-badge vol-${c.volLabel==='Низкая'?'low':c.volLabel==='Высокая'?'high':'med'}">${c.volLabel}</span></td>
+      <td><span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="muted">${c.owned.toFixed(0)}%</span></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function buildMarketFilters(){
+  const sectorWrap = document.getElementById("marketSectorFilters");
+  if(sectorWrap && !sectorWrap.dataset.built){
+    const sectors = [...new Set((GameEngine.COMPANIES||[]).map(c=>c.sector))];
+    const chips = [`<button type="button" class="chip active" data-sector="all">Все секторы</button>`]
+      .concat(sectors.map(sec=>`<button type="button" class="chip" data-sector="${sec}">${sec}</button>`));
+    sectorWrap.innerHTML = chips.join("");
+    sectorWrap.dataset.built = "1";
+    sectorWrap.querySelectorAll(".chip").forEach(btn=>{
+      btn.onclick = ()=>{
+        marketSectorFilter = btn.dataset.sector;
+        sectorWrap.querySelectorAll(".chip").forEach(b=> b.classList.toggle("active", b===btn));
+        if(latest) renderMarketTable(latest);
+      };
+    });
+  }
+  const ownWrap = document.getElementById("marketOwnFilters");
+  if(ownWrap && !ownWrap.dataset.built){
+    ownWrap.dataset.built = "1";
+    ownWrap.querySelectorAll(".chip").forEach(btn=>{
+      btn.onclick = ()=>{
+        marketOwnFilter = btn.dataset.own;
+        ownWrap.querySelectorAll(".chip").forEach(b=> b.classList.toggle("active", b===btn));
+        if(latest) renderMarketTable(latest);
+      };
+    });
+  }
+}
+
 let countdownTimer = null;
 function render(){
   if(!latest) return;
@@ -1018,24 +1704,8 @@ function render(){
   if(countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
 
   // market table
-  const body = document.getElementById("marketBody");
-  body.innerHTML = "";
-  s.companies.forEach(c=>{
-    const delta = c.price - c.prevPrice;
-    const deltaPct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
-    const controller = s.players.find(p=>p.id===c.controllerId);
-    const tr = document.createElement("tr");
-    if(s.pendingRoll && s.pendingRoll.ticker === c.ticker) tr.className = "active-row";
-    tr.innerHTML = `
-      <td><span class="cell-logo-name">${logoHtml(c.ticker,24)}<span><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</span></span></td>
-      <td><span class="sector-tag">${c.sector}</span></td>
-      <td class="price">${fmt(c.price)}</td>
-      <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
-      <td><span class="vol-badge vol-${c.volLabel==='Низкая'?'low':c.volLabel==='Высокая'?'high':'med'}">${c.volLabel}</span></td>
-      <td><span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="muted">${c.owned.toFixed(0)}%</span></td>
-    `;
-    body.appendChild(tr);
-  });
+  recordPriceHistory(s);
+  renderMarketTable(s);
 
   // players
   const playersList = document.getElementById("playersList");
@@ -1043,15 +1713,25 @@ function render(){
   s.players.forEach(p=>{
     const div = document.createElement("div");
     div.className = "player-card" + (p.bankrupt?" bankrupt":"") + (p.id===you?" you":"") + (p.id===s.currentPlayerId && s.phase==="roll" ?" turn":"");
-    const holdingsStr = Object.entries(p.holdings).filter(([,v])=>v>0)
-      .map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`;
+    const isSelf = p.id === you;
+    const revealedBySpy = !isSelf && !p.holdingsHidden;
+    const holdingsStr = p.holdingsHidden
+      ? `<span class="muted">🔒 активы скрыты (нужен шпионаж)</span>`
+      : (Object.entries(p.holdings).filter(([,v])=>v>0).map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`)
+        + ((p.properties||[]).map(re=>`<span>🏠${re.name}${re.level>0?` ★${re.level}`:""}</span>`).join(""));
     const gLabel = genderLabel(p);
+    const rep = reputationLabel(p.reputation);
     div.innerHTML = `
       <div class="player-head">
         <b>${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}${p.bankrupt?" 💀":""}${p.id===you?" (вы)":""}</b>
         <span class="net">${fmt(p.netWorth)}</span>
       </div>
       <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span> ${p.connected?"":'<span class="badge offline">офлайн</span>'} ${p.points?`<span class="badge points-badge">🏆 ${p.points}</span>`:""} ${gLabel?`<span class="muted">· ${gLabel}</span>`:""}</div>
+      <div class="rep-badge-row" style="margin-top:6px;">
+        <span class="rep-badge ${rep.cls}">⭐ ${p.reputation}</span>
+        ${p.loanPrincipal?`<span class="rep-badge loan">🏦 ${fmt(p.loanPrincipal)}</span>`:""}
+        ${revealedBySpy?`<span class="rep-badge" style="background:rgba(224,177,104,.22);color:#7a5300;">🕵️ раскрыто до соб. ${p.revealExpiresEvent}</span>`:""}
+      </div>
       <div class="holdings">${holdingsStr}</div>
     `;
     playersList.appendChild(div);
@@ -1072,6 +1752,7 @@ function render(){
   renderCapital(s);
   renderControlPanel(s);
   renderTicker(s);
+  if(openModalTicker) refreshCompanyModal();
 
   if(mode === "online" && s.phase === "trade" && s.tradeWindowEndsAt){
     const tick = ()=>{
@@ -1104,17 +1785,37 @@ function renderStageBoard(s){
   const board = GameEngine.BOARD;
   const companyMap = {};
   s.companies.forEach(c=> companyMap[c.ticker] = c);
+  const reMap = {};
+  (s.realEstate||[]).forEach(re=> reMap[re.id] = re);
+  const playerMap = {};
+  s.players.forEach(p=> playerMap[p.id] = p);
   const roll = s.pendingRoll;
   let cellsHtml = "";
   for(let r=0;r<12;r++){
     for(let c=0;c<12;c++){
-      const ticker = board[r][c];
-      const comp = companyMap[ticker];
-      const cls = SECTOR_CLASS[comp ? comp.sector : ""] || "";
+      const cell = board[r][c];
       const isActive = !!(roll && roll.row-1===r && roll.col-1===c);
-      cellsHtml += `<div class="stage-cell${isActive?" active-cell":""}" title="${comp?comp.name:ticker} (${ticker})">
-        <div class="stage-cell-badge ${cls}">${boardIconHtml(ticker)}</div>
-      </div>`;
+      if(GameEngine.isRealEstateCell(cell)){
+        const cityId = GameEngine.cityIdFromCell(cell);
+        const re = reMap[cityId] || {};
+        const owner = re.ownerId ? playerMap[re.ownerId] : null;
+        const stars = re.level>0 ? "★".repeat(re.level) : "";
+        const title = `${re.name||cityId} — рента ${fmt(re.rent||0)}${owner?` — владелец: ${owner.name}`:""}${re.level?` — улучшение ${re.level}/${GameEngine.MAX_RE_LEVEL}`:""}`;
+        cellsHtml += `<div class="stage-cell re-cell${isActive?" active-cell":""}${owner?" re-owned":""}" title="${escapeHtml(title)}">
+          <div class="stage-cell-badge re-badge">
+            <span class="re-icon">🏠</span>
+            ${owner?`<span class="re-owner">${owner.avatar || owner.name.charAt(0).toUpperCase()}</span>`:""}
+            ${stars?`<span class="re-stars">${stars}</span>`:""}
+          </div>
+        </div>`;
+      } else {
+        const ticker = cell;
+        const comp = companyMap[ticker];
+        const cls = SECTOR_CLASS[comp ? comp.sector : ""] || "";
+        cellsHtml += `<div class="stage-cell${isActive?" active-cell":""}" title="${comp?comp.name:ticker} (${ticker})">
+          <div class="stage-cell-badge ${cls}">${boardIconHtml(ticker)}</div>
+        </div>`;
+      }
     }
   }
   const players = s.players;
@@ -1162,10 +1863,42 @@ function recommendTag(c, held){
   return `<span class="cap-tip">стабильна</span>`;
 }
 
-function renderCapital(s){
-  const el = document.getElementById("capitalBody");
-  const me = s.players.find(p=>p.id===you);
-  if(!me){ el.innerHTML = `<div class="muted">Загрузка...</div>`; return; }
+function reputationLabel(rep){
+  rep = rep==null?50:rep;
+  if(rep>=70) return {text:"Высокая", cls:"rep-high"};
+  if(rep>=40) return {text:"Средняя", cls:"rep-mid"};
+  if(rep>=20) return {text:"Низкая", cls:"rep-low"};
+  return {text:"Очень низкая", cls:"rep-crit"};
+}
+
+function loanSectionHtml(s, me){
+  const terms = s.bankTerms || {limit:0, ratePct:0};
+  if(s.myLoan){
+    const l = s.myLoan;
+    return `<div class="mini-card">
+      <h3>🏦 Кредит банка</h3>
+      <div class="cap-summary"><span>Долг</span><b class="down">${fmt(l.principal)}</b></div>
+      <div class="cap-summary"><span>Ставка</span><b>${l.ratePct}% за событие</b></div>
+      ${l.missedPayments>0?`<div class="muted" style="font-size:11.5px;color:#e39c8c;">⚠️ Просрочек подряд: ${l.missedPayments}/3 — при 3-й банк принудительно взыщет долг.</div>`:""}
+      <div class="row-inline" style="margin-top:8px;">
+        <input id="repayAmount" type="number" placeholder="Сумма" min="1" max="${Math.round(l.principal)}" style="flex:1;">
+        <button class="small" onclick="doRepayLoan()">Погасить</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="mini-card">
+    <h3>🏦 Кредит банка</h3>
+    <div class="muted" style="font-size:12px;">Лимит и ставка зависят от вашей репутации и чистого капитала.</div>
+    <div class="cap-summary"><span>Лимит</span><b>${fmt(terms.limit)}</b></div>
+    <div class="cap-summary"><span>Ставка</span><b>${terms.ratePct}% за событие</b></div>
+    <div class="row-inline" style="margin-top:8px;">
+      <input id="loanAmount" type="number" placeholder="Сумма" min="1" max="${Math.max(1,Math.round(terms.limit))}" style="flex:1;" ${terms.limit<=0?"disabled":""}>
+      <button class="small" onclick="doTakeLoan()" ${terms.limit<=0?"disabled":""}>Взять кредит</button>
+    </div>
+  </div>`;
+}
+
+function myAssetsSectionHtml(s, me){
   const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
   const rows = holdings.map(([t,v])=>{
     const c = s.companies.find(x=>x.ticker===t);
@@ -1173,12 +1906,81 @@ function renderCapital(s){
     const value = c.price * (v/100);
     return `<div class="cap-row"><span class="tkr">${logoHtml(t,18)}${t}</span><span>${v}% · ${fmt(value)}</span>${recommendTag(c, v)}</div>`;
   }).join("") || `<div class="muted" style="font-size:12.5px;">У вас пока нет акций.</div>`;
+
+  const myRe = (me.properties||[]);
+  const reRows = myRe.map(re=>{
+    const full = (s.realEstate||[]).find(r=>r.id===re.id);
+    const rent = full ? full.rent : 0;
+    return `<div class="cap-row"><span class="tkr">🏠 ${re.name}</span><span>${re.level>0?`★${re.level} · `:""}рента ${fmt(rent)}</span></div>`;
+  }).join("") || `<div class="muted" style="font-size:12.5px;">Недвижимости пока нет — покупается при попадании на клетку.</div>`;
+
+  return `
+    <div class="mini-card">
+      <h3>📦 Акции</h3>
+      ${rows}
+    </div>
+    <div class="mini-card">
+      <h3>🏠 Недвижимость</h3>
+      <div class="muted" style="font-size:12px;">Покупается и улучшается только при попадании на свою клетку на столе.</div>
+      ${reRows}
+    </div>`;
+}
+
+function statsSectionHtml(s, me){
+  const rankSorted = s.players.slice().sort((a,b)=>b.netWorth-a.netWorth);
+  const rank = rankSorted.findIndex(p=>p.id===me.id) + 1;
+  const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
+  const stockValue = (t,v)=>{ const c=s.companies.find(x=>x.ticker===t); return c?c.price*(v/100):0; };
+  let biggest = null, biggestVal = 0;
+  holdings.forEach(([t,v])=>{ const val=stockValue(t,v); if(val>biggestVal){biggestVal=val; biggest={label:t, val};} });
+  (me.properties||[]).forEach(re=>{
+    const full=(s.realEstate||[]).find(r=>r.id===re.id);
+    const val = full ? full.price*(1+re.level*0.4) : 0;
+    if(val>biggestVal){biggestVal=val; biggest={label:re.name, val};}
+  });
+  const controlled = s.companies.filter(c=>c.controllerId===me.id).length;
+  const diversify = holdings.length + (me.properties||[]).length;
+  const rentIncome = (me.properties||[]).reduce((sum,re)=>{ const full=(s.realEstate||[]).find(r=>r.id===re.id); return sum + (full?full.rent:0); },0);
+  const debtLoad = me.netWorth > 0 ? Math.round((me.loanPrincipal||0) / me.netWorth * 100) : 0;
+  const rep = reputationLabel(me.reputation);
+  return `<div class="mini-card">
+    <h3>📊 Статистика</h3>
+    <div class="cap-summary"><span>Место по капиталу</span><b>${rank} / ${s.players.length}</b></div>
+    <div class="cap-summary"><span>Крупнейший актив</span><b>${biggest?`${biggest.label} · ${fmt(biggest.val)}`:"—"}</b></div>
+    <div class="cap-summary"><span>Контролируемых компаний</span><b>${controlled}</b></div>
+    <div class="cap-summary"><span>Диверсификация портфеля</span><b>${diversify} актив(ов)</b></div>
+    <div class="cap-summary"><span>Потенциальная рента/раунд</span><b>${fmt(rentIncome)}</b></div>
+    <div class="cap-summary"><span>Долговая нагрузка</span><b class="${debtLoad>50?'down':''}">${debtLoad}% от капитала</b></div>
+    <div class="cap-summary"><span>Банковская комиссия (репутация)</span><b class="${rep.cls}">${(s.bankFeePct*100).toFixed(1)}%</b></div>
+  </div>`;
+}
+
+function renderCapital(s){
+  const el = document.getElementById("capitalBody");
+  const me = s.players.find(p=>p.id===you);
+  if(!me){ el.innerHTML = `<div class="muted">Загрузка...</div>`; return; }
+  const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
   const invested = holdings.reduce((sum,[t,v])=>{ const c=s.companies.find(x=>x.ticker===t); return sum + (c?c.price*(v/100):0); },0);
+  const rep = reputationLabel(me.reputation);
+  const subtabs = [
+    {id:"loan", label:"🏦 Кредит"},
+    {id:"stocks", label:"📦 Мои акции"},
+    {id:"stats", label:"📊 Статистика"},
+  ];
+  const subtabsHtml = `<div class="row-inline cap-subtabs" style="margin:10px 0;">
+    ${subtabs.map(t=>`<button class="small${capitalSubTab===t.id?"":" secondary"}" style="flex:1;" onclick="switchCapitalSubTab('${t.id}')">${t.label}</button>`).join("")}
+  </div>`;
+  let bodyHtml;
+  if(capitalSubTab === "loan") bodyHtml = loanSectionHtml(s, me);
+  else if(capitalSubTab === "stats") bodyHtml = statsSectionHtml(s, me);
+  else bodyHtml = myAssetsSectionHtml(s, me);
   el.innerHTML = `
     <div class="cap-summary"><span>Наличные</span><b class="${me.cash<0?'down':''}">${fmt(me.cash)}</b></div>
     <div class="cap-summary"><span>В акциях</span><b>${fmt(invested)}</b></div>
     <div class="cap-summary"><span>Чистый капитал</span><b>${fmt(me.netWorth)}</b></div>
-    ${rows}
+    <div class="cap-summary"><span>⭐ Репутация</span><b class="${rep.cls}">${me.reputation} · ${rep.text}</b></div>
+    ${subtabsHtml}
+    ${bodyHtml}
   `;
 }
 
@@ -1191,13 +1993,10 @@ function renderControlPanel(s){
     if(activeTab === "control") switchTab("turn");
     return;
   }
-  const myControlled = s.companies.filter(c => (me.holdings[c.ticker]||0) > 50);
-  if(myControlled.length === 0 && !pendingInsiderCard){
-    tabBtns.forEach(b=> b.style.display = "none");
-    if(activeTab === "control") switchTab("turn");
-    return;
-  }
+  // Вкладка теперь доступна всем (не только владельцам контрольных пакетов) —
+  // шпионаж и дискредитация не требуют контроля над компанией.
   tabBtns.forEach(b=> b.style.display = "inline-block");
+  const myControlled = s.companies.filter(c => (me.holdings[c.ticker]||0) > 50);
 
   if(pendingInsiderCard){
     const card = pendingInsiderCard;
@@ -1217,11 +2016,39 @@ function renderControlPanel(s){
   }
 
   if(s.phase !== "trade"){
-    el.innerHTML = `<div class="muted" style="font-size:12.5px;">Спецдействия доступны только во время фазы торгов (следующее биржевое событие откроет окно).</div>`;
+    el.innerHTML = `<div class="muted" style="font-size:12.5px;">Спецдействия, шпионаж и дискредитация доступны только во время фазы торгов (следующее биржевое событие откроет окно).</div>`;
     return;
   }
   if(s.frozen){
     el.innerHTML = `<div class="muted" style="font-size:12.5px;">🧊 Заморозка цен — спецдействия временно запрещены.</div>`;
+    return;
+  }
+
+  const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
+  const targetOpts = otherPlayers.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} (⭐${p.reputation})</option>`).join("") || "<option>нет доступных целей</option>";
+
+  let html = `
+    <div class="control-card">
+      <h3>🕵️ Шпионаж</h3>
+      <p>$8 000 · шанс раскрыть активы цели (акции и недвижимость) на 2 события · раз за событие на одну цель. При провале вас ловят — минус к вашей репутации.</p>
+      <div class="row-inline">
+        <select id="spyTarget" ${otherPlayers.length===0?"disabled":""}>${targetOpts}</select>
+        <button onclick="doCtrlEspionage()" ${otherPlayers.length===0?"disabled":""}>Шпионить</button>
+      </div>
+    </div>
+    <div class="control-card">
+      <h3>🗞️ Дискредитация</h3>
+      <p>Стоимость растёт с репутацией цели (чем выше — тем дороже атаковать) · при успехе репутация цели падает · при провале падает ваша.</p>
+      <div class="row-inline">
+        <select id="discreditTarget" ${otherPlayers.length===0?"disabled":""}>${targetOpts}</select>
+        <button onclick="doCtrlDiscredit()" ${otherPlayers.length===0?"disabled":""}>Дискредитировать</button>
+      </div>
+    </div>
+  `;
+
+  if(myControlled.length === 0){
+    html += `<div class="muted" style="font-size:12px;padding:4px 2px;">👑 Спецдействия с контрольным пакетом (вброс новостей, PR-кампания, инсайд, выкуп миноритариев) появятся здесь, когда вы получите &gt;50% какой-либо компании.</div>`;
+    el.innerHTML = html;
     return;
   }
 
@@ -1232,7 +2059,7 @@ function renderControlPanel(s){
   const shortOpts = s.companies.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join("");
   const myShorts = (s.shorts||[]).filter(sh=>sh.playerId===you);
 
-  el.innerHTML = `
+  html += `
     <div class="control-card">
       <h3>📉 Вброс негативной информации</h3>
       <p>$10 000 · цена чужой компании −15% · раз в 2 события на одну и ту же цель.</p>
@@ -1272,6 +2099,7 @@ function renderControlPanel(s){
       ${myShorts.length ? myShorts.map(sh=>`<div class="muted" style="font-size:11.5px;margin-top:6px;">Открыт шорт по ${sh.ticker} при цене ${fmt(sh.priceAtBet)} — ждём итогов события.</div>`).join("") : ""}
     </div>
   `;
+  el.innerHTML = html;
 }
 
 // ---------------------------------------------------------------------
@@ -1292,7 +2120,7 @@ function statusRowHtml(s){
   const roomText = mode === "online" ? `Комната ${roomCode}` : "Офлайн-партия";
   return `
     <div class="status-row">${phaseHtml}${viewAsHtml}</div>
-    <div class="muted" style="font-size:11px;margin:2px 0 14px;">${roomText} · Раунд ${s.turn}/3 · Событий: ${s.eventCount} · Колода: ${s.deckRemaining}</div>
+    <div class="muted" style="font-size:11px;margin:2px 0 14px;">${roomText} · Раунд ${s.turn}/${s.roundLen||3} · Событий: ${s.eventCount} · Колода: ${s.deckRemaining}</div>
   `;
 }
 
@@ -1314,12 +2142,17 @@ function capSummaryHtml(s){
   if(!me) return "";
   const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
   const invested = holdings.reduce((sum,[t,v])=>{ const c=s.companies.find(x=>x.ticker===t); return sum + (c?c.price*(v/100):0); },0);
+  const rep = reputationLabel(me.reputation);
   return `<div class="mini-card">
     <h3>💰 Ваш капитал</h3>
     <div class="cap-mini-row">
       <div class="cap-mini"><span>Наличные</span><b class="${me.cash<0?'down':''}">${fmt(me.cash)}</b></div>
       <div class="cap-mini"><span>В акциях</span><b>${fmt(invested)}</b></div>
       <div class="cap-mini"><span>Итого</span><b>${fmt(me.netWorth)}</b></div>
+    </div>
+    <div class="rep-badge-row">
+      <span class="rep-badge ${rep.cls}">⭐ ${me.reputation}</span>
+      ${me.loanPrincipal ? `<span class="rep-badge loan">🏦 ${fmt(me.loanPrincipal)}</span>` : ""}
     </div>
   </div>`;
 }
@@ -1376,23 +2209,82 @@ function stocksListHtml(s){
   return `<div class="mini-card"><h3>📦 Ваши акции</h3>${rows}</div>`;
 }
 
+function forcedPriceWaitingPopupHtml(s){
+  // Показывается контролёру (>50%, единственный держатель) даже вне его хода —
+  // ему нужно назначить цену выкупа для игрока, отказавшегося покупать акции.
+  const roll = s.pendingRoll;
+  const meta = s.pendingRollMeta;
+  const roller = s.players.find(p=>p.id===roll.playerId);
+  const c = s.companies.find(x=>x.ticker===meta.ticker);
+  const fair = Math.round((c ? c.price : 0) * (meta.forcedPct||0.05) * (meta.totalOwnedPct/100));
+  return `<div class="popup-card">
+    <div class="muted" style="margin-bottom:10px;font-size:12.5px;">🏛️ Игрок «${roller?roller.name:"?"}» выбрал не покупать ${meta.ticker} — вы полностью контролируете этот пакет. Назначьте цену выкупа.</div>
+    <div class="muted" style="font-size:11.5px;margin-bottom:8px;">Ориентировочная справедливая цена: ${fmt(fair)}. Слишком высокая цена ударит по вашей репутации и может привести к антимонопольной конфискации.</div>
+    <div class="row-inline">
+      <input id="forcedPriceAmount" type="number" min="1" placeholder="Сумма, $" style="flex:1;">
+      <button onclick="doSetForcedPrice()">Назначить цену</button>
+    </div>
+  </div>`;
+}
+
 function rollPopupHtml(s){
   const roll = s.pendingRoll;
-  const c = s.companies.find(x=>x.ticker===roll.ticker);
-  let actionsHtml;
-  if(c.owned >= 100){
-    actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="send({type:'dividendFromRoll'})">Заплатить дивиденды владельцам ${roll.ticker}</button>`;
-  } else {
-    const free = 100 - c.owned;
-    actionsHtml = `
-      <div class="row-inline" style="margin-top:10px;">
-        <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
-        <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
-      </div>`;
-  }
+  const meta = s.pendingRollMeta || {};
   const rollKey = `${roll.playerId}-${roll.row}-${roll.col}`;
   const isNewRoll = rollKey !== lastAnimatedRollKey;
   if(isNewRoll) lastAnimatedRollKey = rollKey;
+
+  if(meta.kind === "realestate"){
+    const owner = meta.ownerId ? s.players.find(p=>p.id===meta.ownerId) : null;
+    let actionsHtml, allowSkip = true;
+    if(!meta.ownerId){
+      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="doBuyRealEstateFromRoll()">Купить недвижимость за ${fmt(meta.price)}</button>`;
+    } else if(meta.ownerId === you){
+      if(meta.level < meta.maxLevel){
+        actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="doUpgradeRealEstateFromRoll()">Улучшить (${meta.level}/${meta.maxLevel}) за ${fmt(meta.upgradeCost)}</button>`;
+      } else {
+        actionsHtml = `<div class="muted" style="margin-top:10px;font-size:12.5px;">Максимум улучшений (${meta.maxLevel}/${meta.maxLevel}) уже достигнут.</div>`;
+      }
+    } else {
+      actionsHtml = `<button style="width:100%;margin-top:10px;" onclick="doPayRealEstateRentFromRoll()">Заплатить ренту ${fmt(meta.rent)} игроку ${owner?owner.name:"?"}</button>`;
+      allowSkip = false;
+    }
+    return `<div class="popup-card${isNewRoll?" roll-reveal":""}">
+      <div class="muted" style="margin-bottom:10px;font-size:12.5px;">🎲 <b>${roll.row}</b> / <b>${roll.col}</b> → выпала недвижимость:</div>
+      <div class="stock-row" style="cursor:default;">
+        <span class="re-icon" style="font-size:20px;">🏠</span>
+        <span class="stk-name"><b>${meta.cityName}</b>${owner?` <span class="muted">— владелец: ${owner.name}${meta.level?` ★${meta.level}`:""}</span>`:""}</span>
+        <span class="price">${fmt(meta.rent)}/рента</span>
+      </div>
+      ${actionsHtml}
+      ${allowSkip ? `<div class="row-inline" style="margin-top:10px;">
+        <button class="secondary" style="width:100%;" onclick="send({type:'skipRoll'})">Пропустить действие и завершить ход</button>
+      </div>` : ""}
+    </div>`;
+  }
+
+  // kind === "stock"
+  const c = s.companies.find(x=>x.ticker===roll.ticker);
+  const free = 100 - c.owned;
+  let actionsHtml = "";
+  let allowSkip = meta.ownersCount === 0;
+  if(free >= 10){
+    actionsHtml += `<div class="row-inline" style="margin-top:10px;">
+      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
+      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
+    </div>`;
+  }
+  if(meta.ownersCount > 0){
+    if(meta.controllerId){
+      if(s.pendingForcedPrice && s.pendingForcedPrice.targetId === you){
+        actionsHtml += `<button style="width:100%;margin-top:10px;" onclick="doPayForcedPrice()">Оплатить назначенную цену: ${fmt(s.pendingForcedPrice.amount)}</button>`;
+      } else {
+        actionsHtml += `<div class="muted" style="margin-top:10px;font-size:12.5px;">🏛️ ${meta.controllerName} полностью контролирует эту компанию — ожидайте, пока владелец назначит цену выкупа.</div>`;
+      }
+    } else {
+      actionsHtml += `<button style="width:100%;margin-top:10px;" onclick="send({type:'dividendFromRoll'})">Заплатить ${(meta.forcedPct*100).toFixed(0)}% капитализации держателям (${meta.ownersCount})</button>`;
+    }
+  }
   return `<div class="popup-card${isNewRoll?" roll-reveal":""}">
     <div class="muted" style="margin-bottom:10px;font-size:12.5px;">🎲 <b>${roll.row}</b> / <b>${roll.col}</b> → выпала компания:</div>
     <div class="stock-row" style="cursor:default;">
@@ -1402,9 +2294,9 @@ function rollPopupHtml(s){
       <span class="muted">${c.owned.toFixed(0)}%</span>
     </div>
     ${actionsHtml}
-    <div class="row-inline" style="margin-top:10px;">
+    ${allowSkip ? `<div class="row-inline" style="margin-top:10px;">
       <button class="secondary" style="width:100%;" onclick="send({type:'skipRoll'})">Пропустить действие и завершить ход</button>
-    </div>
+    </div>` : ""}
   </div>`;
 }
 
@@ -1467,6 +2359,14 @@ function renderStage(s){
     return;
   }
   if(s.phase === "roll"){
+    // Контролёр пакета (>50%) должен назначить цену выкупа — показываем ему
+    // это даже если сейчас не его ход, иначе он никогда не увидит запрос.
+    if(s.pendingRoll && s.pendingRollMeta && s.pendingRollMeta.kind==="stock" && s.pendingRollMeta.controllerId===you && !s.pendingForcedPrice){
+      cornerAction.innerHTML = "";
+      popup.style.display = "flex";
+      popup.innerHTML = forcedPriceWaitingPopupHtml(s);
+      return;
+    }
     if(s.currentPlayerId !== you){
       const cp = s.players.find(p=>p.id===s.currentPlayerId);
       cornerAction.innerHTML = `<div class="stage-panel muted">${mode==="offline" ? `Передайте устройство игроку «${cp?cp.name:"?"}»...` : `Ожидание хода игрока «${cp?cp.name:"?"}»...`}</div>`;
@@ -1504,6 +2404,98 @@ function doProposeStockTrade(ticker){
   });
 }
 
+// ---------------------------------------------------------------------
+// Модалка компании: полная информация + большой график по клику из
+// таблицы биржи. Использует тот же priceHistoryClient, что и sparklineSvg,
+// но рисует его крупнее с подписями мин/макс и статистикой.
+// ---------------------------------------------------------------------
+let openModalTicker = null;
+function openCompanyModal(ticker){
+  openModalTicker = ticker;
+  document.getElementById("companyModalOverlay").style.display = "flex";
+  refreshCompanyModal();
+}
+function closeCompanyModal(){
+  openModalTicker = null;
+  document.getElementById("companyModalOverlay").style.display = "none";
+}
+function fullChartSvg(ticker, color){
+  const w = 440, h = 140, pad = 6;
+  const hist = priceHistoryClient[ticker] || [];
+  if(hist.length < 2){
+    const only = hist[0] || 0;
+    return { svg: `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity=".6"/></svg>`, min: only, max: only };
+  }
+  const min = Math.min(...hist), max = Math.max(...hist);
+  const span = (max - min) || 1;
+  const step = (w - pad*2) / (hist.length - 1);
+  const pts = hist.map((v,i)=>{
+    const x = pad + i*step;
+    const y = h - pad - ((v-min)/span) * (h - pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = pts.join(" ");
+  const area = `${pad},${h-pad} ${line} ${w-pad},${h-pad}`;
+  return {
+    svg: `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polygon points="${area}" fill="${color}" opacity=".14"/>
+      <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`,
+    min, max,
+  };
+}
+function refreshCompanyModal(){
+  if(!openModalTicker || !latest){ return; }
+  const s = latest;
+  const c = (s.companies||[]).find(x=>x.ticker===openModalTicker);
+  if(!c){ closeCompanyModal(); return; }
+  const delta = c.price - c.prevPrice;
+  const deltaPct = c.prevPrice ? (delta/c.prevPrice*100) : 0;
+  const controller = s.players.find(p=>p.id===c.controllerId);
+  const color = delta>0 ? "#3E7358" : delta<0 ? "#A8543E" : "rgba(36,31,26,.35)";
+  const chart = fullChartSvg(c.ticker, color);
+  const me = s.players.find(p=>p.id===you);
+  const myHolding = me ? (me.holdings[c.ticker]||0) : 0;
+  const canBuyNow = s.pendingRoll && s.pendingRoll.ticker === c.ticker && s.pendingRoll.playerId === you;
+  let actionsHtml = "";
+  if(canBuyNow){
+    const free = 100 - c.owned;
+    actionsHtml += `<div class="row-inline" style="margin-top:6px;">
+      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10});closeCompanyModal();" ${free<10?"disabled":""}>Купить 10%</button>
+      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25});closeCompanyModal();" ${free<25?"disabled":""}>Купить 25%</button>
+    </div>`;
+  } else {
+    actionsHtml += `<div class="muted" style="font-size:11.5px;margin-top:6px;">Купить акции у банка можно, только когда фишка попадёт на эту компанию.</div>`;
+  }
+  if(myHolding > 0 && s.phase === "trade" && !s.frozen){
+    actionsHtml += `<div class="row-inline" style="margin-top:10px;">
+      <button class="small secondary" style="flex:1;" onclick="doSellStock('${c.ticker}',10);" ${myHolding<10?"disabled":""}>Продать 10%</button>
+      <button class="small secondary" style="flex:1;" onclick="doSellStock('${c.ticker}',25);" ${myHolding<25?"disabled":""}>Продать 25%</button>
+    </div>`;
+  }
+  document.getElementById("companyModalCard").innerHTML = `
+    <div class="company-modal-head">
+      ${logoHtml(c.ticker,40)}
+      <div>
+        <h2>${escapeHtml(c.name)}</h2>
+        <div class="muted">${c.ticker} · <span class="sector-tag">${c.sector}</span></div>
+      </div>
+      <button type="button" class="company-modal-close" onclick="closeCompanyModal()">✕</button>
+    </div>
+    <div class="company-modal-stats">
+      <div class="cap-mini"><span>Цена</span><b>${fmt(c.price)}</b></div>
+      <div class="cap-mini"><span>Изменение</span><b class="${delta>0?'up':delta<0?'down':''}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</b></div>
+      <div class="cap-mini"><span>В обороте у игроков</span><b>${c.owned.toFixed(0)}%</b></div>
+      <div class="cap-mini"><span>Волатильность</span><b>${c.volLabel}</b></div>
+      ${controller ? `<div class="cap-mini"><span>Контрольный пакет</span><b>👑 ${escapeHtml(controller.name)}</b></div>` : ""}
+      ${myHolding ? `<div class="cap-mini"><span>У вас</span><b>${myHolding}% (${fmt(c.price*myHolding/100)})</b></div>` : ""}
+    </div>
+    <div class="full-chart-wrap">${chart.svg}</div>
+    <div class="full-chart-minmax"><span>мин ${fmt(chart.min)}</span><span>макс ${fmt(chart.max)}</span></div>
+    ${actionsHtml}
+  `;
+}
+
 function doCtrlNegativeInfo(){
   const el = document.getElementById("negTarget");
   if(!el || !el.value) return;
@@ -1528,8 +2520,41 @@ function doCtrlInsiderResolve(action){
   send({type:"ctrlInsiderResolve", action});
   pendingInsiderCard = null;
 }
+function doCtrlEspionage(){
+  const el = document.getElementById("spyTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlEspionage", target: parseInt(el.value)});
+}
+function doCtrlDiscredit(){
+  const el = document.getElementById("discreditTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlDiscredit", target: parseInt(el.value)});
+}
+function doTakeLoan(){
+  const el = document.getElementById("loanAmount");
+  const amount = Math.round(Number(el && el.value));
+  if(!amount || amount<=0) return;
+  send({type:"takeLoan", amount});
+}
+function doRepayLoan(){
+  const el = document.getElementById("repayAmount");
+  const amount = Math.round(Number(el && el.value));
+  if(!amount || amount<=0) return;
+  send({type:"repayLoan", amount});
+}
+function doBuyRealEstateFromRoll(){ send({type:"buyRealEstateFromRoll"}); }
+function doUpgradeRealEstateFromRoll(){ send({type:"upgradeRealEstateFromRoll"}); }
+function doPayRealEstateRentFromRoll(){ send({type:"payRealEstateRentFromRoll"}); }
+function doSetForcedPrice(){
+  const el = document.getElementById("forcedPriceAmount");
+  const amount = Math.round(Number(el && el.value));
+  if(!amount || amount<=0) return;
+  send({type:"setForcedPrice", amount});
+}
+function doPayForcedPrice(){ send({type:"payForcedPrice"}); }
 
 initProfileUI();
+buildMarketFilters();
 </script>
 </body>
 </html>
