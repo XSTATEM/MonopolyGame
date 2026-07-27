@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
 const engine = require("./public/engine.js");
+const users = require("./users.js");
 
 function fmt(n) { return "$" + Math.round(n).toLocaleString("ru-RU"); }
 
@@ -61,23 +62,51 @@ function run(conn, result) {
     if (!result.stillChanged) return;
   }
   const room = requireRoom(conn);
-  if (room) { syncTradeTimer(room); broadcast(room); }
+  if (room) { syncTradeTimer(room); syncAccountPoints(room); broadcast(room); }
 }
 
+// Победа в игре начисляет очки на persistent-аккаунт игрока (engine.js лишь
+// один раз выставляет room.lastGamePointsAward — здесь мы это подхватываем
+// и дописываем в users.json, а в комнате освежаем отображаемую сумму).
+function syncAccountPoints(room) {
+  const award = room.lastGamePointsAward;
+  if (!award) return;
+  room.lastGamePointsAward = null;
+  for (const [, c] of connections) {
+    if (c.roomCode === room.code && c.playerId === award.playerId && c.accountUsername) {
+      const total = users.addPoints(c.accountUsername, award.amount);
+      const p = room.players.find((x) => x.id === award.playerId);
+      if (p && total != null) p.points = total;
+      break;
+    }
+  }
+}
+
+// Вход в комнату теперь требует аккаунт: ник — это логин, доступ к нему
+// закрыт паролем (scrypt-хэш в users.js), чтобы прогресс/очки нельзя было
+// присвоить или потерять, просто зная чужой ник.
 function handleJoin(ws, msg) {
   const code = String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
-  const name = String(msg.name || "").trim().slice(0, 20);
-  const gender = String(msg.gender || "").trim().slice(0, 24);
-  const avatar = String(msg.avatar || "").trim().slice(0, 8);
-  if (!name) return sendTo(ws, { type: "error", message: "Введите имя игрока." });
+  const authMode = msg.authMode === "register" ? "register" : "login";
+  const username = String(msg.username || "").trim().slice(0, 20);
+  const password = String(msg.password || "");
+  if (!username) return sendTo(ws, { type: "error", message: "Введите ник." });
+  if (!password) return sendTo(ws, { type: "error", message: "Введите пароль." });
+
+  const authResult = authMode === "register"
+    ? users.register(username, password, msg.gender, msg.avatar)
+    : users.login(username, password);
+  if (authResult.error) return sendTo(ws, { type: "error", message: authResult.error });
+  const profile = authResult.user;
+
   const isNew = !rooms.has(code);
   const twm = ALLOWED_TRADE_WINDOWS.includes(Number(msg.tradeWindowMs)) ? Number(msg.tradeWindowMs) : undefined;
   const room = isNew ? getOrCreateRoom(code, twm) : getOrCreateRoom(code);
 
-  const result = engine.addPlayer(room, name, gender, avatar);
+  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points);
   if (result.error) return sendTo(ws, { type: "error", message: result.error });
 
-  connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name });
+  connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name: profile.username, accountUsername: profile.username });
   sendTo(ws, { type: "joined", playerId: result.player.id, room: code });
   syncTradeTimer(room);
   broadcast(room);

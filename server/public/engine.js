@@ -243,6 +243,8 @@
       const won = Math.round(netWorth(room, winner));
       const pointsEarned = Math.max(1, Math.round(won / 1000));
       winner.points = (winner.points || 0) + pointsEarned;
+      // Сетевой слой (server.js) заберёт это один раз и допишет очки в персистентный аккаунт игрока.
+      room.lastGamePointsAward = { playerId: winner.id, amount: pointsEarned };
       addLog(room, `🏆 Игра окончена! Победитель: ${winner.name} с капиталом ${fmt(won)} — начислено ${pointsEarned} очков (всего ${winner.points}).`, "win");
     }
   }
@@ -369,7 +371,7 @@
   // ---------------------------------------------------------------------
   // Игроки
   // ---------------------------------------------------------------------
-  function addPlayer(room, name, gender, avatar) {
+  function addPlayer(room, name, gender, avatar, initialPoints) {
     name = String(name || "").trim().slice(0, 20);
     if (!name) return { error: "Введите имя игрока." };
     gender = String(gender || "").trim().slice(0, 24);
@@ -382,9 +384,10 @@
       player.connected = true;
       if (gender) player.gender = gender;
       if (avatar) player.avatar = avatar;
+      if (initialPoints != null) player.points = initialPoints;
       addLog(room, `Игрок «${name}» переподключился.`, "player");
     } else {
-      player = { id: room.nextPlayerId++, name, gender, avatar, points: 0, cash: 150000, holdings: {}, bankrupt: false, connected: true };
+      player = { id: room.nextPlayerId++, name, gender, avatar, points: initialPoints != null ? initialPoints : 0, cash: 150000, holdings: {}, bankrupt: false, connected: true };
       room.players.push(player);
       room.turnOrder.push(player.id);
       addLog(room, `Игрок «${name}» присоединился со стартовым капиталом ${fmt(150000)}.`, "player");

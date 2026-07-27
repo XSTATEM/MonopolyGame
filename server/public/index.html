@@ -85,7 +85,6 @@
   .net{font-weight:700;font-family:var(--font-mono);}
   .muted{color:var(--muted);}
   .event-banner{background:linear-gradient(120deg, rgba(255,214,168,.5), rgba(198,224,214,.5));border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text);}
-  .footer-note{font-size:11.5px;color:var(--muted);text-align:center;padding:20px;}
   .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
   .join-box{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px;width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(36,31,26,.1);}
   .join-box h1{font-size:20px;margin:0 0 6px;}
@@ -128,13 +127,17 @@
   .stage-tabbar .tab-btn{color:rgba(243,238,228,.7);}
   .stage-tabbar .tab-btn.active{background:rgba(255,255,255,.22);color:#fff;}
 
-  /* Биржа/Капитал/Контроль/Лента открываются поверх стола оверлеем, а не заменяют экран */
+  /* Биржа/Капитал/Контроль/Лента открываются поверх стола оверлеем, а не заменяют экран.
+     Переключатель вкладок остаётся закреплён снизу — так же, как на столе — чтобы
+     при переходе на любую вкладку он не «прыгал» наверх экрана. */
   .overlay-panel.active{
     position:fixed;inset:0;z-index:22;display:block;overflow-y:auto;
     background:rgba(20,14,9,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    padding:16px 16px 24px;
+    padding:16px 16px 88px;
   }
-  .overlay-panel-close{position:sticky;top:0;z-index:2;width:100%;margin-bottom:10px;background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:4px 6px;}
+  .overlay-panel-close{position:fixed;left:12px;right:12px;bottom:12px;z-index:23;width:auto;margin-bottom:0;background:rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:2px 6px;box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  .overlay-panel-close .tab-btn{color:rgba(243,238,228,.7);}
+  .overlay-panel-close .tab-btn.active{background:rgba(255,255,255,.22);color:#fff;}
 
   .mini-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;}
   .mini-card h3{font-size:12px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
@@ -202,7 +205,7 @@
   .cell-logo-name{display:inline-flex;align-items:center;}
 
   /* Игровой стол: тёмная сцена по центру экрана, полупрозрачные виджеты по углам, контекстные попапы */
-  .stage{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:14px;min-height:min(80vh,660px);
+  .stage{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:14px;min-height:clamp(520px, calc(100vh - 38px), 900px);
     background:radial-gradient(ellipse at 50% 26%, #4a3323 0%, #241a12 60%, #140e09 100%);
     box-shadow:0 20px 50px rgba(0,0,0,.35);
     display:grid;
@@ -322,22 +325,33 @@
 <div class="center-screen" id="onlineScreen" style="display:none;">
   <div class="join-box" style="width:400px;">
     <h1>🌐 Играть онлайн</h1>
-    <p>Выберите комнату из списка или создайте новую — партия хранится на сервере и общая для всех.</p>
-    <label>Ваш ник</label>
-    <input id="joinName" placeholder="например Игрок1" maxlength="20">
+    <p>Ник — это логин вашего аккаунта, защищённый паролем: прогресс и очки сохраняются между сессиями, и никто не сможет войти под вашим ником без пароля.</p>
 
-    <label>Пол</label>
-    <select id="joinGender">
-      <option value="">Не указывать</option>
-      <option value="male">Мужской</option>
-      <option value="female">Женский</option>
-      <option value="nonbinary">Небинарный</option>
-      <option value="other">Другое</option>
-    </select>
-    <input id="joinGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+    <div class="row-inline" style="margin:0 0 4px;">
+      <button type="button" class="small" style="flex:1;" id="authModeLogin">Вход</button>
+      <button type="button" class="secondary small" style="flex:1;" id="authModeRegister">Регистрация</button>
+    </div>
 
-    <label>Аватар</label>
-    <div class="avatar-picker" id="joinAvatarPicker"></div>
+    <label>Ник</label>
+    <input id="joinName" placeholder="например Игрок1" maxlength="20" autocomplete="username">
+
+    <label>Пароль</label>
+    <input id="joinPassword" type="password" placeholder="пароль" autocomplete="current-password">
+
+    <div id="registerFields" style="display:none;">
+      <label>Пол</label>
+      <select id="joinGender">
+        <option value="">Не указывать</option>
+        <option value="male">Мужской</option>
+        <option value="female">Женский</option>
+        <option value="nonbinary">Небинарный</option>
+        <option value="other">Другое</option>
+      </select>
+      <input id="joinGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+
+      <label>Аватар</label>
+      <div class="avatar-picker" id="joinAvatarPicker"></div>
+    </div>
 
     <label>Активные комнаты</label>
     <div class="room-list-box" id="roomList"></div>
@@ -540,7 +554,6 @@
     </section>
   </div>
 </main>
-<div class="footer-note" id="footerNote">Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.</div>
 </div>
 
 <script src="/engine.js"></script>
@@ -584,8 +597,21 @@ function currentJoinGender(){
   if(sel === "other") return document.getElementById("joinGenderOther").value.trim().slice(0,24);
   return sel;
 }
-function saveProfileLocal(name, gender, genderOtherRaw, avatar){
-  try { localStorage.setItem("tm_profile", JSON.stringify({name, gender, genderOther: genderOtherRaw||"", avatar: avatar||""})); } catch(e){}
+// Пароль никогда не сохраняется локально — только последний использованный ник,
+// чтобы не перепечатывать его при следующем входе.
+function saveUsernameLocal(username){
+  try { localStorage.setItem("tm_username", username || ""); } catch(e){}
+}
+let authMode = "login"; // 'login' | 'register'
+function setAuthMode(m){
+  authMode = m === "register" ? "register" : "login";
+  document.getElementById("authModeLogin").classList.toggle("secondary", authMode !== "login");
+  document.getElementById("authModeRegister").classList.toggle("secondary", authMode !== "register");
+  document.getElementById("registerFields").style.display = authMode === "register" ? "block" : "none";
+  const pwd = document.getElementById("joinPassword");
+  pwd.placeholder = authMode === "register" ? "не короче 4 символов" : "пароль";
+  pwd.autocomplete = authMode === "register" ? "new-password" : "current-password";
+  document.getElementById("joinErr").textContent = "";
 }
 function initProfileUI(){
   const joinGenderSel = document.getElementById("joinGender");
@@ -599,16 +625,13 @@ function initProfileUI(){
     offlineGenderOther.style.display = offlineGenderSel.value === "other" ? "block" : "none";
   });
 
+  document.getElementById("authModeLogin").onclick = ()=> setAuthMode("login");
+  document.getElementById("authModeRegister").onclick = ()=> setAuthMode("register");
+  setAuthMode("login");
+
   try {
-    const saved = JSON.parse(localStorage.getItem("tm_profile") || "null");
-    if(saved){
-      if(saved.name) document.getElementById("joinName").value = saved.name;
-      if(saved.gender){
-        joinGenderSel.value = saved.gender;
-        if(saved.gender === "other"){ joinGenderOther.style.display = "block"; joinGenderOther.value = saved.genderOther || ""; }
-      }
-      if(saved.avatar) joinAvatar = saved.avatar;
-    }
+    const savedUsername = localStorage.getItem("tm_username");
+    if(savedUsername) document.getElementById("joinName").value = savedUsername;
   } catch(e){}
 
   buildAvatarPicker("joinAvatarPicker", joinAvatar, a=> joinAvatar = a);
@@ -694,31 +717,48 @@ function refreshRoomList(){
     });
   }).catch(()=>{});
 }
+function currentAuthPayload(){
+  const username = document.getElementById("joinName").value.trim();
+  const password = document.getElementById("joinPassword").value;
+  const payload = { username, password, authMode };
+  if(authMode === "register"){
+    payload.gender = currentJoinGender();
+    payload.avatar = joinAvatar;
+  }
+  return payload;
+}
+function validateAuthPayload(p){
+  if(!p.username) return "Введите ник.";
+  if(!p.password) return "Введите пароль.";
+  if(p.authMode === "register" && p.password.length < 4) return "Пароль должен быть не короче 4 символов.";
+  return null;
+}
 function doJoin(code){
-  const name = document.getElementById("joinName").value.trim();
-  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
+  const auth = currentAuthPayload();
+  const err = validateAuthPayload(auth);
+  if(err){ document.getElementById("joinErr").textContent = err; return; }
   document.getElementById("joinErr").textContent = "";
-  const gender = currentJoinGender();
-  saveProfileLocal(name, document.getElementById("joinGender").value, document.getElementById("joinGenderOther").value, joinAvatar);
-  connectOnline(code, name, undefined, gender, joinAvatar);
+  saveUsernameLocal(auth.username);
+  connectOnline(code, undefined, auth);
 }
 document.getElementById("btnCreateRoom").onclick = ()=>{
-  const name = document.getElementById("joinName").value.trim();
-  if(!name){ document.getElementById("joinErr").textContent = "Введите ник."; return; }
+  const auth = currentAuthPayload();
+  const err = validateAuthPayload(auth);
+  if(err){ document.getElementById("joinErr").textContent = err; return; }
   const room = document.getElementById("joinRoom").value.trim() || ("R" + Math.random().toString(36).slice(2,6).toUpperCase());
   document.getElementById("joinErr").textContent = "";
   const tradeWindowMs = parseInt(document.getElementById("createTradeSpeed").value);
-  const gender = currentJoinGender();
-  saveProfileLocal(name, document.getElementById("joinGender").value, document.getElementById("joinGenderOther").value, joinAvatar);
-  connectOnline(room, name, tradeWindowMs, gender, joinAvatar);
+  saveUsernameLocal(auth.username);
+  connectOnline(room, tradeWindowMs, auth);
 };
 document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
+document.getElementById("joinPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
 
-function connectOnline(room, name, tradeWindowMs, gender, avatar){
+function connectOnline(room, tradeWindowMs, auth){
   mode = "online";
-  roomCode = room; myName = name;
+  roomCode = room; myName = auth.username;
   ws = new WebSocket(wsUrl());
-  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, name, tradeWindowMs, gender, avatar})); };
+  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, tradeWindowMs, username: auth.username, password: auth.password, authMode: auth.authMode, gender: auth.gender, avatar: auth.avatar})); };
   ws.onmessage = (ev)=>{
     const msg = JSON.parse(ev.data);
     if(msg.type === "joined"){
@@ -732,7 +772,6 @@ function connectOnline(room, name, tradeWindowMs, gender, avatar){
         renderLobby(msg);
       } else {
         showOnly("app");
-        document.getElementById("footerNote").textContent = "Партия хранится на сервере и общая для всех, кто подключился с тем же кодом комнаты.";
         render();
       }
     } else if(msg.type === "insiderCard"){
@@ -792,7 +831,6 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   localRoom.phase = "roll"; // офлайн хот-сит — без комнаты ожидания, сразу к игре
   viewAs = localRoom.players[0].id;
   showOnly("app");
-  document.getElementById("footerNote").textContent = "Офлайн-партия хранится только в этой вкладке браузера и не сохраняется на сервере.";
   refreshLocal();
 };
 

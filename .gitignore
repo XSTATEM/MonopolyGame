@@ -1,3 +1,5 @@
 node_modules/
 server/server.out.log
 server/server.err.log
+server/preview-*.log
+server/data/
