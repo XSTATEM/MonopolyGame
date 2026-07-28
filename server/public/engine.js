@@ -11,7 +11,6 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  const DEFAULT_TRADE_WINDOW_MS = 90000;
   const TIER_PRICE = { A: 40000, B: 20000, C: 8000 };
   // Волатильность по тиру: голубые фишки (A) двигаются спокойнее, малые компании (C) — резче.
   // Множитель применяется к любому изменению цены (события, сделки, спецдействия).
@@ -31,40 +30,104 @@
     { ticker: "GOOGL", name: "Google", sector: "Технологии", tier: "A" },
     { ticker: "NVDA", name: "NVIDIA", sector: "Технологии", tier: "B" },
     { ticker: "IBM", name: "IBM", sector: "Технологии", tier: "B" },
+    { ticker: "INTC", name: "Intel", sector: "Технологии", tier: "B" },
+    { ticker: "SONY", name: "Sony", sector: "Технологии", tier: "B" },
     { ticker: "AMZN", name: "Amazon", sector: "Интернет и медиа", tier: "B" },
     { ticker: "DIS", name: "Disney", sector: "Интернет и медиа", tier: "A" },
+    { ticker: "NFLX", name: "Netflix", sector: "Интернет и медиа", tier: "A" },
+    { ticker: "META", name: "Meta", sector: "Интернет и медиа", tier: "A" },
     { ticker: "YDEX", name: "Яндекс", sector: "Интернет и медиа", tier: "C" },
     { ticker: "VKCO", name: "VK", sector: "Интернет и медиа", tier: "C" },
     { ticker: "MCD", name: "McDonald's", sector: "Потребительские товары", tier: "A" },
     { ticker: "NKE", name: "Nike", sector: "Потребительские товары", tier: "B" },
     { ticker: "KO", name: "Coca-Cola", sector: "Потребительские товары", tier: "B" },
     { ticker: "WMT", name: "Walmart", sector: "Потребительские товары", tier: "B" },
+    { ticker: "PEP", name: "Pepsi", sector: "Потребительские товары", tier: "B" },
+    { ticker: "SBUX", name: "Starbucks", sector: "Потребительские товары", tier: "B" },
     { ticker: "RKT", name: "Durex", sector: "Потребительские товары", tier: "C" },
+    { ticker: "ADS", name: "Adidas", sector: "Потребительские товары", tier: "C" },
     { ticker: "BA", name: "Boeing", sector: "Промышленность и транспорт", tier: "A" },
+    { ticker: "TSLA", name: "Tesla", sector: "Промышленность и транспорт", tier: "A" },
     { ticker: "MMM", name: "3M", sector: "Промышленность и транспорт", tier: "B" },
     { ticker: "AFLT", name: "Аэрофлот", sector: "Промышленность и транспорт", tier: "C" },
+    { ticker: "F", name: "Ford", sector: "Промышленность и транспорт", tier: "C" },
+    { ticker: "V", name: "Visa", sector: "Финансы и сырьё", tier: "A" },
     { ticker: "SBER", name: "Сбербанк", sector: "Финансы и сырьё", tier: "B" },
     { ticker: "GAZP", name: "Газпром", sector: "Финансы и сырьё", tier: "C" },
     { ticker: "MGNT", name: "Магнит", sector: "Финансы и сырьё", tier: "C" },
     { ticker: "MTSS", name: "МТС", sector: "Финансы и сырьё", tier: "C" },
   ];
   // Клетки вида "RE:<cityId>" — недвижимость (см. CITIES ниже), вкраплена в поле
-  // акций почти как в «Монополии»: 16 клеток из 144 отданы под конкретные города,
-  // остальные — как раньше, тикеры компаний.
-  const BOARD = [
-    ["AAPL","RE:nyc","MMM","MTSS","KO","YDEX","RE:sf","YDEX","NKE","AMZN","MMM","BA"],
-    ["MGNT","GOOGL","NKE","AAPL","BA","GOOGL","AAPL","SBER","NVDA","RE:la","KO","MSFT"],
-    ["MTSS","NKE","MSFT","RE:boston","IBM","NVDA","KO","GOOGL","RE:seattle","IBM","MCD","DIS"],
-    ["RE:chicago","NVDA","WMT","SBER","NKE","RE:miami","AMZN","VKCO","AFLT","GAZP","MTSS","MGNT"],
-    ["MGNT","GAZP","IBM","KO","AMZN","GOOGL","MSFT","IBM","AMZN","NVDA","RE:dc","GOOGL"],
-    ["GAZP","SBER","RE:denver","MTSS","BA","IBM","BA","RE:austin","IBM","NKE","BA","AAPL"],
-    ["MCD","MSFT","AMZN","RKT","RE:dallas","YDEX","AAPL","KO","MSFT","RE:atlanta","WMT","KO"],
-    ["AAPL","RE:houston","GOOGL","NKE","AFLT","MMM","YDEX","GOOGL","RKT","AMZN","NVDA","GOOGL"],
-    ["MCD","MGNT","MSFT","MCD","AMZN","AAPL","RE:phoenix","MSFT","AAPL","MMM","IBM","RKT"],
-    ["WMT","BA","GAZP","RE:vegas","MGNT","NVDA","KO","RKT","SBER","VKCO","NVDA","BA"],
-    ["GAZP","AFLT","MCD","GOOGL","KO","WMT","SBER","AFLT","RE:detroit","SBER","KO","MSFT"],
-    ["MCD","AAPL","MSFT","YDEX","MCD","NVDA","MMM","SBER","NVDA","GOOGL","YDEX","AAPL"],
-  ];
+  // акций почти как в «Монополии»: 16 клеток из 144 отданы под конкретные города
+  // (ровно по одной клетке на город — шанс попасть на каждый город одинаков).
+  // Раньше оставшиеся 128 клеток были расставлены вручную, и шансы выпадения
+  // компаний отличались в разы (например, Apple/Google получали по 10 клеток,
+  // а Disney — всего 1). Теперь поле собирается программно (buildBoard ниже):
+  // каждая компания получает максимально равное число клеток (128 / N компаний,
+  // остаток размазывается по одной лишней клетке — так что расхождение между
+  // любыми двумя компаниями не больше одной клетки), а сама раскладка на поле
+  // перемешивается детерминированным генератором с фиксированным seed — поле
+  // не меняется от перезапуска к перезапуску, но и не расставлено вручную.
+  const RE_CITY_IDS = ["nyc", "sf", "la", "boston", "seattle", "chicago", "miami", "dc", "denver", "austin", "dallas", "atlanta", "houston", "phoenix", "vegas", "detroit"];
+  const RE_CELL_POS = [
+    [0, 1], [0, 6], [1, 9], [2, 3], [2, 8], [3, 0], [3, 5], [4, 10],
+    [5, 2], [5, 7], [6, 4], [6, 9], [7, 1], [8, 6], [9, 3], [10, 8],
+  ]; // те же 16 позиций, что и в прежнем вручную составленном поле — раскладка городов не меняется
+
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seededShuffle(arr, seed) {
+    const rnd = mulberry32(seed);
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+  function buildBoard() {
+    const size = 12;
+    const total = size * size; // 144
+    const rePosSet = new Set(RE_CELL_POS.map(([r, c]) => r * size + c));
+    const nonRECount = total - rePosSet.size; // 128
+    const n = COMPANIES.length;
+    const base = Math.floor(nonRECount / n);
+    const extra = nonRECount - base * n; // столько компаний получат на 1 клетку больше остальных
+    // Кому именно достанется лишняя клетка — тоже определяем детерминированным
+    // перемешиванием (а не первым N по порядку объявления), чтобы бонусная клетка
+    // не была всегда у одних и тех же тикеров/секторов.
+    const extraOrder = seededShuffle(COMPANIES.map((c, i) => i), 733221);
+    const extraSet = new Set(extraOrder.slice(0, extra));
+    let tickerPool = [];
+    COMPANIES.forEach((c, i) => {
+      const count = base + (extraSet.has(i) ? 1 : 0);
+      for (let k = 0; k < count; k++) tickerPool.push(c.ticker);
+    });
+    tickerPool = seededShuffle(tickerPool, 20260728);
+    const grid = [];
+    let poolIdx = 0;
+    for (let r = 0; r < size; r++) {
+      const row = [];
+      for (let c = 0; c < size; c++) {
+        const idx = r * size + c;
+        if (rePosSet.has(idx)) {
+          const reIdx = RE_CELL_POS.findIndex(([rr, cc]) => rr === r && cc === c);
+          row.push("RE:" + RE_CITY_IDS[reIdx]);
+        } else {
+          row.push(tickerPool[poolIdx++]);
+        }
+      }
+      grid.push(row);
+    }
+    return grid;
+  }
+  const BOARD = buildBoard();
   const REAL_ESTATE_POS = {};
   for (let r = 0; r < 12; r++) {
     for (let c = 0; c < 12; c++) {
@@ -185,13 +248,13 @@
     const specials = [
       { key: "freeze", title: "Заморозка цен", desc: "До конца этого события цены не меняются." },
       { key: "buyback", title: "Принудительный выкуп", desc: "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене." },
-      { key: "extra_trade", title: "Дополнительная фаза торгов", desc: "Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей." },
+      { key: "extra_turn", title: "Дополнительный ход", desc: "Игрок, при котором наступило это событие, получает ещё один ход подряд." },
       { key: "audit", title: "Аудит", desc: "Каждый игрок с отрицательным балансом немедленно продаёт акции или объявляет банкротство." },
       { key: "double_dividend", title: "Дивидендный сезон", desc: "Все дивиденды до следующего события удваиваются." },
       { key: "tax", title: "Налоговая проверка", desc: "Каждый игрок платит банку 2% от своего текущего чистого капитала." },
       { key: "freeze", title: "Заморозка цен", desc: "До конца этого события цены не меняются." },
       { key: "buyback", title: "Принудительный выкуп", desc: "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене." },
-      { key: "extra_trade", title: "Дополнительная фаза торгов", desc: "Сразу после этой фазы — ещё одна фаза свободных торгов без карты новостей." },
+      { key: "extra_turn", title: "Дополнительный ход", desc: "Игрок, при котором наступило это событие, получает ещё один ход подряд." },
       { key: "audit", title: "Аудит", desc: "Каждый игрок с отрицательным балансом немедленно продаёт акции или объявляет банкротство." },
       { key: "double_dividend", title: "Дивидендный сезон", desc: "Все дивиденды до следующего события удваиваются." },
       { key: "tax", title: "Налоговая проверка", desc: "Каждый игрок платит банку 2% от своего текущего чистого капитала." },
@@ -211,7 +274,7 @@
 
   function fmt(n) { return "$" + Math.round(n).toLocaleString("ru-RU"); }
 
-  function freshRoom(code, tradeWindowMs) {
+  function freshRoom(code) {
     const companies = {};
     COMPANIES.forEach((c) => {
       companies[c.ticker] = {
@@ -243,7 +306,7 @@
       nextShortId: 1,
       turnOrder: [],
       turnIndex: 0,
-      phase: "lobby", // 'lobby' | 'roll' | 'trade' | 'ended'
+      phase: "lobby", // 'lobby' | 'roll' | 'ended'
       hostPlayerId: null,
       chat: [],
       nextChatId: 1,
@@ -252,22 +315,46 @@
       pendingTrades: [],
       dividendMultiplier: 1,
       frozen: false,
-      extraTradePending: false,
-      tradeWindowEndsAt: null,
-      tradeTimer: null, // используется только сервером (сетевой таймер), движок его не трогает
-      tradeWindowMs: tradeWindowMs || DEFAULT_TRADE_WINDOW_MS,
-      tradeReadyIds: [], // id игроков, нажавших «Готов завершить торги» в текущей фазе торгов
+      rolledThisTurn: false, // бросил ли текущий игрок кубики в этот ход (чтобы нельзя было бросить дважды)
+      extraTurnPending: false, // игрок, вызвавший биржевое событие, получает ещё один ход подряд
       insiderUsedEvent: {},
       pendingInsider: null,
       shorts: [],
       log: [],
       createdAt: Date.now(),
+      kickVote: null, // {targetId, initiatorId, startedAt, voters:{playerId:true}}
+      reactions: [], // {id, playerId, emoji, ts} — короткоживущие реакции за столом, чистятся по TTL на клиенте
+      nextReactionId: 1,
     };
   }
 
-  function addLog(room, text, tag) {
-    room.log.push({ text, tag: tag || "", turnTag: `Событие ${room.eventCount}`, ts: Date.now() });
+  // visibleTo (необязательно) — список id игроков, которым эта запись видна в ленте.
+  // Если не указан — запись публична (видна всем), как раньше. Используется для сделок
+  // покупки/продажи акций (tag "trade"), чтобы держать чужие сделки скрытыми и придать
+  // смысл шпионажу — иначе состав чужого портфеля был бы виден прямо из ленты событий.
+  function addLog(room, text, tag, visibleTo) {
+    room.log.push({ text, tag: tag || "", turnTag: `Событие ${room.eventCount}`, ts: Date.now(), visibleTo: visibleTo || null });
     if (room.log.length > 300) room.log.shift();
+  }
+
+  // Учёт себестоимости позиции (сколько всего денег вложено в текущий пакет по
+  // тикеру), чтобы можно было показать игроку прибыль/убыток по акции. Хранится
+  // как суммарная стоимость покупки текущего пакета (не за штуку) — при частичной
+  // продаже/передаче списывается пропорционально проданной/переданной доле.
+  function addCostBasis(p, ticker, pct, totalCost) {
+    if (!p.costBasis) p.costBasis = {};
+    if (pct <= 0) return;
+    p.costBasis[ticker] = (p.costBasis[ticker] || 0) + Math.max(0, totalCost);
+  }
+  function removeCostBasisProportional(p, ticker, pctRemoved) {
+    if (!p.costBasis) p.costBasis = {};
+    const heldBefore = p.holdings[ticker] || 0;
+    if (heldBefore <= 0 || pctRemoved <= 0) return 0;
+    const basis = p.costBasis[ticker] || 0;
+    const removed = pctRemoved >= heldBefore ? basis : basis * (pctRemoved / heldBefore);
+    const remainingPct = heldBefore - pctRemoved;
+    p.costBasis[ticker] = remainingPct <= 0 ? 0 : Math.max(0, basis - removed);
+    return removed;
   }
 
   function totalOwnedPct(room, ticker) {
@@ -288,6 +375,34 @@
     });
     if (p.loan) v -= p.loan.principal;
     return v;
+  }
+  // Стоимость платных «мер» контроля привязана к капиталу игрока (netWorth), а не
+  // к фиксированной сумме — иначе одна и та же цена в начале и в конце партии
+  // ощущается совершенно по-разному (для бедного игрока дорого, для богатого —
+  // копейки). Проценты и clamp-диапазоны подобраны так, чтобы в начале игры
+  // (когда netWorth близок к стартовому капиталу) стоимость была близка к старым
+  // фиксированным значениям, а к концу игры росла вместе с капиталом игрока.
+  function espionageCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.05), 6000, 45000); }
+  function negativeInfoCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.06), 8000, 55000); }
+  function insiderPeekCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.03), 4000, 28000); }
+  function shortDepositCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.04), 4000, 32000); }
+  function discreditCost(room, p, target) {
+    const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
+    return clamp(Math.round(netWorth(room, p) * 0.05) + targetRep * 250, 6000, 80000);
+  }
+  function personalPrCostFor(room, p) {
+    const uses = p.personalPrCount || 0;
+    return Math.max(5000 + 3000 * uses, Math.round(netWorth(room, p) * 0.03));
+  }
+  // Стоимость принудительного выкупа миноритариев зависит от чужих (обычно
+  // скрытых от игрока) долей, поэтому итоговую сумму считаем на сервере и
+  // отдаём в payload точечно по каждой доступной для выкупа компании — так
+  // сама раскладка долей миноритариев не раскрывается, а точная цена видна.
+  function squeezeOutCost(room, p, ticker) {
+    const c = room.companies[ticker];
+    if (!c) return 0;
+    const minority = room.players.filter((x) => x.id !== p.id && !x.bankrupt && (x.holdings[ticker] || 0) > 0);
+    return minority.reduce((s, x) => s + c.price * (x.holdings[ticker] / 100), 0);
   }
   function applyPriceDelta(room, ticker, pct) {
     if (room.frozen) return;
@@ -321,6 +436,21 @@
     return null;
   }
 
+  // Единая проверка «действие доступно только ходящему игроку сейчас» — заменяет
+  // старую привязку к общей фазе торгов. Ходящий игрок может в любой момент
+  // своего хода продать/обменять акции или применить спецдействие (шпионаж,
+  // дискредитация, расследование и т.п.), без ожидания отдельной фазы.
+  // opts.blockFrozen — для действий, напрямую двигающих цену акций, которые
+  // запрещены картой «Заморозка цен» (в отличие от шпионажа/дискредитации/расследования).
+  function requireOwnTurn(room, playerId, opts) {
+    opts = opts || {};
+    if (!room) return "Комната не найдена.";
+    if (room.phase !== "roll") return "Действие сейчас недоступно.";
+    if (currentPlayerId(room) !== playerId) return "Действие доступно только в ваш ход.";
+    if (opts.blockFrozen && room.frozen) return "Заморозка цен — действие запрещено до конца события.";
+    return null;
+  }
+
   function settleDebt(room, player) {
     if (player.cash >= 0) return;
     for (const ticker in player.holdings) {
@@ -331,6 +461,7 @@
       const proceeds = c.price * (pct / 100);
       player.cash += proceeds;
       player.holdings[ticker] = 0;
+      if (player.costBasis) player.costBasis[ticker] = 0;
       applyPriceDelta(room, ticker, -2 * (pct / 10));
       addLog(room, `${player.name}: принудительная продажа ${pct}% ${ticker} банку за ${fmt(proceeds)} для покрытия долга.`, "forced-sell");
     }
@@ -396,55 +527,6 @@
     room.shorts = remaining;
   }
 
-  function startTradeWindow(room) {
-    room.phase = "trade";
-    room.tradeWindowEndsAt = Date.now() + (room.tradeWindowMs || DEFAULT_TRADE_WINDOW_MS);
-    room.tradeReadyIds = [];
-  }
-
-  function endTradeWindow(room) {
-    if (room.phase === "ended") return;
-    if (room.extraTradePending) {
-      room.extraTradePending = false;
-      addLog(room, "🔁 Дополнительная фаза торгов начинается без новой карты.", "deck");
-      startTradeWindow(room);
-      return;
-    }
-    room.pendingTrades = [];
-    room.phase = "roll";
-    room.tradeWindowEndsAt = null;
-    room.tradeReadyIds = [];
-    room.turnIndex = (room.turnIndex + 1) % Math.max(1, room.turnOrder.length);
-    addLog(room, "Фаза торгов завершена. Ход переходит к следующему игроку.", "turn");
-    checkEndGame(room);
-  }
-
-  // Голосование «пропустить фазу торгов»: каждый активный (не банкрот) игрок
-  // жмёт готовность; как только готовы все — фаза заканчивается досрочно,
-  // без ожидания таймера. Один и тот же игрок может отменить свою готовность
-  // повторным вызовом (toggle), пока фаза не завершилась.
-  function readyEndTradeWindow(room, playerId) {
-    if (room.phase !== "trade") return { error: "Сейчас не фаза торгов." };
-    const player = room.players.find((p) => p.id === playerId);
-    if (!player || player.bankrupt) return { error: "Недоступно." };
-    if (!room.tradeReadyIds) room.tradeReadyIds = [];
-    const idx = room.tradeReadyIds.indexOf(playerId);
-    if (idx >= 0) {
-      room.tradeReadyIds.splice(idx, 1);
-      addLog(room, `${player.name} передумал(а) завершать фазу торгов досрочно.`, "trade");
-      return { ok: true };
-    }
-    room.tradeReadyIds.push(playerId);
-    addLog(room, `${player.name} готов(а) завершить фазу торгов досрочно.`, "trade");
-    const active = room.players.filter((p) => !p.bankrupt);
-    const allReady = active.length > 0 && active.every((p) => room.tradeReadyIds.includes(p.id));
-    if (allReady) {
-      addLog(room, "Все игроки готовы — фаза торгов завершается досрочно.", "trade");
-      endTradeWindow(room);
-    }
-    return { ok: true };
-  }
-
   function marketEvent(room) {
     const eventBeforeThis = room.eventCount;
     room.eventCount++;
@@ -459,6 +541,7 @@
 
     processLoans(room);
     processRealEstate(room);
+    processReputationRecovery(room);
 
     if (room.deckPos >= room.deckOrder.length) {
       room.deckOrder = shuffle(room.deckOrder);
@@ -490,13 +573,14 @@
           const pct = p.holdings[c.ticker] || 0;
           if (pct >= 10) {
             const proceeds = room.companies[c.ticker].price * 0.1;
+            removeCostBasisProportional(p, c.ticker, 10);
             p.holdings[c.ticker] -= 10;
             p.cash += proceeds;
             addLog(room, `🏦 Банк выкупил 10% ${c.ticker} у ${p.name} за ${fmt(proceeds)}.`, "buyback");
           }
         });
-      } else if (card.key === "extra_trade") {
-        room.extraTradePending = true;
+      } else if (card.key === "extra_turn") {
+        room.extraTurnPending = true;
       } else if (card.key === "audit") {
         activePlayers(room).forEach((p) => { if (p.cash < 0) settleDebt(room, p); });
       } else if (card.key === "double_dividend") {
@@ -513,7 +597,6 @@
 
     resolveShorts(room, eventBeforeThis);
     room.turn = 1;
-    startTradeWindow(room);
   }
 
   function afterRollAction(room) {
@@ -523,20 +606,42 @@
     // конфискация снизила долю контролёра ниже 50% и путь оплаты сменился
     // на пропорциональный), не должна "утекать" в следующий бросок.
     room.pendingForcedPrice = null;
-    room.turn++;
-    // Раунд = один полный круг по столу (каждый игрок бросает кубики один раз),
-    // а не фиксированные 3 броска. При фиксированном значении с 2 игроками рынок
-    // «дёргался» вдвое быстрее реального круга, а при 5+ игроках событие могло
-    // наступить раньше, чем все успели сходить — из-за этого темп ощущался
-    // рваным/ускоренным. Привязка к числу игроков делает вращение предсказуемым.
+    // Ход больше не завершается автоматически после одного действия по броску —
+    // игрок теперь сам решает, когда закончить ход (endTurn), чтобы успеть
+    // продать/обменять акции или воспользоваться спецдействиями до передачи хода.
+    checkEndGame(room);
+  }
+
+  // Явное завершение хода текущим игроком. Раунд = один полный круг по столу
+  // (каждый игрок бросает кубики один раз); когда круг завершён — наступает
+  // биржевое событие. Игрок, чей ход довёл счётчик до конца круга, получает
+  // право на дополнительный ход, если сработала карта «Дополнительный ход».
+  function endTurn(room, playerId) {
+    if (!room) return { error: "Комната не найдена." };
+    if (room.phase !== "roll") return { error: "Сейчас нельзя завершить ход." };
+    if (currentPlayerId(room) !== playerId) return { error: "Сейчас не ваш ход." };
+    if (room.pendingRoll) return { error: "Сначала обработайте текущий бросок." };
+    if (room.pendingForcedPrice) return { error: "Дождитесь оплаты назначенной цены выкупа доли." };
+    if (!room.rolledThisTurn) return { error: "Сначала бросьте кубики." };
+    const p = room.players.find((x) => x.id === playerId);
+    room.rolledThisTurn = false;
     const roundLen = Math.max(1, room.turnOrder.length);
+    room.turn++;
     if (room.turn > roundLen) {
       marketEvent(room);
+      if (room.extraTurnPending) {
+        room.extraTurnPending = false;
+        addLog(room, `🔁 ${p ? p.name : "?"} получил(а) дополнительный ход за это событие!`, "turn");
+      } else {
+        room.turnIndex = (room.turnIndex + 1) % Math.max(1, room.turnOrder.length);
+        addLog(room, `${p ? p.name : "?"} завершил(а) ход. Ход переходит дальше.`, "turn");
+      }
     } else {
       room.turnIndex = (room.turnIndex + 1) % Math.max(1, room.turnOrder.length);
-      addLog(room, `Ход завершён. Ход в раунде: ${room.turn}/${roundLen}.`, "turn");
+      addLog(room, `${p ? p.name : "?"} завершил(а) ход. Ход в раунде: ${room.turn}/${roundLen}.`, "turn");
     }
     checkEndGame(room);
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------------
@@ -552,6 +657,9 @@
     if (player && player.connected) {
       return { error: "Это имя уже занято в этой комнате." };
     }
+    if (player && player.kicked) {
+      return { error: "Вы были исключены из этой комнаты голосованием игроков." };
+    }
     if (player) {
       player.connected = true;
       if (gender) player.gender = gender;
@@ -560,7 +668,7 @@
       if (equippedBoardSkin) player.equippedBoardSkin = equippedBoardSkin;
       addLog(room, `Игрок «${name}» переподключился.`, "player");
     } else {
-      player = { id: room.nextPlayerId++, name, gender, avatar, points: initialPoints != null ? initialPoints : 0, equippedBoardSkin: equippedBoardSkin || "default", cash: 150000, holdings: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null };
+      player = { id: room.nextPlayerId++, name, gender, avatar, points: initialPoints != null ? initialPoints : 0, equippedBoardSkin: equippedBoardSkin || "default", cash: 150000, holdings: {}, costBasis: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null };
       room.players.push(player);
       room.turnOrder.push(player.id);
       addLog(room, `Игрок «${name}» присоединился со стартовым капиталом ${fmt(150000)}.`, "player");
@@ -606,12 +714,101 @@
     return { ok: true };
   }
 
+  // ---------------------------------------------------------------------
+  // Голосование за кик из комнаты: любой подключённый игрок может начать
+  // голосование против другого (кроме себя), остальные подключённые игроки
+  // голосуют "за"/"против". Кик срабатывает, как только "за" строго больше
+  // половины среди подключённых игроков, не считая самого кандидата на кик
+  // (чтобы, например, вдвоём/втроём хватало большинства оставшихся, а не всей комнаты).
+  function startKickVote(room, playerId, targetId) {
+    if (!room) return { error: "Комната не найдена." };
+    const voter = room.players.find((x) => x.id === playerId);
+    const target = room.players.find((x) => x.id === targetId);
+    if (!voter || !voter.connected) return { error: "Недоступно." };
+    if (targetId === playerId) return { error: "Нельзя голосовать за собственное исключение." };
+    if (!target || !target.connected || target.bankrupt) return { error: "Этот игрок недоступен для исключения." };
+    if (room.kickVote && room.kickVote.targetId === targetId) return { error: "Голосование за исключение этого игрока уже идёт." };
+    room.kickVote = { targetId, initiatorId: playerId, startedAt: Date.now(), voters: { [playerId]: true } };
+    addLog(room, `🗳️ ${voter.name} начал(а) голосование за исключение игрока «${target.name}».`, "kickvote");
+    return resolveKickVote(room);
+  }
+
+  function voteKick(room, playerId, targetId, yes) {
+    if (!room) return { error: "Комната не найдена." };
+    const kv = room.kickVote;
+    if (!kv || kv.targetId !== targetId) return { error: "Сейчас нет голосования за исключение этого игрока." };
+    const voter = room.players.find((x) => x.id === playerId);
+    if (!voter || !voter.connected) return { error: "Недоступно." };
+    if (playerId === kv.targetId) return { error: "Нельзя голосовать за собственное исключение." };
+    if (yes) kv.voters[playerId] = true; else delete kv.voters[playerId];
+    return resolveKickVote(room);
+  }
+
+  function cancelKickVote(room, playerId) {
+    if (!room) return { error: "Комната не найдена." };
+    const kv = room.kickVote;
+    if (!kv) return { error: "Сейчас нет активного голосования." };
+    if (kv.initiatorId !== playerId) return { error: "Отменить голосование может только тот, кто его начал." };
+    room.kickVote = null;
+    addLog(room, "Голосование за исключение отменено инициатором.", "kickvote");
+    return { ok: true };
+  }
+
+  function resolveKickVote(room) {
+    const kv = room.kickVote;
+    if (!kv) return { ok: true };
+    const target = room.players.find((x) => x.id === kv.targetId);
+    if (!target || !target.connected || target.bankrupt) { room.kickVote = null; return { ok: true }; }
+    const eligible = room.players.filter((p) => p.connected && !p.bankrupt && p.id !== kv.targetId);
+    const yesCount = eligible.filter((p) => kv.voters[p.id]).length;
+    const needed = Math.floor(eligible.length / 2) + 1; // строго больше половины
+    if (eligible.length > 0 && yesCount >= needed) {
+      // Возвращаем активы банку так же, как при банкротстве, но отдельным
+      // флагом kicked помечаем, что это было принудительное исключение, а не
+      // добровольное банкротство — интерфейс показывает это по-разному.
+      target.holdings = {};
+      target.costBasis = {};
+      CITIES.forEach((ct) => {
+        const re = room.realEstate[ct.id];
+        if (re && re.ownerId === target.id) { re.ownerId = null; re.level = 0; }
+      });
+      target.loan = null;
+      target.bankrupt = true;
+      target.kicked = true;
+      target.connected = false;
+      addLog(room, `🚫 «${target.name}» исключён(а) из комнаты голосованием игроков (${yesCount}/${eligible.length}).`, "kicked");
+      room.kickVote = null;
+      if (room.pendingRoll && room.pendingRoll.playerId === target.id) room.pendingRoll = null;
+      if (room.pendingForcedPrice && (room.pendingForcedPrice.targetId === target.id || room.pendingForcedPrice.controllerId === target.id)) room.pendingForcedPrice = null;
+      room.pendingTrades = room.pendingTrades.filter((t) => t.fromId !== target.id && t.toId !== target.id);
+      checkEndGame(room);
+    }
+    return { ok: true, kicked: !room.kickVote && target.kicked };
+  }
+
+  // ---------------------------------------------------------------------
+  // Реакции за столом: короткоживущие эмодзи-реакции над своим аватаром,
+  // видимые всем игрокам комнаты. Хранится небольшой хвост последних реакций
+  // (TTL/анимацию по времени показа отрабатывает клиент), чтобы не раздувать
+  // состояние комнаты бесконечно.
+  const REACTION_EMOJIS = ["😀", "😂", "😮", "😡", "👍", "👎", "🔥", "💰", "🤝", "😢"];
+  function sendReaction(room, playerId, emoji) {
+    if (!room) return { error: "Комната не найдена." };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || !p.connected) return { error: "Недоступно." };
+    emoji = String(emoji || "");
+    if (!REACTION_EMOJIS.includes(emoji)) return { error: "Недопустимая реакция." };
+    room.reactions.push({ id: room.nextReactionId++, playerId, emoji, ts: Date.now() });
+    if (room.reactions.length > 40) room.reactions.shift();
+    return { ok: true };
+  }
+
   function newGameKeepPlayers(room) {
     const prev = room.players.map((p) => ({ name: p.name, gender: p.gender, avatar: p.avatar, points: p.points || 0, equippedBoardSkin: p.equippedBoardSkin || "default" }));
-    const fresh = freshRoom(room.code, room.tradeWindowMs);
+    const fresh = freshRoom(room.code);
     fresh.phase = "roll"; // реванш — сразу к игре, без комнаты ожидания
     prev.forEach((pp) => {
-      const p = { id: fresh.nextPlayerId++, name: pp.name, gender: pp.gender, avatar: pp.avatar, points: pp.points, equippedBoardSkin: pp.equippedBoardSkin, cash: 150000, holdings: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null };
+      const p = { id: fresh.nextPlayerId++, name: pp.name, gender: pp.gender, avatar: pp.avatar, points: pp.points, equippedBoardSkin: pp.equippedBoardSkin, cash: 150000, holdings: {}, costBasis: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null };
       fresh.players.push(p);
       fresh.turnOrder.push(p.id);
     });
@@ -623,9 +820,11 @@
   // Действия хода
   // ---------------------------------------------------------------------
   function rollDice(room, playerId) {
-    if (!room || room.phase !== "roll") return { error: "Сейчас фаза торгов — дождитесь её окончания." };
+    if (!room || room.phase !== "roll") return { error: "Сейчас недоступно." };
     if (currentPlayerId(room) !== playerId) return { error: "Сейчас не ваш ход." };
     if (room.pendingRoll) return { error: "Бросок уже сделан — выберите действие." };
+    if (room.rolledThisTurn) return { error: "Вы уже бросали кубики в этот ход — завершите ход." };
+    room.rolledThisTurn = true;
     ambientJitter(room);
     const row = 1 + Math.floor(Math.random() * 12);
     const col = 1 + Math.floor(Math.random() * 12);
@@ -646,7 +845,9 @@
     if (!room || room.phase !== "roll" || !room.pendingRoll) return { error: "Нет активного броска." };
     if (room.pendingRoll.playerId !== playerId) return { error: "Сейчас не ваш ход." };
     if (!room.pendingRoll.ticker) return { error: "На этой клетке нет акций — там недвижимость." };
-    const pct = pctRaw === 25 ? 25 : 10;
+    let pct = Math.round(Number(pctRaw));
+    if (!Number.isFinite(pct) || pct <= 0) pct = 10;
+    pct = Math.max(1, Math.min(25, pct));
     const ticker = room.pendingRoll.ticker;
     const p = room.players.find((x) => x.id === playerId);
     const c = room.companies[ticker];
@@ -657,8 +858,9 @@
     if (p.cash < cost) return { error: "Недостаточно наличных." };
     p.cash -= cost;
     p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
+    addCostBasis(p, ticker, pct, cost);
     applyPriceDelta(room, ticker, 2 * (pct / 10));
-    addLog(room, `${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}${feePct > 0 ? ` (вкл. комиссию банка ${(feePct * 100).toFixed(1)}% из-за репутации)` : ""}. Новая цена: ${fmt(room.companies[ticker].price)}.`, "trade");
+    addLog(room, `${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}${feePct > 0 ? ` (вкл. комиссию банка ${(feePct * 100).toFixed(1)}% из-за репутации)` : ""}. Новая цена: ${fmt(room.companies[ticker].price)}.`, "trade", [p.id]);
     afterRollAction(room);
     return { ok: true };
   }
@@ -727,6 +929,7 @@
       addLog(room, `⚠️ Цена сильно завышена относительно рыночной (${fmt(fair)}) — репутация ${controller.name} снижена.`, "control");
       if (Math.random() < 0.5) {
         const seize = Math.min(heldPct, ANTITRUST_CONFISCATE_PCT);
+        removeCostBasisProportional(controller, ticker, seize);
         controller.holdings[ticker] -= seize;
         applyPriceDelta(room, ticker, -1 * (seize / 10));
         addLog(room, `🏛️ Антимонопольная служба США вмешалась: конфисковано ${seize}% ${ticker} у ${controller.name}, акции возвращены в свободное обращение банку.`, "control");
@@ -829,38 +1032,57 @@
   }
 
   function buyBank() {
-    // Правило: в свободной фазе торгов доступны только продажа банку и обмен (сделки
-    // между игроками) — покупка у банка закрыта, чтобы не превращать окно торгов в обычную скупку.
-    return { error: "В фазе свободных торгов можно только продать акции банку или предложить обмен другому игроку." };
+    // Правило: напрямую у банка акции покупаются только по результату броска кубиков
+    // (см. buyFromRoll) — так рынок остаётся привязан к перемещению по столу.
+    return { error: "Покупка у банка возможна только по результату броска кубиков." };
   }
 
   function sellBank(room, playerId, ticker, pctRaw) {
-    if (!room || room.phase !== "trade") return { error: "Свободные торги доступны только во время биржевого события." };
+    const err = requireOwnTurn(room, playerId);
+    if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
-    const pct = pctRaw === 25 ? 25 : 10;
+    let pct = Math.round(Number(pctRaw));
+    if (!Number.isFinite(pct) || pct <= 0) pct = 10;
+    pct = Math.max(1, Math.min(25, pct));
     const c = room.companies[ticker];
     if (!c) return { error: "Неизвестная компания." };
     if ((p.holdings[ticker] || 0) < pct) return { error: "Недостаточно акций этой компании." };
     const proceeds = c.price * (pct / 100);
+    removeCostBasisProportional(p, ticker, pct);
     p.holdings[ticker] -= pct;
     p.cash += proceeds;
     applyPriceDelta(room, ticker, -2 * (pct / 10));
-    addLog(room, `${p.name} продал ${pct}% ${ticker} банку за ${fmt(proceeds)}.`, "trade");
+    addLog(room, `${p.name} продал ${pct}% ${ticker} банку за ${fmt(proceeds)}.`, "trade", [p.id]);
     return { ok: true };
   }
 
-  function proposeTrade(room, playerId, toId, ticker, pctRaw, priceRaw) {
-    if (!room || room.phase !== "trade") return { error: "Сделки доступны только во время фазы торгов." };
+  // Предложение сделки другому игроку: from отдаёт pct% ticker; to взамен платит
+  // price наличными и/или (для бартера) отдаёт wantPct% wantTicker обратно from.
+  // Можно указать и цену, и встречный тикер одновременно — оба будут исполнены
+  // при принятии. Только текущий ходящий игрок может предлагать сделки (чтобы
+  // не было сумбура от одновременных предложений всех игроков сразу).
+  function proposeTrade(room, playerId, toId, ticker, pctRaw, priceRaw, wantTicker, wantPctRaw) {
+    const err = requireOwnTurn(room, playerId);
+    if (err) return { error: err };
     const from = room.players.find((x) => x.id === playerId);
     const to = room.players.find((x) => x.id === toId);
     if (!from || !to || from.id === to.id || to.bankrupt) return { error: "Некорректная сделка." };
-    const pct = Math.max(1, Math.min(100, Math.round(Number(pctRaw) || 0)));
+    if (!room.companies[ticker]) return { error: "Неизвестная компания." };
+    const pct = Math.max(1, Math.min(25, Math.round(Number(pctRaw) || 0)));
     const price = Math.max(0, Math.round(Number(priceRaw) || 0));
     if ((from.holdings[ticker] || 0) < pct) return { error: "Недостаточно акций для продажи." };
-    const trade = { id: room.nextTradeId++, fromId: from.id, toId: to.id, ticker, pct, price, status: "pending" };
+    wantTicker = wantTicker ? String(wantTicker) : null;
+    let wantPct = 0;
+    if (wantTicker) {
+      if (!room.companies[wantTicker]) return { error: "Неизвестная компания для встречного предложения." };
+      if (wantTicker === ticker) return { error: "Встречный тикер должен отличаться от предлагаемого." };
+      wantPct = Math.max(1, Math.min(25, Math.round(Number(wantPctRaw) || 0)));
+    }
+    const trade = { id: room.nextTradeId++, fromId: from.id, toId: to.id, ticker, pct, price, wantTicker, wantPct, status: "pending" };
     room.pendingTrades.push(trade);
-    addLog(room, `🤝 ${from.name} предложил ${to.name} купить ${pct}% ${ticker} за ${fmt(price)}.`, "trade-offer");
+    const paymentDesc = [price > 0 ? fmt(price) : "", wantTicker ? `${wantPct}% ${wantTicker}` : ""].filter(Boolean).join(" + ") || "бесплатно";
+    addLog(room, `🤝 ${from.name} предложил ${to.name}: ${pct}% ${ticker} за ${paymentDesc}.`, "trade-offer");
     return { ok: true };
   }
 
@@ -877,27 +1099,37 @@
       return { ok: true };
     }
     if ((from.holdings[trade.ticker] || 0) < trade.pct) return { error: "У продавца больше нет этих акций.", stillChanged: true };
-    if (to.cash < trade.price) return { error: "Недостаточно наличных для этой сделки.", stillChanged: true };
+    if (trade.price > 0 && to.cash < trade.price) return { error: "Недостаточно наличных для этой сделки.", stillChanged: true };
+    if (trade.wantTicker && (to.holdings[trade.wantTicker] || 0) < trade.wantPct) return { error: "У вас недостаточно акций для встречного обмена.", stillChanged: true };
+    // Себестоимость: у продавца списываем пропорционально проданной доле, у
+    // покупателя записываем как затраты — реальная цена сделки, если была
+    // указана, иначе оценка по текущей рыночной цене (для бартера без наличных).
+    removeCostBasisProportional(from, trade.ticker, trade.pct);
+    const mainLegCost = trade.price > 0 ? trade.price : (room.companies[trade.ticker].price * (trade.pct / 100));
     from.holdings[trade.ticker] -= trade.pct;
     to.holdings[trade.ticker] = (to.holdings[trade.ticker] || 0) + trade.pct;
-    from.cash += trade.price;
-    to.cash -= trade.price;
-    addLog(room, `Сделка: ${to.name} купил ${trade.pct}% ${trade.ticker} у ${from.name} за ${fmt(trade.price)} (рыночная цена не меняется).`, "trade");
+    addCostBasis(to, trade.ticker, trade.pct, mainLegCost);
+    if (trade.price > 0) {
+      from.cash += trade.price;
+      to.cash -= trade.price;
+    }
+    if (trade.wantTicker && trade.wantPct > 0) {
+      removeCostBasisProportional(to, trade.wantTicker, trade.wantPct);
+      const wantLegCost = room.companies[trade.wantTicker].price * (trade.wantPct / 100);
+      to.holdings[trade.wantTicker] -= trade.wantPct;
+      from.holdings[trade.wantTicker] = (from.holdings[trade.wantTicker] || 0) + trade.wantPct;
+      addCostBasis(from, trade.wantTicker, trade.wantPct, wantLegCost);
+    }
+    const paymentDesc = [trade.price > 0 ? fmt(trade.price) : "", trade.wantTicker ? `${trade.wantPct}% ${trade.wantTicker}` : ""].filter(Boolean).join(" + ") || "бесплатно";
+    addLog(room, `Сделка: ${to.name} получил ${trade.pct}% ${trade.ticker} от ${from.name} за ${paymentDesc} (рыночная цена не меняется).`, "trade", [from.id, to.id]);
     return { ok: true };
   }
 
   // ---------------------------------------------------------------------
   // §7 Спецдействия контрольного пакета (>50%)
   // ---------------------------------------------------------------------
-  function requireTradePhaseForControl(room) {
-    if (!room) return "Комната не найдена.";
-    if (room.phase !== "trade") return "Спецдействия доступны только во время фазы торгов.";
-    if (room.frozen) return "Заморозка цен — спецдействия запрещены до конца события.";
-    return null;
-  }
-
   function ctrlNegativeInfo(room, playerId, ticker) {
-    const err = requireTradePhaseForControl(room);
+    const err = requireOwnTurn(room, playerId, { blockFrozen: true });
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
@@ -907,8 +1139,8 @@
     if (!target) return { error: "Неизвестная компания." };
     if (mine.includes(ticker)) return { error: "Действует только против чужой компании." };
     if (room.eventCount - target.lastNegInfoEvent < 2) return { error: "Эту компанию уже атаковали недавно — раз в 2 события." };
-    const cost = 10000;
-    if (p.cash < cost) return { error: "Недостаточно наличных ($10 000)." };
+    const cost = negativeInfoCost(room, p);
+    if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
     target.lastNegInfoEvent = room.eventCount;
     applyPriceDelta(room, ticker, -15);
@@ -917,7 +1149,7 @@
   }
 
   function ctrlPrCampaign(room, playerId, ticker) {
-    const err = requireTradePhaseForControl(room);
+    const err = requireOwnTurn(room, playerId, { blockFrozen: true });
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
@@ -934,21 +1166,22 @@
   }
 
   function ctrlInsiderPeek(room, playerId) {
-    const err = requireTradePhaseForControl(room);
+    const err = requireOwnTurn(room, playerId, { blockFrozen: true });
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     if (controlledTickers(room, p.id).length === 0) return { error: "Нужен контрольный пакет (>50%) хотя бы одной компании." };
     if (room.insiderUsedEvent[p.id] === room.eventCount) return { error: "Инсайд уже использован в это событие." };
     if (room.pendingInsider) return { error: "Кто-то уже подсматривает карту — дождитесь решения." };
-    if (p.cash < 5000) return { error: "Недостаточно наличных ($5 000)." };
-    p.cash -= 5000;
+    const cost = insiderPeekCost(room, p);
+    if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
+    p.cash -= cost;
     room.insiderUsedEvent[p.id] = room.eventCount;
     if (room.deckPos >= room.deckOrder.length) { room.deckOrder = shuffle(room.deckOrder); room.deckPos = 0; }
     const idx = room.deckOrder[room.deckPos];
     const card = room.deckData[idx];
     room.pendingInsider = { playerId: p.id };
-    addLog(room, `🕵️ ${p.name} использовал Инсайд за $5 000 — подсматривает верхнюю карту колоды.`, "control");
+    addLog(room, `🕵️ ${p.name} использовал Инсайд за ${fmt(cost)} — подсматривает верхнюю карту колоды.`, "control");
     return { ok: true, card };
   }
 
@@ -968,7 +1201,7 @@
   }
 
   function ctrlSqueezeOut(room, playerId, ticker) {
-    const err = requireTradePhaseForControl(room);
+    const err = requireOwnTurn(room, playerId, { blockFrozen: true });
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
@@ -976,14 +1209,16 @@
     const c = room.companies[ticker];
     const minority = room.players.filter((x) => x.id !== p.id && !x.bankrupt && (x.holdings[ticker] || 0) > 0);
     if (minority.length === 0) return { error: "Нет миноритариев для выкупа." };
-    const totalCost = minority.reduce((s, x) => s + c.price * (x.holdings[ticker] / 100), 0);
+    const totalCost = squeezeOutCost(room, p, ticker);
     if (p.cash < totalCost) return { error: `Недостаточно наличных для выкупа (нужно ${fmt(totalCost)}).` };
     p.cash -= totalCost;
     minority.forEach((x) => {
       const proceeds = c.price * (x.holdings[ticker] / 100);
       x.cash += proceeds;
+      addCostBasis(p, ticker, x.holdings[ticker], proceeds);
       p.holdings[ticker] = (p.holdings[ticker] || 0) + x.holdings[ticker];
       x.holdings[ticker] = 0;
+      if (x.costBasis) x.costBasis[ticker] = 0;
     });
     c.squeezedOut = true;
     c.lastSqueezeEvent = room.eventCount;
@@ -992,17 +1227,18 @@
   }
 
   function ctrlShort(room, playerId, ticker) {
-    const err = requireTradePhaseForControl(room);
+    const err = requireOwnTurn(room, playerId, { blockFrozen: true });
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     const c = room.companies[ticker];
     if (!c) return { error: "Неизвестная компания." };
     if (room.shorts.some((s) => s.playerId === p.id && s.ticker === ticker)) return { error: "У вас уже есть открытый шорт по этой компании." };
-    if (p.cash < 5000) return { error: "Недостаточно наличных ($5 000 залог)." };
-    p.cash -= 5000;
-    room.shorts.push({ id: room.nextShortId++, playerId: p.id, ticker, deposit: 5000, priceAtBet: c.price, placedEventCount: room.eventCount });
-    addLog(room, `🎲 ${p.name} открыл шорт по ${ticker} (залог $5 000), ставка на падение к следующему событию.`, "control");
+    const deposit = shortDepositCost(room, p);
+    if (p.cash < deposit) return { error: `Недостаточно наличных (нужен залог ${fmt(deposit)}).` };
+    p.cash -= deposit;
+    room.shorts.push({ id: room.nextShortId++, playerId: p.id, ticker, deposit, priceAtBet: c.price, placedEventCount: room.eventCount });
+    addLog(room, `🎲 ${p.name} открыл шорт по ${ticker} (залог ${fmt(deposit)}), ставка на падение к следующему событию.`, "control");
     return { ok: true };
   }
 
@@ -1011,6 +1247,7 @@
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     p.holdings = {};
+    p.costBasis = {};
     CITIES.forEach((ct) => {
       const re = room.realEstate[ct.id];
       if (re && re.ownerId === p.id) { re.ownerId = null; re.level = 0; }
@@ -1039,7 +1276,7 @@
     const terms = loanTerms(room, p);
     if (amount > terms.limit) return { error: `Банк одобряет кредит не более ${fmt(terms.limit)} при вашей репутации и капитале.` };
     p.cash += amount;
-    p.loan = { principal: amount, ratePct: terms.ratePct, takenEvent: room.eventCount, missedPayments: 0 };
+    p.loan = { principal: amount, originalAmount: amount, ratePct: terms.ratePct, takenEvent: room.eventCount, missedPayments: 0 };
     addLog(room, `🏦 ${p.name} взял кредит ${fmt(amount)} у банка под ${terms.ratePct}% за событие.`, "loan");
     return { ok: true };
   }
@@ -1055,9 +1292,30 @@
     p.loan.principal -= amount;
     addLog(room, `${p.name} погасил ${fmt(amount)} кредита.`, "loan");
     if (p.loan.principal <= 1) {
+      // Бонус к репутации за полное погашение начисляется, только если кредит
+      // пережил хотя бы один цикл начисления процентов (room.eventCount > takenEvent)
+      // и был не символическим — иначе можно было бы "фармить" репутацию,
+      // мгновенно беря и тут же закрывая кредит на $1 неограниченное число раз.
+      const survivedACycle = room.eventCount > p.loan.takenEvent;
+      const meaningfulAmount = p.loan.originalAmount >= 1000;
       p.loan = null;
-      adjustReputation(room, p, 3, "кредит погашен полностью");
-      addLog(room, `✅ ${p.name} полностью погасил кредит — репутация выросла.`, "loan");
+      if (survivedACycle && meaningfulAmount) {
+        adjustReputation(room, p, 3, "кредит погашен полностью");
+        addLog(room, `✅ ${p.name} полностью погасил кредит — репутация выросла.`, "loan");
+      } else {
+        addLog(room, `${p.name} полностью погасил кредит.`, "loan");
+      }
+    } else {
+      // Бонус за добровольный частичный платёж: не чаще раза в событие на кредит,
+      // и только если платёж ощутимый (≥10% от изначальной суммы кредита) — иначе
+      // можно было бы дробить платежи на копейки ради накрутки репутации.
+      const meaningfulPartial = p.loan.originalAmount >= 1000 && amount >= p.loan.originalAmount * 0.1;
+      const alreadyBonused = p.loan.lastPartialBonusEvent === room.eventCount;
+      if (meaningfulPartial && !alreadyBonused) {
+        p.loan.lastPartialBonusEvent = room.eventCount;
+        adjustReputation(room, p, 1, "частичное погашение кредита");
+        addLog(room, `💳 ${p.name} внёс(ла) существенный частичный платёж по кредиту — репутация чуть выросла.`, "loan");
+      }
     }
     return { ok: true };
   }
@@ -1092,6 +1350,32 @@
     });
   }
 
+  // Восстановление репутации — вызывается раз в биржевое событие (после processLoans).
+  // Два независимых механизма:
+  //  1) Пассивный дрейф к базовой репутации: если репутация ниже стартовой (50) и
+  //     нет активного кредита (иначе долг уже "объясняет" низкую репутацию и её
+  //     восстановление идёт через погашение), она медленно подрастает сама по себе.
+  //  2) Бонус за "чистую" серию: если игрок давно (≥3 события) не прибегал к
+  //     шпионажу/дискредитации против других — вне зависимости от успеха попытки,
+  //     сам факт таких грязных методов сбрасывает счётчик — начисляется разовый
+  //     бонус за репутацию "чистых рук", не чаще раза в 3 события.
+  function processReputationRecovery(room) {
+    const CLEAN_STREAK_EVENTS = 3;
+    activePlayers(room).forEach((p) => {
+      const rep = p.reputation == null ? REPUTATION_START : p.reputation;
+      if (rep < REPUTATION_START && !p.loan) {
+        adjustReputation(room, p, 1, "естественное восстановление доверия");
+      }
+      const lastDirty = p.lastDirtyActionEvent == null ? -100 : p.lastDirtyActionEvent;
+      const lastCleanBonus = p.lastCleanBonusEvent == null ? -100 : p.lastCleanBonusEvent;
+      if (room.eventCount - lastDirty >= CLEAN_STREAK_EVENTS && room.eventCount - lastCleanBonus >= CLEAN_STREAK_EVENTS) {
+        p.lastCleanBonusEvent = room.eventCount;
+        adjustReputation(room, p, 2, "репутация «чистых рук»");
+        addLog(room, `✨ ${p.name} получил(а) бонус к репутации за отсутствие грязных методов.`, "reputation");
+      }
+    });
+  }
+
   // Рыночный дрейф городов — раз в биржевое событие (рента больше не начисляется
   // пассивно: теперь она платится только при попадании на занятую клетку, как в
   // «Монополии»; здесь только меняется рыночный фактор цены/ренты по городу).
@@ -1106,28 +1390,24 @@
   // ---------------------------------------------------------------------
   // Шпионаж и дискредитация
   // ---------------------------------------------------------------------
-  function requireTradePhase(room) {
-    if (!room) return "Комната не найдена.";
-    if (room.phase !== "trade") return "Действие доступно только во время фазы торгов.";
-    return null;
-  }
   function isRevealed(room, viewerId, targetId) {
     if (viewerId === targetId) return true;
     return room.reveals.some((r) => r.spyId === viewerId && r.targetId === targetId && r.expiresEvent >= room.eventCount);
   }
 
   function ctrlEspionage(room, playerId, targetId) {
-    const err = requireTradePhase(room);
+    const err = requireOwnTurn(room, playerId);
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     const target = room.players.find((x) => x.id === targetId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     if (!target || target.bankrupt || target.id === p.id) return { error: "Некорректная цель." };
     if (room.spyCooldown[targetId] === room.eventCount) return { error: "За эту цель уже брались в это событие — попробуйте после следующего." };
-    const cost = 8000;
-    if (p.cash < cost) return { error: "Недостаточно наличных ($8 000)." };
+    const cost = espionageCost(room, p);
+    if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
     room.spyCooldown[targetId] = room.eventCount;
+    p.lastDirtyActionEvent = room.eventCount;
     const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
     const successChance = clamp(0.75 - targetRep / 500, 0.25, 0.75);
     const success = Math.random() < successChance;
@@ -1145,18 +1425,18 @@
   }
 
   function ctrlDiscredit(room, playerId, targetId) {
-    const err = requireTradePhase(room);
+    const err = requireOwnTurn(room, playerId);
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     const target = room.players.find((x) => x.id === targetId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     if (!target || target.bankrupt || target.id === p.id) return { error: "Некорректная цель." };
     if (room.discreditCooldown[targetId] === room.eventCount) return { error: "Эту цель уже дискредитировали в это событие." };
-    const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
-    const cost = Math.round(5000 + targetRep * 300);
+    const cost = discreditCost(room, p, target);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
     room.discreditCooldown[targetId] = room.eventCount;
+    p.lastDirtyActionEvent = room.eventCount;
     const success = Math.random() < 0.55;
     if (success) {
       adjustReputation(room, target, -15, "дискредитирован анонимно");
@@ -1170,31 +1450,53 @@
     return { ok: true, success };
   }
 
+  // Личный PR: платное восстановление собственной репутации, доступно любому
+  // игроку в свой ход (не требует контрольного пакета). Стоимость растёт с
+  // каждым использованием за партию, чтобы не превращалось в дешёвый постоянный
+  // канал восстановления — не чаще раза в биржевое событие.
+  function personalPr(room, playerId) {
+    const err = requireOwnTurn(room, playerId);
+    if (err) return { error: err };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    if (room.eventCount === p.personalPrLastEvent) return { error: "Личный PR уже использован в это событие." };
+    const rep = p.reputation == null ? REPUTATION_START : p.reputation;
+    if (rep >= 100) return { error: "Репутация уже максимальна." };
+    const cost = personalPrCostFor(room, p);
+    if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
+    p.cash -= cost;
+    p.personalPrCount = (p.personalPrCount || 0) + 1;
+    p.personalPrLastEvent = room.eventCount;
+    adjustReputation(room, p, 4, "личный PR");
+    addLog(room, `📣 ${p.name} провёл(а) личную PR-кампанию за ${fmt(cost)} — репутация выросла.`, "reputation");
+    return { ok: true };
+  }
+
   // Расследование: цель шпионажа/дискредитации может попытаться вычислить,
   // кто именно против неё действовал. Стоимость и шанс успеха зависят от
   // капитала и репутации самой цели (богаче и репутабельнее — доступнее
   // качественное расследование). Раскрывает самый старый нераскрытый случай.
-  function investigationCost(player) {
+  function investigationCost(room, player) {
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
-    const base = clamp(Math.round((player.cash || 0) * 0.04), 5000, 50000);
+    const base = clamp(Math.round(netWorth(room, player) * 0.04), 5000, 50000);
     return Math.max(3000, Math.round(base - rep * 40));
   }
-  function investigationChance(player) {
+  function investigationChance(room, player) {
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
-    return clamp(0.28 + rep / 380 + (player.cash || 0) / 2500000, 0.2, 0.85);
+    return clamp(0.28 + rep / 380 + netWorth(room, player) / 2500000, 0.2, 0.85);
   }
   function ctrlInvestigate(room, playerId) {
-    const err = requireTradePhase(room);
+    const err = requireOwnTurn(room, playerId);
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
     if (!p || p.bankrupt) return { error: "Недоступно." };
     const incidents = room.spyIncidents.filter((i) => i.targetId === playerId).sort((a, b) => a.eventCount - b.eventCount);
     if (!incidents.length) return { error: "Нет нераскрытых случаев против вас — расследовать нечего." };
     const incident = incidents[0];
-    const cost = investigationCost(p);
+    const cost = investigationCost(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
-    const success = Math.random() < investigationChance(p);
+    const success = Math.random() < investigationChance(room, p);
     room.spyIncidents = room.spyIncidents.filter((i) => i.id !== incident.id);
     if (success) {
       const suspect = room.players.find((x) => x.id === incident.suspectId);
@@ -1262,9 +1564,7 @@
       chat: room.phase === "lobby" ? room.chat.slice(-100) : undefined,
       frozen: !!room.frozen,
       dividendMultiplier: room.dividendMultiplier || 1,
-      tradeWindowEndsAt: room.tradeWindowEndsAt,
-      tradeWindowMs: room.tradeWindowMs,
-      tradeReadyIds: room.tradeReadyIds || [],
+      rolledThisTurn: !!room.rolledThisTurn,
       currentPlayerId: currentPlayerId(room),
       pendingRoll: room.pendingRoll,
       pendingRollMeta: pendingRollMeta(room),
@@ -1273,13 +1573,41 @@
       shorts: room.shorts,
       pendingInsider: room.pendingInsider,
       gameResult: room.gameResult || null,
+      kickVote: room.kickVote ? (() => {
+        const target = room.players.find((p) => p.id === room.kickVote.targetId);
+        const eligible = room.players.filter((p) => p.connected && !p.bankrupt && p.id !== room.kickVote.targetId);
+        const yesCount = eligible.filter((p) => room.kickVote.voters[p.id]).length;
+        return {
+          targetId: room.kickVote.targetId,
+          targetName: target ? target.name : "?",
+          initiatorId: room.kickVote.initiatorId,
+          yesVoterIds: eligible.filter((p) => room.kickVote.voters[p.id]).map((p) => p.id),
+          yesCount,
+          needed: Math.floor(eligible.length / 2) + 1,
+          totalEligible: eligible.length,
+          myVote: !!room.kickVote.voters[youId],
+        };
+      })() : null,
+      reactions: room.reactions.slice(-20),
       // Случаи шпионажа/дискредитации против меня — без suspectId, чтобы не
       // подсказывать личность до успешного расследования (ctrlInvestigate).
       mySpyIncidents: me ? room.spyIncidents.filter((i) => i.targetId === youId).map((i) => ({ id: i.id, kind: i.kind, eventCount: i.eventCount })) : [],
-      investigationPreview: me ? { cost: investigationCost(me), chancePct: Math.round(investigationChance(me) * 100) } : null,
+      investigationPreview: me ? { cost: investigationCost(room, me), chancePct: Math.round(investigationChance(room, me) * 100) } : null,
       bankFeePct: me ? bankFeePct(me.reputation) : 0,
       bankTerms: me ? loanTerms(room, me) : null,
       myLoan: me && me.loan ? { principal: Math.round(me.loan.principal), ratePct: me.loan.ratePct, missedPayments: me.loan.missedPayments || 0 } : null,
+      myPersonalPr: me ? { cost: personalPrCostFor(room, me), usedThisEvent: me.personalPrLastEvent === room.eventCount } : null,
+      // Точные суммы всех платных «мер» контроля для текущего игрока — привязаны к
+      // его капиталу (netWorth), поэтому вычисляются заново на каждый снимок
+      // состояния и показываются в UI, чтобы игрок точно видел стоимость до клика.
+      myMeasureCosts: me ? {
+        espionage: espionageCost(room, me),
+        negativeInfo: negativeInfoCost(room, me),
+        insiderPeek: insiderPeekCost(room, me),
+        shortDeposit: shortDepositCost(room, me),
+      } : null,
+      myDiscreditCosts: me ? Object.fromEntries(room.players.filter((p) => p.id !== me.id && !p.bankrupt).map((p) => [p.id, discreditCost(room, me, p)])) : {},
+      mySqueezeCosts: me ? Object.fromEntries(COMPANIES.filter((c) => (me.holdings[c.ticker] || 0) > 75).map((c) => [c.ticker, squeezeOutCost(room, me, c.ticker)])) : {},
       realEstate: CITIES.map((ct) => {
         const re = room.realEstate[ct.id];
         const pos = REAL_ESTATE_POS[ct.id] || {};
@@ -1306,31 +1634,52 @@
       players: room.players.map((p) => {
         const revealed = p.id === youId || isRevealed(room, youId, p.id);
         const reveal = !revealed ? null : room.reveals.find((r) => r.spyId === youId && r.targetId === p.id);
+        // Прибыль/убыток по текущему пакету акций (только когда портфель виден —
+        // свой или раскрытый шпионажем): сравниваем текущую рыночную стоимость
+        // пакета с суммой, за которую он был приобретён (себестоимость).
+        let holdingsPnl = {};
+        if (revealed) {
+          Object.keys(p.holdings || {}).forEach((ticker) => {
+            const heldPct = p.holdings[ticker] || 0;
+            if (heldPct <= 0) return;
+            const basis = (p.costBasis && p.costBasis[ticker]) || 0;
+            const currentValue = room.companies[ticker].price * (heldPct / 100);
+            const pnl = currentValue - basis;
+            holdingsPnl[ticker] = {
+              basis: Math.round(basis),
+              currentValue: Math.round(currentValue),
+              pnl: Math.round(pnl),
+              pnlPct: basis > 0 ? (pnl / basis) * 100 : 0,
+            };
+          });
+        }
         return {
           id: p.id, name: p.name, gender: p.gender || "", avatar: p.avatar || "", points: p.points || 0,
           equippedBoardSkin: p.equippedBoardSkin || "default",
-          cash: p.cash, bankrupt: p.bankrupt, connected: p.connected,
+          cash: p.cash, bankrupt: p.bankrupt, connected: p.connected, kicked: !!p.kicked,
           netWorth: netWorth(room, p),
           reputation: p.reputation == null ? REPUTATION_START : p.reputation,
           loanPrincipal: p.loan ? Math.round(p.loan.principal) : 0,
           holdings: revealed ? p.holdings : {},
+          holdingsPnl,
           properties: revealed ? CITIES.filter((ct) => room.realEstate[ct.id].ownerId === p.id).map((ct) => ({ id: ct.id, name: ct.name, level: room.realEstate[ct.id].level || 0 })) : [],
           holdingsHidden: !revealed,
           revealExpiresEvent: reveal ? reveal.expiresEvent : undefined,
         };
       }),
-      log: room.log.slice(-60),
+      log: room.log.filter((e) => !e.visibleTo || e.visibleTo.includes(youId)).slice(-60),
     };
   }
 
   return {
-    DEFAULT_TRADE_WINDOW_MS, TIER_PRICE, TIER_VOL, VOL_LABEL, TIER_FORCED_PAYMENT_PCT, COMPANIES, BOARD,
+    TIER_PRICE, TIER_VOL, VOL_LABEL, TIER_FORCED_PAYMENT_PCT, COMPANIES, BOARD,
     REPUTATION_START, CITIES, MAX_RE_LEVEL, REAL_ESTATE_POS,
     companyByTicker, cityById, isRealEstateCell, cityIdFromCell, buildDeck, shuffle, fmt,
     realEstatePrice, realEstateRent, realEstateUpgradeCost,
     freshRoom, addLog,
     totalOwnedPct, ownerOfControl, controlledTickers, netWorth, applyPriceDelta, ambientJitter, activePlayers, currentPlayerId,
-    settleDebt, checkEndGame, resolveShorts, marketEvent, startTradeWindow, endTradeWindow, readyEndTradeWindow, afterRollAction,
+    requireOwnTurn,
+    settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
     addPlayer, setConnected, newGameKeepPlayers, startGame, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
     setForcedPrice, payForcedPrice,
@@ -1338,7 +1687,8 @@
     declareBankruptcy, forceEvent,
     adjustReputation, bankFeePct, loanTerms, takeLoan, repayLoan, processLoans,
     buyRealEstateFromRoll, upgradeRealEstateFromRoll, payRealEstateRentFromRoll, processRealEstate,
-    ctrlEspionage, ctrlDiscredit, isRevealed, ctrlInvestigate, investigationCost, investigationChance,
+    ctrlEspionage, ctrlDiscredit, isRevealed, ctrlInvestigate, investigationCost, investigationChance, personalPr,
+    startKickVote, voteKick, cancelKickVote, sendReaction, REACTION_EMOJIS,
     buildStatePayload,
   };
 });

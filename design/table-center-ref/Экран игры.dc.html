@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;}
+    a{color:#4C7A6B;}
+    a:hover{color:#3E7358;}
+    @keyframes cubeRoll{
+      0%{transform:rotateX(0deg) rotateY(0deg);}
+      30%{transform:rotateX(240deg) rotateY(160deg);}
+      60%{transform:rotateX(420deg) rotateY(300deg);}
+      100%{transform:rotateX(360deg) rotateY(360deg);}
+    }
+    @keyframes seatGlow{
+      0%,100%{box-shadow:0 0 0 3px rgba(224,177,104,.55), 0 6px 16px rgba(0,0,0,.35);}
+      50%{box-shadow:0 0 0 6px rgba(224,177,104,.3), 0 6px 16px rgba(0,0,0,.35);}
+    }
+  </style>
+</helmet>
+
+<div style="position:relative;width:100vw;height:100vh;overflow:hidden;font-family:'Manrope',-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#f1ece2;background:linear-gradient(to bottom, #362d24 0%, #362d24 18%, #251f19 55%, #1a1512 100%);">
+
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 55% at 50% 46%, rgba(255,214,150,.16) 0%, transparent 70%);z-index:0;"></div>
+
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:560px;height:560px;perspective:1300px;perspective-origin:50% 50%;z-index:1;">
+    <div style="width:100%;height:100%;transform-style:preserve-3d;transform:rotateX(48deg);">
+      <div style="width:100%;height:100%;display:grid;grid-template-columns:88px minmax(0,1fr) 88px;grid-template-rows:88px minmax(0,1fr) 88px;transform-style:preserve-3d;">
+
+        <div style="grid-column:2;grid-row:1;position:relative;transform-style:preserve-3d;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;">
+          <div style="transform:rotateX(-48deg);transform-origin:50% 100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin-bottom:6px;">
+            <div style="{{ chairs.top.avatarStyle }}">{{ chairs.top.initial }}</div>
+            <div style="{{ chairs.top.tagStyle }}">{{ chairs.top.name }}<br><span style="color:#c9c0af;font-family:'JetBrains Mono',monospace;">{{ chairs.top.cash }}</span></div>
+          </div>
+          <div style="width:44px;height:12px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px);margin-bottom:8px;"></div>
+        </div>
+
+        <div style="grid-column:1;grid-row:2;position:relative;transform-style:preserve-3d;display:flex;flex-direction:row;align-items:center;justify-content:flex-end;">
+          <div style="transform:rotateX(-48deg);transform-origin:100% 50%;display:flex;flex-direction:column;align-items:center;gap:5px;margin-right:4px;">
+            <div style="{{ chairs.left.avatarStyle }}">{{ chairs.left.initial }}</div>
+            <div style="{{ chairs.left.tagStyle }}">{{ chairs.left.name }}<br><span style="color:#c9c0af;font-family:'JetBrains Mono',monospace;">{{ chairs.left.cash }}</span></div>
+          </div>
+          <div style="width:12px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px);margin-right:6px;"></div>
+        </div>
+
+        <div style="grid-column:2;grid-row:2;position:relative;min-width:0;min-height:0;">
+          <div style="position:absolute;inset:-12px -12px -30px -12px;border-radius:44px;background:linear-gradient(160deg,#3a2c1c,#241a10);box-shadow:0 30px 60px rgba(0,0,0,.55);"></div>
+          <div style="position:relative;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box;background:radial-gradient(circle at 30% 20%, #8a6a45, #6b4d30 55%, #543a24 100%);border-radius:36px;box-shadow:0 40px 90px rgba(10,7,4,.55), inset 0 0 0 2px rgba(255,224,180,.15);padding:20px;z-index:1;">
+            <div style="position:relative;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box;background:linear-gradient(160deg,#E7DFCC,#DCD2BA);border-radius:22px;box-shadow:0 10px 30px rgba(36,31,26,.3) inset, 0 4px 16px rgba(0,0,0,.25);padding:12px;">
+              <div style="position:relative;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(12,1fr);gap:2px;background:rgba(36,31,26,.14);border-radius:16px;overflow:hidden;box-shadow:inset 0 2px 10px rgba(36,31,26,.18);">
+                <sc-for list="{{ boardRows }}" as="row" hint-placeholder-count="12">
+                  <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="12">
+                    <div style="{{ cell.cellStyle }}">
+                      <div style="{{ cell.barStyle }}"></div>
+                      <div style="{{ cell.logoStyle }}">{{ cell.letter }}</div>
+                      <span style="{{ cell.tickerStyle }}">{{ cell.ticker }}</span>
+                    </div>
+                  </sc-for>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="grid-column:3;grid-row:2;position:relative;transform-style:preserve-3d;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;">
+          <div style="width:12px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px);margin-left:6px;"></div>
+          <div style="transform:rotateX(-48deg);transform-origin:0% 50%;display:flex;flex-direction:column;align-items:center;gap:5px;margin-left:4px;">
+            <div style="{{ chairs.right.avatarStyle }}">{{ chairs.right.initial }}</div>
+            <div style="{{ chairs.right.tagStyle }}">{{ chairs.right.name }}<br><span style="color:#c9c0af;font-family:'JetBrains Mono',monospace;">{{ chairs.right.cash }}</span></div>
+          </div>
+        </div>
+
+        <div style="grid-column:2;grid-row:3;position:relative;transform-style:preserve-3d;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;">
+          <div style="width:44px;height:12px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px);margin-top:8px;"></div>
+          <div style="transform:rotateX(-48deg);transform-origin:50% 0%;display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px;">
+            <div style="{{ chairs.bottom.avatarStyle }}">{{ chairs.bottom.initial }}</div>
+            <div style="{{ chairs.bottom.tagStyle }}">{{ chairs.bottom.name }}<br><span style="color:#c9c0af;font-family:'JetBrains Mono',monospace;">{{ chairs.bottom.cash }}</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;bottom:16px;right:222px;z-index:3;background:rgba(255,255,255,.1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:10px;display:flex;gap:8px;box-shadow:0 10px 24px rgba(0,0,0,.3);">
+    <div style="width:40px;height:40px;perspective:220px;">
+      <div style="{{ dieAStyle }}">
+        <div style="position:absolute;inset:0;background:#fff;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:translateZ(17px);">{{ diceA }}</div>
+        <div style="position:absolute;inset:0;background:#f1ece2;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:rotateY(90deg) translateZ(17px);">{{ diceA }}</div>
+        <div style="position:absolute;inset:0;background:#e9e2d3;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:rotateX(90deg) translateZ(17px);">{{ diceA }}</div>
+      </div>
+    </div>
+    <div style="width:40px;height:40px;perspective:220px;">
+      <div style="{{ dieBStyle }}">
+        <div style="position:absolute;inset:0;background:#fff;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:translateZ(17px);">{{ diceB }}</div>
+        <div style="position:absolute;inset:0;background:#f1ece2;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:rotateY(90deg) translateZ(17px);">{{ diceB }}</div>
+        <div style="position:absolute;inset:0;background:#e9e2d3;border:1px solid rgba(0,0,0,.18);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:#241F1A;transform:rotateX(90deg) translateZ(17px);">{{ diceB }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;top:14px;left:14px;z-index:3;background:rgba(255,255,255,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:8px 12px;width:172px;box-shadow:0 10px 30px rgba(0,0,0,.25);">
+    <div style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9c0af;margin-bottom:6px;">Лента событий</div>
+    <sc-for list="{{ logEntriesShort }}" as="entry" hint-placeholder-count="2">
+      <div style="font-size:10.5px;line-height:1.35;color:#f1ece2;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08);">
+        <span style="color:#c9c0af;font-size:9px;display:block;">{{ entry.tag }}</span>{{ entry.text }}
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position:absolute;top:24px;right:24px;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:360px;">
+      <div style="background:rgba(255,255,255,.14);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 14px;font-size:12px;color:#d8d0c2;">Комната: <b style="color:#fff;font-family:'JetBrains Mono',monospace;">MAIN</b></div>
+      <div style="background:rgba(255,255,255,.14);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 14px;font-size:12px;color:#d8d0c2;">Ход: <b style="color:#fff;font-family:'JetBrains Mono',monospace;">2/3</b></div>
+      <div style="background:rgba(255,255,255,.14);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 14px;font-size:12px;color:#d8d0c2;">Колода: <b style="color:#fff;font-family:'JetBrains Mono',monospace;">51</b></div>
+    </div>
+    <div style="background:rgba(224,177,104,.4);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:7px 16px;font-size:12.5px;font-weight:700;color:#fff2d9;">Ход: Максим</div>
+  </div>
+
+  <div style="position:absolute;bottom:24px;left:24px;z-index:3;">
+    <button onclick="{{ rollDice }}" style="cursor:pointer;border:none;background:rgba(76,122,107,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.3);color:#fff;font-family:'Manrope',sans-serif;font-weight:800;font-size:15px;border-radius:20px;padding:16px 26px;box-shadow:0 12px 30px rgba(0,0,0,.3);">🎲 Бросить 2×d12</button>
+  </div>
+
+  <sc-if value="{{ showPopup }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;background:rgba(255,255,255,.9);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.85);border-radius:24px;padding:22px 24px;width:340px;box-shadow:0 30px 70px rgba(0,0,0,.45);color:#241F1A;">
+      <div style="background:linear-gradient(120deg, rgba(255,214,168,.5), rgba(198,224,214,.5));border:1px solid rgba(255,255,255,.8);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:14px;">
+        🎲 <b>{{ diceA }}</b> / <b>{{ diceB }}</b> → <b>IBM</b> <span style="color:#6B6459;">(IBM)</span><br>
+        Цена: <b style="font-family:'JetBrains Mono',monospace;">$21,400</b> · В руках игроков: 20%
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button style="flex:1;cursor:pointer;border:none;background:#4C7A6B;color:#fff;font-family:'Manrope',sans-serif;font-weight:700;font-size:13px;border-radius:14px;padding:10px;">Купить 10%</button>
+        <button style="flex:1;cursor:pointer;border:none;background:#4C7A6B;color:#fff;font-family:'Manrope',sans-serif;font-weight:700;font-size:13px;border-radius:14px;padding:10px;">Купить 25%</button>
+      </div>
+      <button onclick="{{ closePopup }}" style="width:100%;cursor:pointer;border:1px solid rgba(36,31,26,.15);background:rgba(255,255,255,.7);color:#241F1A;font-family:'Manrope',sans-serif;font-weight:700;font-size:13px;border-radius:14px;padding:10px;">Пропустить и завершить ход</button>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SECTOR_COLOR = {
+  "Технологии": "#4C7A6B",
+  "Интернет и медиа": "#C97B4A",
+  "Потребительские товары": "#E0B168",
+  "Промышленность и транспорт": "#A8543E",
+  "Финансы и сырьё": "#3E7358",
+};
+const COMPANIES = {
+  AAPL:{sector:"Технологии",tier:"A"}, MSFT:{sector:"Технологии",tier:"A"}, GOOGL:{sector:"Технологии",tier:"A"},
+  NVDA:{sector:"Технологии",tier:"B"}, IBM:{sector:"Технологии",tier:"B"},
+  AMZN:{sector:"Интернет и медиа",tier:"B"}, DIS:{sector:"Интернет и медиа",tier:"A"}, YDEX:{sector:"Интернет и медиа",tier:"C"}, VKCO:{sector:"Интернет и медиа",tier:"C"},
+  MCD:{sector:"Потребительские товары",tier:"A"}, NKE:{sector:"Потребительские товары",tier:"B"}, KO:{sector:"Потребительские товары",tier:"B"}, WMT:{sector:"Потребительские товары",tier:"B"}, RKT:{sector:"Потребительские товары",tier:"C"},
+  BA:{sector:"Промышленность и транспорт",tier:"A"}, MMM:{sector:"Промышленность и транспорт",tier:"B"}, AFLT:{sector:"Промышленность и транспорт",tier:"C"},
+  SBER:{sector:"Финансы и сырьё",tier:"B"}, GAZP:{sector:"Финансы и сырьё",tier:"C"}, MGNT:{sector:"Финансы и сырьё",tier:"C"}, MTSS:{sector:"Финансы и сырьё",tier:"C"},
+};
+const BOARD = [
+  ["AAPL","AMZN","MMM","MTSS","KO","YDEX","RKT","YDEX","NKE","AMZN","MMM","BA"],
+  ["MGNT","GOOGL","NKE","AAPL","BA","GOOGL","AAPL","SBER","NVDA","AAPL","KO","MSFT"],
+  ["MTSS","NKE","MSFT","RKT","IBM","NVDA","KO","GOOGL","WMT","IBM","MCD","DIS"],
+  ["NVDA","NVDA","WMT","SBER","NKE","MGNT","AMZN","VKCO","AFLT","GAZP","MTSS","MGNT"],
+  ["MGNT","GAZP","IBM","KO","AMZN","GOOGL","MSFT","IBM","AMZN","NVDA","MMM","GOOGL"],
+  ["GAZP","SBER","VKCO","MTSS","BA","IBM","BA","KO","IBM","NKE","BA","AAPL"],
+  ["MCD","MSFT","AMZN","RKT","MSFT","YDEX","AAPL","KO","MSFT","GOOGL","WMT","KO"],
+  ["AAPL","KO","GOOGL","NKE","AFLT","MMM","YDEX","GOOGL","RKT","AMZN","NVDA","GOOGL"],
+  ["MCD","MGNT","MSFT","MCD","AMZN","AAPL","IBM","MSFT","AAPL","MMM","IBM","RKT"],
+  ["WMT","BA","GAZP","IBM","MGNT","NVDA","KO","RKT","SBER","VKCO","NVDA","BA"],
+  ["GAZP","AFLT","MCD","GOOGL","KO","WMT","SBER","AFLT","IBM","SBER","KO","MSFT"],
+  ["MCD","AAPL","MSFT","YDEX","MCD","NVDA","MMM","SBER","NVDA","GOOGL","YDEX","AAPL"],
+];
+const ACTIVE_CELL = "6-9";
+
+const SEATS = {
+  top: { name: "Максим", cash: "$221 900", color: "#E0B168", turn: true },
+  right: { name: "Оля", cash: "$96 500", color: "#C97B4A", turn: false },
+  bottom: { name: "Ирина (вы)", cash: "$184 200", color: "#4C7A6B", turn: false },
+  left: { name: "Дима", cash: "$58 100", color: "#A8543E", turn: false },
+};
+
+class Component extends DCLogic {
+  state = { showPopup: false, rolling: false, diceA: 6, diceB: 9 };
+
+  rollDice = () => {
+    if (this.state.rolling) return;
+    if (this.state.showPopup) { this.setState({ showPopup: false }); return; }
+    this.setState({ rolling: true });
+    const tick = setInterval(() => {
+      this.setState({ diceA: 1 + Math.floor(Math.random() * 12), diceB: 1 + Math.floor(Math.random() * 12) });
+    }, 90);
+    setTimeout(() => {
+      clearInterval(tick);
+      this.setState({ rolling: false, showPopup: true, diceA: 6, diceB: 9 });
+    }, 900);
+  };
+
+  renderVals() {
+    const boardRows = BOARD.map((row, ri) => ({
+      cells: row.map((ticker, ci) => {
+        const key = (ri + 1) + "-" + (ci + 1);
+        const meta = COMPANIES[ticker] || { sector: "Технологии", tier: "C" };
+        const sectorColor = SECTOR_COLOR[meta.sector];
+        const isActive = key === ACTIVE_CELL;
+        return {
+          ticker,
+          letter: ticker[0],
+          cellStyle: `position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:${isActive ? "#FDF6E8" : "rgba(239,232,218,.9)"};overflow:hidden;${isActive ? "box-shadow:inset 0 0 0 2px #E0B168, 0 0 14px rgba(224,177,104,.7);z-index:2;" : ""}`,
+          barStyle: `position:absolute;top:0;left:0;right:0;height:3px;background:${sectorColor};opacity:.9;`,
+          logoStyle: `width:15px;height:15px;border-radius:50%;background:${sectorColor};color:#fff;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:'Manrope',sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.25);`,
+          tickerStyle: `font-size:7px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#4a463d;letter-spacing:.01em;`,
+        };
+      }),
+    }));
+
+    const seatVals = (s) => ({
+      name: s.name,
+      cash: s.cash,
+      initial: s.name[0],
+      avatarStyle: `width:44px;height:44px;border-radius:50%;background:${s.color};color:#fff;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.85);${s.turn ? "animation:seatGlow 1.6s ease-in-out infinite;" : "box-shadow:0 6px 16px rgba(0,0,0,.35);"}`,
+      tagStyle: `background:rgba(255,255,255,.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:3px 8px;font-size:10.5px;text-align:center;font-weight:700;color:#f1ece2;line-height:1.4;white-space:nowrap;`,
+    });
+    const chairs = { top: seatVals(SEATS.top), right: seatVals(SEATS.right), bottom: seatVals(SEATS.bottom), left: seatVals(SEATS.left) };
+
+    const logEntries = [
+      { tag: "Событие 4", text: "📰 Технологический прорыв: +12% Технологии" },
+      { tag: "Ход 5", text: "Максим купил 10% NVDA за $2 200" },
+      { tag: "Ход 4", text: "Оля заплатила дивиденды по KO: $310" },
+    ];
+
+    const cubeBase = `position:relative;width:100%;height:100%;transform-style:preserve-3d;`;
+    const rollingAnim = this.state.rolling ? "animation:cubeRoll .9s ease-out 1;" : "transform:rotateX(0deg) rotateY(0deg);";
+
+    return {
+      boardRows,
+      chairs,
+      logEntries,
+      logEntriesShort: logEntries.slice(0, 2),
+      showPopup: this.state.showPopup,
+      diceA: this.state.diceA,
+      diceB: this.state.diceB,
+      dieAStyle: cubeBase + rollingAnim,
+      dieBStyle: cubeBase + rollingAnim,
+      rollDice: this.rollDice,
+      closePopup: () => this.setState({ showPopup: false }),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

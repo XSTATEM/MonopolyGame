@@ -91,9 +91,29 @@
   .player-head b{font-size:14px;}
   .holdings{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono);}
   .holdings span{display:inline-block;margin-right:10px;}
-  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:6px;}
-  .log-entry{padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);}
-  .log-entry .tag{font-size:10.5px;color:var(--muted);}
+  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:8px;}
+  /* Карточки ленты событий — «жидкое стекло» (liquid glass): полупрозрачная
+     размытая подложка со стеклянным бликом сверху, тонкая светлая обводка и
+     мягкая тень, плюс лёгкий диагональный градиент-подсветка под категорию
+     события (вместо сплошной цветной полосы слева) — скруглённый прямоугольник
+     в духе Apple. Используется и в полноразмерной вкладке «Лента», и во
+     всплывающем окне биржевого события, и (в варианте .feed-entry) в
+     компактной живой панели сбоку от стола. См. logEntryMeta() в JS.*/
+  .log-entry{position:relative;overflow:hidden;flex-shrink:0;padding:9px 12px;border-radius:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);
+    backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);
+    border:1px solid rgba(255,255,255,.55);
+    box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 6px 18px rgba(36,31,26,.07);}
+  .log-entry .tag{font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;margin-bottom:2px;}
+  .log-entry.feed-market{background:linear-gradient(135deg, rgba(76,141,255,.26), rgba(76,141,255,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-trade{background:linear-gradient(135deg, rgba(62,115,88,.24), rgba(62,115,88,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-control{background:linear-gradient(135deg, rgba(224,177,104,.3), rgba(224,177,104,.03) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-espionage{background:linear-gradient(135deg, rgba(178,107,214,.28), rgba(178,107,214,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-finance{background:linear-gradient(135deg, rgba(47,182,196,.26), rgba(47,182,196,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-system{background:linear-gradient(135deg, rgba(120,120,120,.18), rgba(120,120,120,.01) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .log-entry.feed-danger{background:linear-gradient(135deg, rgba(168,84,62,.3), rgba(168,84,62,.03) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);border-color:rgba(168,84,62,.4);}
+  .log-entry.feed-win{background:linear-gradient(135deg, rgba(224,169,41,.34), rgba(224,169,41,.04) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);border-color:rgba(224,169,41,.45);font-weight:700;}
+  .log-entry.feed-header{background:transparent;border-color:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;text-align:center;font-weight:700;letter-spacing:.02em;opacity:.8;padding:4px 8px;}
   .badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:var(--radius-pill);margin-left:6px;}
   .badge.control{background:var(--amber);color:#4a3300;}
   .badge.offline{background:var(--red);color:#fff;}
@@ -108,8 +128,8 @@
   .join-box{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px;width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(36,31,26,.1);}
   .join-box h1{font-size:20px;margin:0 0 6px;}
   .join-box p{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
-  .join-box label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
-  .join-box input, .join-box select{width:100%;}
+  .join-box label, .company-modal label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
+  .join-box input, .join-box select, .company-modal input, .company-modal select{width:100%;}
   .join-box .err{color:var(--red);font-size:12.5px;margin-top:10px;min-height:1em;}
   .trade-offer{background:var(--panel2);border:1px solid var(--amber);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px;font-size:12.5px;}
   details.tips summary{cursor:pointer;font-weight:700;color:var(--text);list-style:none;padding:4px 0;}
@@ -207,9 +227,21 @@
     100%{transform:scale(1);opacity:1;}
   }
 
+  .pct-slider-row{margin:8px 0;}
+  .pct-slider-readout{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;margin-bottom:4px;}
+  .pct-slider-readout b{font-size:15px;color:var(--text);}
+  .pct-slider-readout span{color:var(--muted);font-weight:700;}
+  input[type="range"].pct-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--radius-pill);background:var(--line);outline:none;cursor:pointer;margin:0;}
+  input[type="range"].pct-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;}
+  input[type="range"].pct-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;}
+  input[type="range"].pct-slider::-moz-range-track{height:6px;border-radius:var(--radius-pill);background:var(--line);}
   .cap-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;gap:8px;}
   .cap-row:last-child{border-bottom:none;}
   .cap-row .tkr{font-weight:700;}
+  .cap-row-mid{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:1;text-align:right;}
+  .cap-pnl{font-size:10.5px;font-weight:700;}
+  .cap-pnl.up{color:var(--green);}
+  .cap-pnl.down{color:var(--red);}
   .cap-tip{font-size:11px;padding:1px 8px;border-radius:var(--radius-pill);white-space:nowrap;}
   .cap-tip.hold{background:rgba(62,115,88,.15);color:var(--green);}
   .cap-tip.sell{background:rgba(168,84,62,.15);color:var(--red);}
@@ -223,6 +255,11 @@
   .control-card .row-inline select, .control-card .row-inline button{flex:1;}
   .insider-box{background:rgba(224,177,104,.18);border:1px solid var(--amber);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;font-size:12.5px;}
 
+  .measure-result-badge{margin-top:8px;padding:6px 9px;border-radius:8px;font-size:12px;font-weight:600;animation:measureResultIn .18s ease-out;}
+  .measure-result-badge.ok{background:rgba(66,166,110,.18);color:#2f7a4f;border:1px solid rgba(66,166,110,.4);}
+  .measure-result-badge.fail{background:rgba(224,90,90,.18);color:#b03a3a;border:1px solid rgba(224,90,90,.4);}
+  @keyframes measureResultIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
+
   .menu-btn-col{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
   .room-card{background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:9px 12px;margin-bottom:7px;cursor:pointer;font-size:12.5px;transition:border-color .15s;}
   .room-card:hover{border-color:var(--accent);}
@@ -235,10 +272,25 @@
   .avatar-opt.selected{border-color:var(--accent);background:rgba(76,122,107,.18);}
   .points-badge{background:var(--amber);color:#4a3300;}
 
-  .menu-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px;}
+  .menu-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;}
   .menu-tile{background:var(--panel2);color:var(--text);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;}
   .menu-tile span{white-space:nowrap;}
-  @media (max-width:420px){ .menu-grid{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:420px){ .menu-grid{grid-template-columns:repeat(2,1fr);} }
+
+  .menu-cards{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+  .menu-card{display:flex;align-items:center;gap:12px;width:100%;padding:16px 18px;border-radius:var(--radius-md);border:none;cursor:pointer;color:#fff;text-align:left;font-size:14px;font-weight:700;}
+  .menu-card .menu-card-icon{font-size:26px;flex:none;}
+  .menu-card .menu-card-sub{display:block;font-size:11.5px;font-weight:500;opacity:.85;margin-top:2px;}
+  .menu-card.online{background:var(--green);}
+  .menu-card.offline{background:var(--accent2);}
+
+  .account-corner-btn{position:fixed;top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));z-index:40;
+    background:var(--panel2);color:var(--text);border:1px solid var(--glass-border);border-radius:var(--radius-pill);
+    padding:8px 14px;font-size:12.5px;font-weight:700;display:none;align-items:center;gap:6px;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+  .account-corner-btn.show{display:inline-flex;}
+  .account-modal-tabs{display:flex;gap:0;margin:2px 0 14px;border-radius:var(--radius-pill);background:var(--panel);padding:3px;}
+  .account-modal-tabs button{flex:1;border-radius:var(--radius-pill);background:transparent;color:var(--muted);font-size:12.5px;padding:7px 0;}
+  .account-modal-tabs button.active{background:var(--panel2);color:var(--text);}
 
   .rating-list{max-height:340px;overflow-y:auto;margin-top:10px;}
   .rating-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);font-size:12.5px;}
@@ -272,15 +324,56 @@
   .company-modal-stats .cap-mini{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:8px 10px;}
   .company-modal-stats .cap-mini span{display:block;font-size:11px;color:var(--muted);}
   .company-modal-stats .cap-mini b{font-size:14px;}
-  .full-chart-wrap{margin:12px 0;}
+
+  /* Реакции за столом (клик по своему аватару) и голосование за исключение
+     игрока (клик по чужому аватару) — переиспользуют модалку компании
+     (companyModalOverlay/companyModalCard), см. openPlayerModal(). */
+  .reaction-picker{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px;}
+  .reaction-btn{font-size:22px;line-height:1;padding:8px 10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);cursor:pointer;}
+  .reaction-btn:hover{background:var(--panel2);}
+  .av-reaction{position:absolute;top:-24px;left:50%;font-size:20px;pointer-events:none;animation:reactionPop 2.6s ease-out forwards;}
+  @keyframes reactionPop{
+    0%{opacity:0;transform:translate(-50%,6px) scale(.6);}
+    15%{opacity:1;transform:translate(-50%,-6px) scale(1.15);}
+    70%{opacity:1;transform:translate(-50%,-14px) scale(1);}
+    100%{opacity:0;transform:translate(-50%,-26px) scale(.9);}
+  }
+  /* Плавающий баннер активного голосования за кик — виден всем за столом,
+     не только инициатору/цели, чтобы никто не пропустил происходящее. */
+  .kickvote-banner{position:fixed;top:calc(50px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:45;
+    display:none;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;max-width:min(92vw,420px);
+    background:var(--panel2);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--glass-border);
+    border-radius:var(--radius-pill);padding:8px 16px;box-shadow:0 12px 30px rgba(0,0,0,.35);font-size:12.5px;font-weight:700;}
+  .kickvote-banner.show{display:flex;}
+  .kickvote-banner button{font-size:11.5px;padding:5px 10px;}
+
+  /* Всплывающее окно биржевого события: рисуется каждый раз, когда room.eventCount
+     увеличивается (см. detectMarketEventPopup) — не пропустить итоги раунда среди
+     прочего интерфейса. Закрывается кнопкой или кликом по фону; не блокирует
+     действия — это просто модальная сводка, которую можно спокойно прочитать. */
+  .market-event-overlay{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(10,8,6,.65);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+  .market-event-modal{background:var(--panel);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.55);max-width:440px;width:100%;max-height:85vh;overflow-y:auto;animation:toastIn .2s ease-out;}
+  .market-event-modal h2{margin:0 0 2px;font-size:18px;display:flex;align-items:center;gap:8px;}
+  .market-event-modal .muted{font-size:12px;margin:0 0 14px;}
+  .market-event-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+  .market-event-list .log-entry{margin:0;}
+  .market-event-close-btn{width:100%;}
+  .full-chart-wrap{margin:12px 0;position:relative;}
   .full-chart-wrap svg{display:block;width:100%;height:140px;}
   .full-chart-minmax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px;}
+  .fc-tooltip{position:absolute;display:none;top:2px;left:0;z-index:5;background:rgba(20,16,12,.88);color:#fff;border-radius:8px;padding:4px 9px;font-size:11.5px;font-weight:600;white-space:nowrap;pointer-events:none;box-shadow:0 6px 16px rgba(0,0,0,.3);}
+  .fc-tooltip b{font-weight:800;}
+  .fc-tooltip .up{color:#7CD69A;}
+  .fc-tooltip .down{color:#E38A76;}
+  .fc-tooltip .muted{color:rgba(255,255,255,.6);}
 
   .market-filters{margin-bottom:12px;}
   .filter-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
   .filter-group:last-child{margin-bottom:0;}
   .chip{background:var(--panel2);border:1px solid var(--glass-border);color:var(--muted);border-radius:var(--radius-pill);padding:5px 12px;font-size:11.5px;font-weight:700;}
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  #marketPlayerChips{display:contents;}
+  .market-player-bar{align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 12px;padding:8px 10px;background:var(--panel2);border:1px solid var(--glass-border);border-radius:var(--radius-md);font-size:12px;}
   .spark{display:block;}
   .col-spark{white-space:nowrap;}
 
@@ -301,7 +394,7 @@
     gap:10px 12px;
     grid-template-areas:
       "ticker ticker ticker"
-      "tl     board  tr"
+      "tl     feed   tr"
       ".      board  ."
       "bl     board  br";
   }
@@ -312,6 +405,54 @@
   .corner-bl{grid-area:bl;justify-self:start;align-self:end;}
   .corner-br{grid-area:br;justify-self:end;align-self:end;text-align:right;}
   #tableBody{grid-area:board;justify-self:center;align-self:center;width:100%;}
+  /* Живая лента событий над игровым полем (только на широких экранах — на узких/ландшафте
+     остаётся вкладка «Лента» снизу). Занимает верхнюю строку сетки между блоком
+     «Ходит: ...» (tl, слева) и блоком «Ваш капитал» (tr, справа) — то есть растянута
+     горизонтально от одного до другого, прямо над столом, а не сбоку от него. Без
+     заголовка и без своей общей подложки — только сам список карточек-событий
+     (см. .feed-entry), с ограничением по высоте и собственной прокруткой. */
+  .corner-feed{grid-area:feed;justify-self:stretch;align-self:start;min-height:0;display:flex;max-height:180px;}
+  .corner-feed .stage-panel{display:flex;flex-direction:column;width:100%;min-height:0;padding:0;
+    background:none;border:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;}
+  /* Мягкое растворение по краям списка (сверху и снизу) через mask-image — при прокрутке
+     карточки не обрываются резко на границе, а плавно исчезают в прозрачность, как в
+     нативных чат-лентах. Небольшой вертикальный padding нужен, чтобы сама растяжка маски
+     не "съедала" верх/низ первой и последней карточки. */
+  .feed-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;
+    padding:8px 0;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+    mask-image:linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);}
+  /* Записи компактной ленты у стола — те же карточки «жидкое стекло», что и в .log-entry
+     (см. комментарий выше), просто чуть компактнее и без общей подложки-панели вокруг
+     (см. .corner-feed .stage-panel) — карточки как будто плавают прямо над столом. */
+  .feed-entry{position:relative;overflow:hidden;flex-shrink:0;padding:6px 9px;border-radius:12px;
+    font-size:11px;line-height:1.4;text-align:left;color:var(--text);
+    background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);
+    backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
+    border:1px solid rgba(255,255,255,.5);
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 4px 14px rgba(0,0,0,.28);}
+  .feed-entry .feed-entry-icon{display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:5px;margin-right:5px;font-size:9.5px;
+    background:rgba(0,0,0,.06);vertical-align:-3px;}
+  .feed-entry.feed-market{background:linear-gradient(135deg, rgba(76,141,255,.26), rgba(76,141,255,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-trade{background:linear-gradient(135deg, rgba(62,115,88,.24), rgba(62,115,88,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-control{background:linear-gradient(135deg, rgba(224,177,104,.3), rgba(224,177,104,.03) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-espionage{background:linear-gradient(135deg, rgba(178,107,214,.28), rgba(178,107,214,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-finance{background:linear-gradient(135deg, rgba(47,182,196,.26), rgba(47,182,196,.02) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-system{background:linear-gradient(135deg, rgba(120,120,120,.18), rgba(120,120,120,.01) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);}
+  .feed-entry.feed-danger{background:linear-gradient(135deg, rgba(168,84,62,.3), rgba(168,84,62,.03) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);border-color:rgba(168,84,62,.4);}
+  .feed-entry.feed-win{background:linear-gradient(135deg, rgba(224,169,41,.34), rgba(224,169,41,.04) 65%), linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--panel2);border-color:rgba(224,169,41,.45);font-weight:700;}
+  /* feed-header — это строки-разделители («— Биржевое событие #N —», «Хост начал игру»)
+     без карточного фона: они лежат прямо на тёмной сцене, поэтому им нужен свой светлый
+     цвет текста с тенью, а не тёмный var(--text), унаследованный от .feed-entry (иначе
+     тёмный текст на тёмном фоне сцены становится нечитаемым). */
+  .feed-entry.feed-header{background:transparent;border-color:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;text-align:center;font-weight:700;letter-spacing:.02em;opacity:.85;padding:4px 8px;color:rgba(243,238,228,.8);text-shadow:0 1px 3px rgba(0,0,0,.55);}
+  /* Анимация появления новых записей — как в живом чате: новая карточка мягко всплывает
+     сверху и проявляется. Класс feed-entry-in навешивается в JS (renderCornerFeed) только
+     на реально новые записи с прошлого рендера, чтобы старые карточки не переигрывали
+     анимацию при каждом обновлении состояния. */
+  @keyframes feedEntryIn{ from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
+  .feed-entry-in{animation:feedEntryIn .55s cubic-bezier(.22,.75,.32,1);}
   .stage .ticker-wrap{position:static;background:rgba(255,255,255,.08);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.16);border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.3);}
   .stage .ticker-track{color:#F3EEE4;padding:6px 12px;}
   .stage-panel{background:rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:var(--radius-md);padding:10px 14px;color:#F3EEE4;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:12.5px;}
@@ -322,7 +463,13 @@
   .stage-roll-btn{background:rgba(255,255,255,.14) !important;color:#F3EEE4 !important;border:1px solid rgba(255,255,255,.28) !important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(0,0,0,.35);}
   .stage-roll-btn:hover{background:rgba(255,255,255,.22) !important;}
 
-  .context-popup{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:16px;z-index:9;pointer-events:none;}
+  /* position:fixed (не absolute) — попап всегда центрирован по вьюпорту и не участвует
+     во внутренней прокрутке .stage. Если бы попап был в потоке прокручиваемого контента
+     (absolute внутри overflow:auto контейнера), его собственная высота (список акций,
+     предложения обмена) добавлялась бы к scrollHeight сцены и утапливала кнопку «Бросить
+     кубики» (corner-bl) ниже видимой области — особенно критично на низких мобильных
+     экранах в ландшафте, где высоты и так впритык. */
+  .context-popup{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;z-index:9;pointer-events:none;}
   .context-popup .popup-card{pointer-events:auto;}
   .popup-card{background:var(--panel2);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:0 24px 60px rgba(0,0,0,.5);max-width:360px;width:100%;max-height:calc(100% - 20px);overflow-y:auto;}
   .popup-card.popup-wide{max-width:440px;background:var(--panel);}
@@ -382,13 +529,19 @@
     .mini-card{padding:10px 12px;}
     .stage{padding:9px 9px calc(74px + env(safe-area-inset-bottom)) 9px;gap:8px;
       grid-template-columns:1fr 1fr;
-      grid-template-rows:auto auto auto auto;
+      grid-template-rows:auto auto auto;
       grid-template-areas:
-        "ticker ticker"
         "tl     tr"
         "board  board"
         "bl     br";
     }
+    /* Бегущая строка (цены/новости) на мобильном убрана целиком — не сколько
+       ради контента, сколько ради высоты: это одна из самых сжимаемых по
+       ценности строк грида, а события и так дублируются тостами, попапом
+       события раунда и вкладкой «Лента». Освобождённое место отдаём доске и
+       угловым панелям, чтобы реже требовалась прокрутка. */
+    .stage-ticker{display:none;}
+    .corner-feed{display:none;} /* нет места на узком экране — используйте вкладку «Лента» */
     .stage-corner{max-width:100%;}
     .stage-panel{padding:7px 9px;font-size:10.5px;}
     .cap-mini-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
@@ -400,7 +553,27 @@
     .table-avatar .av-circle{width:30px;height:30px;font-size:12px;}
     .table-avatar .av-name{font-size:9px;padding:1px 5px;}
     .popup-card{padding:12px 14px;}
+    .company-modal-overlay, .market-event-overlay{padding:10px;}
+    .company-modal, .market-event-modal{padding:12px 14px;max-height:calc(100% - 20px);}
+    .market-event-modal h2, .company-modal h2{font-size:14px;margin:0 0 2px;}
+    .market-event-modal .muted{font-size:10.5px;margin:0 0 8px;}
+    .market-event-list{gap:6px;margin-bottom:10px;}
+    .market-event-list .log-entry{padding:7px 9px;border-radius:11px;font-size:11px;line-height:1.32;}
+    .market-event-list .log-entry .tag{font-size:9px;margin-bottom:1px;}
+    .market-event-close-btn{padding:9px;font-size:12.5px;}
   }
+
+  /* Базовые (десктопные) значения для экрана конца игры — специально стоят
+     ПЕРЕД ландшафтным мобильным брейкпоинтом ниже: он переопределяет часть этих
+     же свойств для мобилок, а при равной специфичности выигрывает более поздний
+     по тексту файла — если бы этот блок шёл после брейкпоинта (как было раньше),
+     он снова забивал бы мобильную компоновку исходными крупными размерами. */
+  .end-screen-icon{font-size:44px;line-height:1;animation:endIconPop .5s ease-out;}
+  .end-title{margin:8px 0 2px;}
+  .end-subtitle{margin-bottom:14px;font-size:13px;}
+  .end-rank-list{display:flex;flex-direction:column;gap:6px;text-align:left;margin-bottom:14px;}
+  .end-reward-card{margin-bottom:14px;text-align:left;}
+  .end-rank-row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel);border-radius:12px;padding:8px 12px;font-size:13px;}
 
   /* Мобильный ландшафт (телефон повёрнут набок): мало высоты, много ширины —
      убираем пустую распорную строку сетки, сжимаем доску по высоте вьюпорта,
@@ -409,18 +582,59 @@
     main{padding:8px 10px 16px;}
     .stage{padding:8px 10px calc(56px + env(safe-area-inset-bottom)) 10px;gap:6px 10px;
       grid-template-columns:minmax(96px,1fr) minmax(180px,2fr) minmax(96px,1fr);
-      grid-template-rows:auto 1fr auto;
+      grid-template-rows:1fr auto;
       grid-template-areas:
-        "ticker ticker ticker"
         "tl     board  tr"
         "bl     board  br";
     }
+    /* Как и в узкой раскладке — убираем бегущую строку целиком на мобильном
+       ландшафте, это самая низкоценная по контенту строка грида, а высота
+       здесь на счету больше всего. События по-прежнему приходят тостами,
+       попапом биржевого события и во вкладке «Лента». */
+    .stage-ticker{display:none;}
+    .corner-feed{display:none;} /* мало высоты в ландшафте — используйте вкладку «Лента» */
     .stage-corner{max-width:150px;}
     /* Кнопка меню (☰) закреплена в правом верхнем углу поверх всего экрана — в ландшафте
-       угловая панель капитала слишком высокая, чтобы начинаться ниже неё, поэтому просто
-       резервируем отступ сверху под саму кнопку, чтобы текст не прятался под ней. */
-    .corner-tr .mini-card{padding-top:40px;}
+       угловая панель капитала слишком высокая, чтобы начинаться ниже неё. Раньше отступ
+       под неё резервировался через padding-top на .corner-tr .mini-card, но этот селектор
+       по специфичности равен следующему правилу .stage-corner .mini-card{padding:...} —
+       и то, что шло по тексту ниже, полностью перебивало padding-top обратно на 6px (баг:
+       заголовок карточки визуально прятался под кнопкой). Чиним двумя способами: сама
+       кнопка в этом брейкпоинте меньше и компактнее, а отступ снова задаём ПОСЛЕ общего
+       правила .stage-corner .mini-card, чтобы он действительно применялся. */
+    .game-menu-btn{width:32px;height:32px;font-size:14px;top:8px;right:8px;}
     .stage-panel{padding:6px 8px;font-size:10px;}
+    /* Панели капитала/рейтинга (углы tr/br) могут содержать переменное число строк
+       (акции, игроки) — при большом числе они не должны раздувать высоту строки грида
+       сетки .stage за пределы короткого вьюпорта и утапливать кнопку хода (bl) ниже
+       экрана. Поэтому жёстко ограничиваем высоту самой карточки; предпочитаем сжимать
+       содержимое (см. ниже), внутренняя прокрутка — только страховка на крайний случай. */
+    .stage-corner .mini-card{max-height:30vh;overflow-y:auto;margin-bottom:0;padding:4px 8px;}
+    .corner-tr .mini-card{padding-top:34px;}
+    .stage-corner .mini-card h3{font-size:9.5px;margin:0 0 2px;}
+    /* Капитал: пробовали свести подпись+сумму в одну строку через flex space-between, но
+       на колонке шириной ~64px это делит ширину пополам и обрезает саму СУММУ многоточием
+       ("$150 000" → "$15…") — то есть скрывает именно те цифры, ради которых карточка
+       нужна. Оставляем подпись/сумму на двух строках (сумма получает всю ширину ячейки),
+       просто сильно уменьшаем шрифт/отступы, чтобы всё равно уложиться по высоте. */
+    .cap-mini-row{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+    .cap-mini{min-width:0;padding:1px 5px;font-size:7.5px;line-height:1.15;}
+    .cap-mini b{display:block;font-size:9.5px;line-height:1.2;margin-top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .cap-mini-row .cap-mini:last-child:nth-child(odd){grid-column:1 / -1;}
+    /* Бейджи репутации/кредита под цифрами капитала не влезают по высоте вместе с
+       остальным содержимым карточки в этом брейкпоинте — репутация и займы и так
+       полностью видны во вкладке «Капитал», так что здесь не дублируем. */
+    .rep-badge-row{display:none;}
+    /* 6 игроков — официальный максимум (см. лимит при добавлении офлайн-игроков), это не
+       редкий крайний случай, а обычный полный стол. Строки рейтинга должны помещаться без
+       прокрутки и на таком составе, поэтому здесь предельно плотная упаковка. */
+    .rating-row{padding:1.5px 0;font-size:9px;gap:4px;line-height:1.2;}
+    .rating-rank{width:12px;font-size:8.5px;}
+    /* Строка со своим игроком, когда он же ходит сейчас, набирала «Имя (вы) 🎯» — на узкой
+       угловой панели это переносилось на вторую строку и раздувало высоту карточки
+       рейтинга. Обрезаем многоточием вместо переноса: бейджи «(вы)»/🎯/💀 не критичны для
+       чтения на такой мелкой панели, а вот лишняя высота — критична. */
+    .rating-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .stage-board-outer{width:min(48vh,320px);margin:0 auto;}
     .table-avatar{width:38px;gap:2px;}
     .table-avatar .av-circle{width:26px;height:26px;font-size:11px;}
@@ -429,6 +643,68 @@
     .stage-tabbar .tab-btn{padding:5px 3px;font-size:9.5px;}
     .overlay-panel.active{padding:10px 12px calc(58px + env(safe-area-inset-bottom));}
     .popup-card{max-height:calc(100% - 12px);padding:10px 12px;}
+    /* Попап биржевого события (карточки раунда) — раньше на низких мобильных
+       экранах нужно было прокручивать сам попап, чтобы добраться до кнопки
+       «Понятно, закрыть». Вместо прокрутки — сжимаем сами карточки и отступы,
+       чтобы обычное число событий за раунд (1-4 карточки) помещалось целиком. */
+    .company-modal-overlay, .market-event-overlay{padding:8px;}
+    .company-modal, .market-event-modal{padding:10px 12px;max-height:calc(100% - 16px);}
+    .market-event-modal h2, .company-modal h2{font-size:13px;margin:0 0 2px;}
+    .market-event-modal .muted{font-size:10px;margin:0 0 6px;}
+    .market-event-list{gap:5px;margin-bottom:8px;}
+    .market-event-list .log-entry{padding:6px 8px;border-radius:10px;font-size:10.5px;line-height:1.3;}
+    .market-event-list .log-entry .tag{font-size:8.5px;margin-bottom:1px;}
+    .market-event-close-btn{padding:8px;font-size:12px;}
+    /* Модалка компании (график + статистика) — раньше использовала десктопные
+       размеры шапки/статкарт/графика даже на мобильном ландшафте, из-за чего
+       график обрезался снизу (нужна была внутренняя прокрутка). Сжимаем вместо
+       прокрутки, как и остальные карточки/попапы в этом брейкпоинте. */
+    .company-modal-head h2{font-size:14px;}
+    .company-modal-head .muted{font-size:10px;}
+    .company-modal-stats{gap:5px;margin:8px 0;}
+    .company-modal-stats .cap-mini{padding:4px 7px;}
+    .company-modal-stats .cap-mini span{font-size:8.5px;}
+    .company-modal-stats .cap-mini b{font-size:11px;}
+    .full-chart-wrap{margin:6px 0;}
+    .full-chart-wrap svg{height:90px;}
+    .full-chart-minmax{font-size:9px;}
+    /* Экран конца игры (победа/поражение + таблица результатов) — при 5-6 игроках
+       список рангов раньше требовал прокрутки, чтобы добраться до кнопки «Новая
+       партия». Сжимаем иконку/заголовок/строки рейтинга/карточку награды вместо
+       прокрутки — это финальный экран, кнопка перезапуска должна быть видна сразу. */
+    .end-screen-icon{font-size:26px;}
+    .end-title{margin:3px 0 1px;font-size:15px;}
+    .end-subtitle{margin-bottom:5px;font-size:10.5px;}
+    .end-rank-list{gap:3px;margin-bottom:5px;}
+    .end-rank-row{padding:3px 8px;font-size:10.5px;border-radius:8px;}
+    .end-reward-card{margin-bottom:5px;padding:4px 8px;}
+    .end-reward-card h3{font-size:9.5px;margin:0 0 2px;}
+  }
+
+  /* Самые маленькие ландшафтные экраны (напр. iPhone SE, ~320px высоты) — 30vh для
+     угловых карточек капитала/рейтинга там даёт всего ~96px, и даже предельно плотная
+     упаковка выше (для 6 игроков) в это не помещается. Здесь чуть увеличиваем лимит
+     высоты и уплотняем ещё сильнее вместо появления внутренней прокрутки. */
+  @media (orientation:landscape) and (max-height:340px){
+    .game-menu-btn{width:28px;height:28px;font-size:12px;top:6px;right:6px;}
+    /* Порядок правил важен: .stage-corner .mini-card ниже задаёт padding шортхендом
+       (перебивает padding-top), поэтому персональный отступ для corner-tr должен идти
+       ПОСЛЕ него в тексте файла — иначе кнопка меню (☰) снова наедет на заголовок
+       карточки капитала, как уже было в основном ландшафтном брейкпоинте выше. */
+    .stage-corner .mini-card{max-height:34vh;padding:3px 7px;}
+    .corner-tr .mini-card{padding-top:28px;}
+    .stage-corner .mini-card h3{margin:0 0 1px;}
+    .rating-row{padding:1px 0;font-size:8.5px;gap:3px;}
+    .rating-rank{width:10px;font-size:8px;}
+    /* Экран конца игры при 6 игроках на самых низких экранах (~320px высоты) всё ещё
+       не помещается даже после базовой ландшафтной компактизации выше — уплотняем
+       ещё сильнее, вплоть до скрытия иконки-эмодзи (чисто декоративной). */
+    .end-screen-icon{font-size:0;height:0;margin:0;}
+    .end-title{margin:2px 0 1px;font-size:13px;}
+    .end-subtitle{margin-bottom:3px;font-size:9.5px;}
+    .end-rank-list{gap:2px;margin-bottom:3px;}
+    .end-rank-row{padding:2px 7px;font-size:9.5px;}
+    .end-reward-card{margin-bottom:3px;padding:3px 7px;}
   }
 
   .toast-stack{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:8px;width:min(360px,92vw);pointer-events:none;align-items:center;}
@@ -445,29 +721,63 @@
   @keyframes toastIn{ from{opacity:0;transform:translateY(-14px) scale(.96);} to{opacity:1;transform:translateY(0) scale(1);} }
   @keyframes toastOut{ from{opacity:1;transform:translateY(0) scale(1);} to{opacity:0;transform:translateY(-10px) scale(.96);} }
   @media (max-width:480px){ .toast-stack{width:94vw;} }
-
-  .end-screen-icon{font-size:44px;line-height:1;animation:endIconPop .5s ease-out;}
   @keyframes endIconPop{ from{transform:scale(.4);opacity:0;} to{transform:scale(1);opacity:1;} }
-  .end-rank-row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel);border-radius:12px;padding:8px 12px;font-size:13px;}
   .end-rank-row.me{border:1px solid var(--accent2);}
   .end-rank-row .end-rank-name{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* Предупреждение о повороте устройства — на мобильных (тач, без hover) в портретной
+     ориентации перекрывает вообще всё приложение непрозрачным полноэкранным блоком,
+     пока игрок не повернёт телефон в горизонтальное положение. На десктопе (курсор/hover)
+     не показывается никогда, даже если окно браузера узкое и высокое. */
+  .rotate-warning{display:none;position:fixed;inset:0;z-index:99999;
+    background:
+      radial-gradient(circle at 12% 18%, var(--patch1) 0%, transparent 40%),
+      radial-gradient(circle at 88% 78%, var(--patch2) 0%, transparent 42%),
+      var(--bg);
+    flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    padding:32px;gap:14px;}
+  .rotate-warning .rotate-icon{font-size:60px;line-height:1;animation:rotateHint 1.8s ease-in-out infinite;}
+  .rotate-warning h2{margin:0;font-size:19px;color:var(--text);font-weight:800;}
+  .rotate-warning p{margin:0;font-size:13px;color:var(--muted);max-width:280px;line-height:1.5;}
+  @keyframes rotateHint{ 0%,18%{transform:rotate(0deg);} 50%,68%{transform:rotate(-90deg);} 100%{transform:rotate(-90deg);} }
+  @media (orientation:portrait) and (pointer:coarse){
+    .rotate-warning{display:flex;}
+    body.rotate-locked > *:not(.rotate-warning){display:none !important;}
+  }
 </style>
 </head>
 <body>
 
+<div class="rotate-warning" id="rotateWarning">
+  <div class="rotate-icon">📱</div>
+  <h2>Поверните телефон</h2>
+  <p>Игра рассчитана на горизонтальную ориентацию экрана — поверните устройство набок, чтобы продолжить.</p>
+</div>
+
 <div class="toast-stack" id="toastStack"></div>
+<div class="kickvote-banner" id="kickVoteBanner"></div>
+
+<button type="button" class="account-corner-btn show" id="btnAccountMenu">👤 <span id="accountCornerLabel">Войти в аккаунт</span></button>
+<div class="company-modal-overlay" id="accountModalOverlay" onclick="if(event.target===this) closeAccountModal();">
+  <div class="company-modal" id="accountModalCard" style="max-width:380px;"></div>
+</div>
 
 <div class="center-screen" id="mainMenu">
   <div class="join-box">
     <h1>📈 Trade Monopoly</h1>
     <p>Настольная экономическая игра. Выберите, как хотите играть.</p>
-    <div class="menu-btn-col">
-      <button style="width:100%;" id="btnGoOnline">🌐 Играть онлайн</button>
-      <button class="secondary" style="width:100%;" id="btnGoOffline">🎮 Офлайн (хот-сит на одном устройстве)</button>
+    <div class="menu-cards">
+      <button type="button" class="menu-card online" id="btnGoOnline">
+        <span class="menu-card-icon">🌐</span>
+        <span>Играть онлайн<span class="menu-card-sub">С другими игроками по сети</span></span>
+      </button>
+      <button type="button" class="menu-card offline" id="btnGoOffline">
+        <span class="menu-card-icon">🎮</span>
+        <span>Офлайн<span class="menu-card-sub">Хот-сит на одном устройстве</span></span>
+      </button>
     </div>
     <div class="menu-grid">
       <button type="button" class="menu-tile" id="btnGoRating">🏆<span>Рейтинг</span></button>
-      <button type="button" class="menu-tile" id="btnGoProfile">👤<span>Профиль</span></button>
       <button type="button" class="menu-tile" id="btnGoSkins">🎨<span>Скины</span></button>
       <button type="button" class="menu-tile" id="btnGoSettings">⚙️<span>Настройки</span></button>
       <button type="button" class="menu-tile" id="btnGoRules">📖<span>Правила</span></button>
@@ -495,12 +805,7 @@
     <h1>👤 Профиль</h1>
     <div id="profileGate">
       <p>Войдите в свой аккаунт, чтобы изменить профиль.</p>
-      <label>Ник</label>
-      <input id="profileLoginName" placeholder="ваш ник" maxlength="20" autocomplete="username">
-      <label>Пароль</label>
-      <input id="profileLoginPassword" type="password" placeholder="пароль" autocomplete="current-password">
-      <button style="width:100%;margin-top:14px;" id="profileLoginBtn">Войти</button>
-      <div class="err" id="profileLoginErr"></div>
+      <button style="width:100%;" id="profileGateLoginBtn">Войти в аккаунт</button>
     </div>
     <div id="profileContent" style="display:none;">
       <div class="row-inline" style="justify-content:space-between;">
@@ -550,12 +855,7 @@
     <h1>🎨 Скины</h1>
     <div id="skinsGate">
       <p>Войдите в свой аккаунт, чтобы покупать и применять скины за очки рейтинга.</p>
-      <label>Ник</label>
-      <input id="skinsLoginName" placeholder="ваш ник" maxlength="20" autocomplete="username">
-      <label>Пароль</label>
-      <input id="skinsLoginPassword" type="password" placeholder="пароль" autocomplete="current-password">
-      <button style="width:100%;margin-top:14px;" id="skinsLoginBtn">Войти</button>
-      <div class="err" id="skinsLoginErr"></div>
+      <button style="width:100%;" id="skinsGateLoginBtn">Войти в аккаунт</button>
     </div>
     <div id="skinsContent" style="display:none;">
       <div class="row-inline" style="justify-content:space-between;">
@@ -597,8 +897,8 @@
       <div class="muted rules-p">На своём ходу бросьте кубики — фишка встанет на компанию по сумме очков. Если у компании ещё есть акции в банке, вам предложат купить одну или несколько по текущей цене. Если акции уже разобраны другими игроками, вместо этого можно получить дивиденды с держателя контрольного пакета.</div>
     </details>
     <details class="tips">
-      <summary>Фаза торгов</summary>
-      <div class="muted rules-p">Каждый 3-й ход открывается общее окно торгов на ограниченное время. В это окно нельзя покупать акции у банка — только продавать их банку по текущей цене или заключать прямые сделки с другими игроками по договорной цене.</div>
+      <summary>Продажа, обмен и спецдействия</summary>
+      <div class="muted rules-p">Общей фазы торгов больше нет — пока ход ваш, вы в любой момент (до или после броска кубиков) можете продать акции банку, предложить другому игроку сделку (за деньги и/или в обмен на его акции) или применить спецдействия контрольного пакета и шпионаж. Это исключает сумбур от одновременных действий всех игроков сразу. Когда закончите — нажмите «Завершить ход».</div>
     </details>
     <details class="tips">
       <summary>Волатильность цен</summary>
@@ -618,7 +918,7 @@
     </details>
     <details class="tips">
       <summary>Шпионаж</summary>
-      <div class="muted rules-p">Держатели контрольных пакетов могут использовать инсайдерскую информацию и дискредитацию, чтобы влиять на цены акций конкурентов — рискованно и может повредить репутации при раскрытии.</div>
+      <div class="muted rules-p">В свой ход (в любой момент, не дожидаясь особой фазы) можно провести шпионаж за соперником, дискредитировать его или расследовать, кто действовал против вас — рискованно и может повредить репутации при раскрытии.</div>
     </details>
     <details class="tips">
       <summary>Недвижимость</summary>
@@ -639,58 +939,37 @@
 <div class="center-screen" id="onlineScreen" style="display:none;">
   <div class="join-box" style="width:400px;">
     <h1>🌐 Играть онлайн</h1>
-    <p>Ник — это логин вашего аккаунта, защищённый паролем: прогресс и очки сохраняются между сессиями, и никто не сможет войти под вашим ником без пароля.</p>
 
-    <div class="row-inline" style="margin:0 0 4px;">
-      <button type="button" class="small" style="flex:1;" id="authModeLogin">Вход</button>
-      <button type="button" class="secondary small" style="flex:1;" id="authModeRegister">Регистрация</button>
+    <div id="onlineGate">
+      <p>Чтобы играть онлайн, сначала войдите в аккаунт или зарегистрируйтесь — это ваш логин, защищённый паролем: прогресс и очки сохраняются между сессиями.</p>
+      <button style="width:100%;" id="onlineGateLoginBtn">Войти в аккаунт</button>
     </div>
 
-    <label>Ник</label>
-    <input id="joinName" placeholder="например Игрок1" maxlength="20" autocomplete="username">
-
-    <label>Пароль</label>
-    <input id="joinPassword" type="password" placeholder="пароль" autocomplete="current-password">
-
-    <div id="registerFields" style="display:none;">
-      <label>Пол</label>
-      <select id="joinGender">
-        <option value="">Не указывать</option>
-        <option value="male">Мужской</option>
-        <option value="female">Женский</option>
-        <option value="nonbinary">Небинарный</option>
-        <option value="other">Другое</option>
-      </select>
-      <input id="joinGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
-
-      <label>Аватар</label>
-      <div class="avatar-picker" id="joinAvatarPicker"></div>
-    </div>
-
-    <label>Активные комнаты</label>
-    <div class="room-list-box" id="roomList"></div>
-    <div class="muted" id="roomListEmpty" style="font-size:12px;display:none;">Пока нет активных комнат — создайте новую ниже.</div>
-
-    <details class="tips" style="margin-top:14px;">
-      <summary>Создать новую комнату</summary>
-      <div style="padding:10px 0 0 4px;">
-        <label style="margin-top:0;">Код комнаты (необязательно)</label>
-        <input id="joinRoom" placeholder="например MAIN" maxlength="20">
-        <label>Формат</label>
-        <select id="createFormat" disabled>
-          <option value="online" selected>🌐 Онлайн (мультиплеер)</option>
-        </select>
-        <label>Скорость торгов</label>
-        <select id="createTradeSpeed">
-          <option value="30000">Быстро (30с)</option>
-          <option value="90000" selected>Стандарт (90с)</option>
-          <option value="180000">Долго (180с)</option>
-        </select>
-        <button style="width:100%;margin-top:12px;" id="btnCreateRoom">Создать и войти</button>
+    <div id="onlineContent" style="display:none;">
+      <div class="row-inline" style="justify-content:space-between;margin-bottom:6px;">
+        <div>Вы вошли как <b id="onlineWhoName"></b></div>
       </div>
-    </details>
 
-    <div class="err" id="joinErr"></div>
+      <label>Активные комнаты</label>
+      <div class="room-list-box" id="roomList"></div>
+      <div class="muted" id="roomListEmpty" style="font-size:12px;display:none;">Пока нет активных комнат — создайте новую ниже.</div>
+
+      <details class="tips" style="margin-top:14px;">
+        <summary>Создать новую комнату</summary>
+        <div style="padding:10px 0 0 4px;">
+          <label style="margin-top:0;">Код комнаты (необязательно)</label>
+          <input id="joinRoom" placeholder="например MAIN" maxlength="20">
+          <label>Формат</label>
+          <select id="createFormat" disabled>
+            <option value="online" selected>🌐 Онлайн (мультиплеер)</option>
+          </select>
+          <button style="width:100%;margin-top:12px;" id="btnCreateRoom">Создать и войти</button>
+        </div>
+      </details>
+
+      <div class="err" id="joinErr"></div>
+    </div>
+
     <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromOnline">← Назад в меню</button>
   </div>
 </div>
@@ -756,6 +1035,7 @@
       <div class="stage-corner corner-tl" id="cornerStatus"></div>
       <div class="stage-corner corner-tr" id="cornerCapital"></div>
       <div id="tableBody"></div>
+      <div class="stage-corner corner-feed" id="cornerFeed"></div>
       <div class="stage-corner corner-bl" id="cornerAction"></div>
       <div class="stage-corner corner-br" id="cornerRating"></div>
       <div class="context-popup" id="contextPopup"></div>
@@ -777,8 +1057,10 @@
           <button type="button" class="chip" data-own="free">Свободные</button>
           <button type="button" class="chip" data-own="mine">Мои</button>
           <button type="button" class="chip" data-own="control">Под контролем</button>
+          <span id="marketPlayerChips"></span>
         </div>
       </div>
+      <div class="market-player-bar" id="marketPlayerBar" style="display:none;"></div>
       <div class="table-scroll">
       <table id="marketTable">
         <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th class="col-spark" title="История цены с начала сессии">График</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
@@ -819,8 +1101,8 @@
         <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">когда наступает ваш ход, нажмите «Бросить кубики» — игра найдёт компанию на пересечении координат и предложит купить её акции или получить дивиденды, если она уже полностью разобрана.</div>
       </details>
       <details class="tips">
-        <summary>Фаза торгов</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">открывается всем игрокам одновременно каждый 3-й ход. Покупка у банка в это окно закрыта — доступны только продажа акций банку и обмен (сделки) с другими игроками по договорной цене.</div>
+        <summary>Продажа, обмен и сделки</summary>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">единой фазы торгов больше нет — ходящий игрок в любой момент своего хода (до или после броска) может продать акции банку, обменяться акциями и/или деньгами с другим игроком. Остальные игроки в это время могут только принять или отклонить адресованное им предложение.</div>
       </details>
       <details class="tips">
         <summary>Контрольный пакет (&gt;50%)</summary>
@@ -828,7 +1110,7 @@
       </details>
       <details class="tips">
         <summary>Офлайн (хот-сит)</summary>
-        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">в офлайн-режиме нет сети и таймеров — устройство передаётся по кругу. Переключайте «Ход как» на вкладке «Главный ход», чтобы действовать от лица нужного игрока, а фазу торгов завершайте вручную кнопкой там же.</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6;padding:6px 0 2px 14px;">в офлайн-режиме нет сети и таймеров — устройство передаётся по кругу. Переключайте «Смотреть как» на вкладке «Ход», чтобы действовать от лица нужного игрока или ответить на предложенную сделку, а свой ход завершайте вручную кнопкой там же.</div>
       </details>
       <details class="tips">
         <summary>Банкротство</summary>
@@ -851,15 +1133,65 @@
 <div class="company-modal-overlay" id="companyModalOverlay" onclick="if(event.target===this) closeCompanyModal();">
   <div class="company-modal" id="companyModalCard"></div>
 </div>
+
+<div class="market-event-overlay" id="marketEventOverlay" onclick="if(event.target===this) closeMarketEventModal();">
+  <div class="market-event-modal" id="marketEventModalCard"></div>
+</div>
 </div>
 
 <script src="/engine.js"></script>
 <script src="/skins.js"></script>
 <script>
+// --- Предупреждение о повороте телефона -------------------------------
+// На тач-устройствах (нет hover/курсора) в портретной ориентации приложение
+// целиком не рендерится — только полноэкранная заглушка с просьбой повернуть
+// экран. На десктопе (мышь/трекпад, даже при узком окне) заглушка никогда не
+// показывается. Дублируем логику отображения самой заглушки в CSS-медиазапросе
+// (см. .rotate-warning), а здесь только скрываем остальной DOM классом на body —
+// это дополнительно останавливает фоновую прокрутку/анимации/фокус, а не только
+// визуально перекрывает их оверлеем.
+const rotateLockQuery = window.matchMedia("(orientation:portrait) and (pointer:coarse)");
+function updateRotateLock(){
+  document.body.classList.toggle("rotate-locked", rotateLockQuery.matches);
+}
+updateRotateLock();
+if(rotateLockQuery.addEventListener) rotateLockQuery.addEventListener("change", updateRotateLock);
+else if(rotateLockQuery.addListener) rotateLockQuery.addListener(updateRotateLock); // старые Safari/iOS
+window.addEventListener("orientationchange", ()=> setTimeout(updateRotateLock, 50));
+
 let mode = null; // 'online' | 'offline'
 let ws = null;
 let you = null;
 let latest = null;
+// Итог последней использованной платной меры (успех/провал/выполнено) — чтобы
+// показать его сразу на самой карточке в Контроль, а не только искать в ленте.
+let lastMeasureResult = null;
+let measureResultTimer = null;
+function recordMeasureResult(measure, result){
+  if(!result || result.error) return;
+  lastMeasureResult = { measure, success: result.success !== false, ts: Date.now(), suspectName: result.suspectName || null };
+  if(measureResultTimer) clearTimeout(measureResultTimer);
+  measureResultTimer = setTimeout(()=>{ lastMeasureResult = null; if(latest) renderControlPanel(latest); }, 7000);
+  if(latest) renderControlPanel(latest);
+}
+function measureResultBadgeHtml(measure){
+  if(!lastMeasureResult || lastMeasureResult.measure !== measure) return "";
+  const r = lastMeasureResult;
+  const labels = {
+    espionage: r.success ? "✅ Успех — активы цели раскрыты на 2 события." : "❌ Провал — вас поймали, репутация снижена.",
+    discredit: r.success ? "✅ Успех — репутация цели снижена." : "❌ Провал — атака вскрылась публично, ваша репутация снижена.",
+    investigate: r.success ? `✅ Виновный найден${r.suspectName?": "+escapeHtml(r.suspectName):""}!` : "❌ Виновный остался неизвестен.",
+    negativeInfo: "✅ Атака проведена — цена компании упала.",
+    prCampaign: "✅ PR-кампания проведена — цена выросла.",
+    insiderPeek: "✅ Карта подсмотрена.",
+    squeezeOut: "✅ Миноритарии выкуплены — дивиденды теперь ×2.",
+    short: "✅ Шорт открыт.",
+    personalPr: "✅ Репутация повышена.",
+  };
+  const dual = measure==="espionage" || measure==="discredit" || measure==="investigate";
+  const cls = dual ? (r.success?"ok":"fail") : "ok";
+  return `<div class="measure-result-badge ${cls}">${labels[measure]||""}</div>`;
+}
 let myName = "";
 let roomCode = "";
 let pendingInsiderCard = null;
@@ -871,7 +1203,6 @@ let localRoom = null;
 let viewAs = null;
 let offlinePlayerNames = []; // {name, gender, avatar}[]
 let offlineNewAvatar = "";
-let joinAvatar = "";
 const AVATAR_SET = ["🧑","👩","👨","🧔","👩‍🦱","👨‍🦱","🧕","👳","🦸","🧙","🥷","🐱","🐶","🦊","🐼","🐸"];
 const GENDER_LABEL = { male:"Мужской", female:"Женский", nonbinary:"Небинарный" };
 function genderLabel(p){
@@ -890,49 +1221,17 @@ function buildAvatarPicker(containerId, selected, onPick){
     };
   });
 }
-function currentJoinGender(){
-  const sel = document.getElementById("joinGender").value;
-  if(sel === "other") return document.getElementById("joinGenderOther").value.trim().slice(0,24);
-  return sel;
-}
 // Пароль никогда не сохраняется локально — только последний использованный ник,
 // чтобы не перепечатывать его при следующем входе.
 function saveUsernameLocal(username){
   try { localStorage.setItem("tm_username", username || ""); } catch(e){}
 }
-let authMode = "login"; // 'login' | 'register'
-function setAuthMode(m){
-  authMode = m === "register" ? "register" : "login";
-  document.getElementById("authModeLogin").classList.toggle("secondary", authMode !== "login");
-  document.getElementById("authModeRegister").classList.toggle("secondary", authMode !== "register");
-  document.getElementById("registerFields").style.display = authMode === "register" ? "block" : "none";
-  const pwd = document.getElementById("joinPassword");
-  pwd.placeholder = authMode === "register" ? "не короче 4 символов" : "пароль";
-  pwd.autocomplete = authMode === "register" ? "new-password" : "current-password";
-  document.getElementById("joinErr").textContent = "";
-}
 function initProfileUI(){
-  const joinGenderSel = document.getElementById("joinGender");
-  const joinGenderOther = document.getElementById("joinGenderOther");
-  if(joinGenderSel) joinGenderSel.addEventListener("change", ()=>{
-    joinGenderOther.style.display = joinGenderSel.value === "other" ? "block" : "none";
-  });
   const offlineGenderSel = document.getElementById("offlineNewGender");
   const offlineGenderOther = document.getElementById("offlineNewGenderOther");
   if(offlineGenderSel) offlineGenderSel.addEventListener("change", ()=>{
     offlineGenderOther.style.display = offlineGenderSel.value === "other" ? "block" : "none";
   });
-
-  document.getElementById("authModeLogin").onclick = ()=> setAuthMode("login");
-  document.getElementById("authModeRegister").onclick = ()=> setAuthMode("register");
-  setAuthMode("login");
-
-  try {
-    const savedUsername = localStorage.getItem("tm_username");
-    if(savedUsername) document.getElementById("joinName").value = savedUsername;
-  } catch(e){}
-
-  buildAvatarPicker("joinAvatarPicker", joinAvatar, a=> joinAvatar = a);
   buildAvatarPicker("offlineAvatarPicker", offlineNewAvatar, a=> offlineNewAvatar = a);
 }
 let expandedTicker = null;
@@ -942,15 +1241,40 @@ function switchCapitalSubTab(name){ capitalSubTab = name; if(latest) renderCapit
 
 function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
 
+// Переиспользуемый компонент "слайдер процента" для гибкой покупки/продажи/обмена
+// акций (1-25% вместо старых фиксированных кнопок 10%/25%). unitPrice — цена за 1%
+// пакета (уже с учётом банковской комиссии, если нужно), используется только для
+// живого пересчёта суммы под слайдером.
+function pctSliderHtml(sliderId, max, value, unitPrice){
+  value = Math.max(1, Math.min(max, value));
+  return `<div class="pct-slider-row">
+    <div class="pct-slider-readout"><b id="${sliderId}_pct">${value}%</b><span id="${sliderId}_amt">${fmt(unitPrice*value)}</span></div>
+    <input type="range" class="pct-slider" id="${sliderId}" min="1" max="${max}" step="1" value="${value}"
+      data-unit="${unitPrice}" oninput="onPctSlider(this)">
+  </div>`;
+}
+function onPctSlider(el){
+  const pct = parseInt(el.value, 10) || 1;
+  const unit = parseFloat(el.dataset.unit) || 0;
+  const pctOut = document.getElementById(el.id + "_pct");
+  const amtOut = document.getElementById(el.id + "_amt");
+  if(pctOut) pctOut.textContent = pct + "%";
+  if(amtOut) amtOut.textContent = fmt(unit*pct);
+}
+function pctSliderVal(id){ const el = document.getElementById(id); return el ? (parseInt(el.value, 10) || 1) : 1; }
+
 // Не все бренды есть в библиотеке simpleicons.org (нет Microsoft, IBM, Amazon,
-// Disney, Яндекс, Walmart, Durex, Сбербанк, Газпром, Магнит, МТС — проверено
-// напрямую по данным пакета simple-icons). Для них рисуем собственные цветные
+// Disney, Яндекс, Walmart, Durex, Сбербанк, Газпром, Магнит, МТС, Pepsi —
+// проверено напрямую по данным пакета simple-icons). Для них рисуем собственные цветные
 // бейджи с инициалами вместо серой заглушки, чтобы иконки выглядели завершёнными
 // у всех компаний, а не только у тех, что нашлись во внешнем CDN.
 const LOGO_SLUG = {
   AAPL:"apple", GOOGL:"google", NVDA:"nvidia", VKCO:"vk",
   MCD:"mcdonalds", NKE:"nike", KO:"cocacola",
   BA:"boeing", MMM:"3m", AFLT:"aeroflot",
+  INTC:"intel", SONY:"sony", NFLX:"netflix", META:"meta",
+  ADS:"adidas", SBUX:"starbucks", TSLA:"tesla",
+  F:"ford", V:"visa",
 };
 const LOGO_FALLBACK = {
   MSFT:{ bg:"#00A4EF", fg:"#ffffff", text:"MS" },
@@ -974,13 +1298,29 @@ const LOGO_FALLBACK = {
   BA:{ bg:"#0039A6", fg:"#ffffff", text:"Ba" },
   MMM:{ bg:"#FF0000", fg:"#ffffff", text:"3M" },
   AFLT:{ bg:"#00256C", fg:"#ffffff", text:"Аэ" },
+  INTC:{ bg:"#0071C5", fg:"#ffffff", text:"In" },
+  SONY:{ bg:"#000000", fg:"#ffffff", text:"So" },
+  NFLX:{ bg:"#E50914", fg:"#ffffff", text:"Nf" },
+  META:{ bg:"#0668E1", fg:"#ffffff", text:"Me" },
+  ADS:{ bg:"#000000", fg:"#ffffff", text:"Ad" },
+  PEP:{ bg:"#004B93", fg:"#ffffff", text:"Pe" },
+  SBUX:{ bg:"#00704A", fg:"#ffffff", text:"Sb" },
+  TSLA:{ bg:"#CC0000", fg:"#ffffff", text:"Te" },
+  F:{ bg:"#00095B", fg:"#ffffff", text:"Fo" },
+  V:{ bg:"#1A1F71", fg:"#ffffff", text:"Vi" },
 };
+// Бейдж co-logo рисуется на светлой (почти белой) подложке — если фирменный цвет
+// логотипа в simpleicons.org по умолчанию белый (например, Sony), он сливается
+// с фоном и становится невидимым. Для таких тикеров запрашиваем у CDN явный
+// тёмный вариант цвета через /<hex> в конце пути вместо цвета по умолчанию.
+const LOGO_COLOR_OVERRIDE = { SONY:"000000" };
 function logoHtml(ticker, size){
   size = size || 22;
   const slug = LOGO_SLUG[ticker];
   const fb = LOGO_FALLBACK[ticker] || { bg:"var(--panel2)", fg:"var(--text)", text: ticker.slice(0,2) };
   const fbStyle = `background:${fb.bg};color:${fb.fg};`;
-  const imgHtml = slug ? `<img src="https://cdn.simpleicons.org/${slug}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : "";
+  const colorSuffix = LOGO_COLOR_OVERRIDE[ticker] ? "/" + LOGO_COLOR_OVERRIDE[ticker] : "";
+  const imgHtml = slug ? `<img src="https://cdn.simpleicons.org/${slug}${colorSuffix}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : "";
   return `<span class="co-logo" style="width:${size}px;height:${size}px;">${imgHtml}<span class="co-logo-fb" style="display:${slug?"none":"flex"};${fbStyle}">${fb.text}</span></span>`;
 }
 function wsUrl(){
@@ -991,6 +1331,10 @@ function showOnly(id){
   ["mainMenu","onlineScreen","offlineSetup","lobbyScreen","app","ratingScreen","profileScreen","skinsScreen","settingsScreen","rulesScreen"].forEach(x=>{
     document.getElementById(x).style.display = (x===id) ? (x==="app"?"block":"flex") : "none";
   });
+  // Кнопка аккаунта в углу нужна только в меню — во время игры/лобби там уже
+  // есть свой круглый значок меню в том же углу (.game-menu-btn).
+  const acc = document.getElementById("btnAccountMenu");
+  if(acc) acc.classList.toggle("show", id !== "app" && id !== "lobbyScreen");
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -1001,14 +1345,27 @@ function escapeHtml(s){
 // ---------------------------------------------------------------------
 document.getElementById("btnGoOnline").onclick = ()=>{
   showOnly("onlineScreen");
-  refreshRoomList();
-  if(roomListPollTimer) clearInterval(roomListPollTimer);
-  roomListPollTimer = setInterval(refreshRoomList, 4000);
+  renderOnlineGate();
 };
 document.getElementById("btnBackFromOnline").onclick = ()=>{
   if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
   showOnly("mainMenu");
 };
+function renderOnlineGate(){
+  const gate = document.getElementById("onlineGate");
+  const content = document.getElementById("onlineContent");
+  if(!gate || !content) return;
+  if(!accountUser){
+    gate.style.display = "block"; content.style.display = "none";
+    if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
+    return;
+  }
+  gate.style.display = "none"; content.style.display = "block";
+  document.getElementById("onlineWhoName").textContent = accountUser.username;
+  refreshRoomList();
+  if(roomListPollTimer) clearInterval(roomListPollTimer);
+  roomListPollTimer = setInterval(refreshRoomList, 4000);
+}
 document.getElementById("btnGoOffline").onclick = ()=>{
   offlinePlayerNames = [];
   renderOfflinePlayersBox();
@@ -1023,6 +1380,41 @@ document.getElementById("btnBackFromOffline").onclick = ()=> showOnly("mainMenu"
 // ---------------------------------------------------------------------
 let accountUser = null;     // publicProfile с сервера, если вошли в аккаунт
 let accountPassword = "";   // держим только в памяти вкладки, никогда не сохраняем
+let accountSessionToken = null; // токен сессии — заменяет пароль при повторных запросах/переподключении
+
+// ---------------------------------------------------------------------
+// Куки сессии: сервер выдаёт tm_session сам (Set-Cookie на /api/login,
+// /api/register), но мы дублируем токен в localStorage, чтобы читать его
+// синхронно на старте страницы и передавать в WS join (у WS нет куки).
+// ---------------------------------------------------------------------
+function getCookie(name){
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function saveSessionToken(token){
+  accountSessionToken = token || null;
+  try { if(token) localStorage.setItem("tm_session", token); else localStorage.removeItem("tm_session"); } catch(e){}
+}
+function loadSavedSessionToken(){
+  let t = null;
+  try { t = localStorage.getItem("tm_session"); } catch(e){}
+  return t || getCookie("tm_session");
+}
+// При загрузке страницы: если есть сохранённый токен — тихо пробуем
+// восстановить аккаунт (без пароля). Если сервер не узнал токен (истёк/уже
+// невалиден) — просто остаёмся неавторизованными, без ошибок на экране.
+async function restoreSession(){
+  updateAccountCornerBtn();
+  const token = loadSavedSessionToken();
+  if(!token) return;
+  const data = await apiPost("/api/session", { token });
+  if(data.error || !data.user){ saveSessionToken(null); return; }
+  accountUser = data.user;
+  accountSessionToken = token;
+  saveUsernameLocal(data.user.username);
+  applyBoardSkin(data.user.equippedBoardSkin || "default");
+  updateAccountCornerBtn();
+}
 
 async function apiPost(path, body){
   try {
@@ -1062,15 +1454,13 @@ async function loadRating(){
   }).join("");
 }
 
-// --- Профиль ---
-document.getElementById("btnGoProfile").onclick = ()=>{ showOnly("profileScreen"); renderProfileScreen(); };
+// --- Профиль --- (открывается из модалки аккаунта, см. renderAccountModal)
 document.getElementById("btnBackFromProfile").onclick = ()=> showOnly("mainMenu");
 function renderProfileScreen(){
   const gate = document.getElementById("profileGate");
   const content = document.getElementById("profileContent");
   if(!accountUser){
     gate.style.display = "block"; content.style.display = "none";
-    try { const saved = localStorage.getItem("tm_username"); if(saved) document.getElementById("profileLoginName").value = saved; } catch(e){}
     return;
   }
   gate.style.display = "none"; content.style.display = "block";
@@ -1090,7 +1480,7 @@ function renderProfileScreen(){
     btn.onclick = async ()=>{
       box.querySelectorAll(".avatar-opt").forEach(b=>b.classList.remove("selected"));
       btn.classList.add("selected");
-      const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, avatar: btn.dataset.avatar });
+      const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, token: accountSessionToken, avatar: btn.dataset.avatar });
       if(!data.error) accountUser = data.user;
     };
   });
@@ -1099,36 +1489,152 @@ function renderProfileScreen(){
   document.getElementById("profilePassErr").textContent = "";
   document.getElementById("profileNewPassword").value = "";
 }
-function accountLoginErrEl(prefix){ return document.getElementById(prefix+"LoginErr"); }
-async function doAccountLogin(prefix){
-  const nameEl = document.getElementById(prefix+"LoginName");
-  const passEl = document.getElementById(prefix+"LoginPassword");
-  const errEl = accountLoginErrEl(prefix);
-  const btn = document.getElementById(prefix+"LoginBtn");
-  const username = nameEl.value.trim();
-  const password = passEl.value;
+function doAccountLogout(){
+  if(accountUser && accountSessionToken){
+    apiPost("/api/logout", { username: accountUser.username, token: accountSessionToken });
+  }
+  accountUser = null;
+  accountPassword = "";
+  saveSessionToken(null);
+  renderProfileScreen();
+  renderSkinsScreen();
+  renderOnlineGate();
+  updateAccountCornerBtn();
+  closeAccountModal();
+}
+document.getElementById("profileGateLoginBtn").onclick = ()=> openAccountModal("login");
+document.getElementById("skinsGateLoginBtn").onclick = ()=> openAccountModal("login");
+document.getElementById("onlineGateLoginBtn").onclick = ()=> openAccountModal("login");
+document.getElementById("profileLogoutBtn").onclick = doAccountLogout;
+document.getElementById("skinsLogoutBtn").onclick = doAccountLogout;
+
+// ---------------------------------------------------------------------
+// Глобальная модалка аккаунта: единая точка входа/регистрации, доступная
+// с любого экрана через кнопку в углу. Вход/регистрация используют
+// самостоятельный HTTP API (/api/login, /api/register) — независимо от
+// присоединения к комнате по WebSocket.
+// ---------------------------------------------------------------------
+let accountModalMode = "login"; // 'login' | 'register' — актуально только пока не вошли
+let accountModalAvatar = "";
+function updateAccountCornerBtn(){
+  // Видимость (класс "show") решает showOnly() — эта функция только обновляет
+  // подпись, чтобы не скрывать кнопку во время игры/лобби, где она не нужна.
+  const label = document.getElementById("accountCornerLabel");
+  label.textContent = accountUser ? accountUser.username : "Войти в аккаунт";
+}
+function openAccountModal(mode){
+  accountModalMode = mode === "register" ? "register" : "login";
+  document.getElementById("accountModalOverlay").style.display = "flex";
+  renderAccountModal();
+}
+function closeAccountModal(){
+  document.getElementById("accountModalOverlay").style.display = "none";
+}
+function accountModalGender(){
+  const sel = document.getElementById("accModalGender");
+  if(!sel) return "";
+  if(sel.value === "other") { const o = document.getElementById("accModalGenderOther"); return o ? o.value.trim().slice(0,24) : ""; }
+  return sel.value;
+}
+function renderAccountModal(){
+  const card = document.getElementById("accountModalCard");
+  if(!card) return;
+  if(accountUser){
+    const photo = (accountUser.avatar === "PHOTO" && accountUser.avatarPhoto) ? `<img src="${accountUser.avatarPhoto}">` : (accountUser.avatar || "🧑");
+    card.innerHTML = `
+      <div class="company-modal-head">
+        <h2>👤 Аккаунт</h2>
+        <button class="company-modal-close" type="button" onclick="closeAccountModal();">✕</button>
+      </div>
+      <div class="row-inline" style="align-items:center;margin-top:12px;">
+        <div class="profile-photo-preview">${photo}</div>
+        <div><b>${escapeHtml(accountUser.username)}</b><br><span class="chip">${accountUser.points||0} очков</span></div>
+      </div>
+      <button style="width:100%;margin-top:16px;" onclick="closeAccountModal(); showOnly('profileScreen'); renderProfileScreen();">👤 Открыть профиль</button>
+      <button class="secondary" style="width:100%;margin-top:8px;" onclick="doAccountLogout();">Выйти из аккаунта</button>
+    `;
+    return;
+  }
+  const isLogin = accountModalMode === "login";
+  card.innerHTML = `
+    <div class="company-modal-head">
+      <h2>${isLogin ? "Вход" : "Регистрация"}</h2>
+      <button class="company-modal-close" type="button" onclick="closeAccountModal();">✕</button>
+    </div>
+    <div class="account-modal-tabs">
+      <button type="button" class="${isLogin?"active":""}" onclick="openAccountModal('login');">Вход</button>
+      <button type="button" class="${!isLogin?"active":""}" onclick="openAccountModal('register');">Регистрация</button>
+    </div>
+    <label>Ник</label>
+    <input id="accModalName" placeholder="например Игрок1" maxlength="20" autocomplete="username">
+    <label>Пароль</label>
+    <input id="accModalPassword" type="password" placeholder="${isLogin?"пароль":"не короче 4 символов"}" autocomplete="${isLogin?"current-password":"new-password"}">
+    ${isLogin ? "" : `
+      <label>Пол</label>
+      <select id="accModalGender">
+        <option value="">Не указывать</option>
+        <option value="male">Мужской</option>
+        <option value="female">Женский</option>
+        <option value="nonbinary">Небинарный</option>
+        <option value="other">Другое</option>
+      </select>
+      <input id="accModalGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+      <label>Аватар</label>
+      <div class="avatar-picker" id="accModalAvatarPicker"></div>
+    `}
+    <button style="width:100%;margin-top:14px;" id="accModalSubmitBtn">${isLogin?"Войти":"Зарегистрироваться"}</button>
+    <div class="err" id="accModalErr"></div>
+  `;
+  try { const saved = localStorage.getItem("tm_username"); if(saved) document.getElementById("accModalName").value = saved; } catch(e){}
+  if(!isLogin){
+    const genderSel = document.getElementById("accModalGender");
+    const genderOther = document.getElementById("accModalGenderOther");
+    genderSel.addEventListener("change", ()=>{ genderOther.style.display = genderSel.value === "other" ? "block" : "none"; });
+    buildAvatarPicker("accModalAvatarPicker", accountModalAvatar, a=> accountModalAvatar = a);
+  }
+  const submit = ()=> isLogin ? doAccountModalLogin() : doAccountModalRegister();
+  document.getElementById("accModalSubmitBtn").onclick = submit;
+  document.getElementById("accModalName").addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
+  document.getElementById("accModalPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
+}
+async function doAccountModalLogin(){
+  const errEl = document.getElementById("accModalErr");
+  const btn = document.getElementById("accModalSubmitBtn");
+  const username = document.getElementById("accModalName").value.trim();
+  const password = document.getElementById("accModalPassword").value;
   errEl.textContent = "";
   if(!username || !password){ errEl.textContent = "Введите ник и пароль."; return; }
   btn.disabled = true;
   const data = await apiPost("/api/login", { username, password });
   btn.disabled = false;
   if(data.error){ errEl.textContent = data.error; return; }
+  onAccountAuthed(data, password);
+}
+async function doAccountModalRegister(){
+  const errEl = document.getElementById("accModalErr");
+  const btn = document.getElementById("accModalSubmitBtn");
+  const username = document.getElementById("accModalName").value.trim();
+  const password = document.getElementById("accModalPassword").value;
+  errEl.textContent = "";
+  if(!username || !password){ errEl.textContent = "Введите ник и пароль."; return; }
+  btn.disabled = true;
+  const data = await apiPost("/api/register", { username, password, gender: accountModalGender(), avatar: accountModalAvatar });
+  btn.disabled = false;
+  if(data.error){ errEl.textContent = data.error; return; }
+  onAccountAuthed(data, password);
+}
+function onAccountAuthed(data, password){
   accountUser = data.user;
   accountPassword = password;
-  saveUsernameLocal(username);
+  saveSessionToken(data.sessionToken);
+  saveUsernameLocal(accountUser.username);
+  updateAccountCornerBtn();
   renderProfileScreen();
   renderSkinsScreen();
+  renderOnlineGate();
+  closeAccountModal();
 }
-function doAccountLogout(){
-  accountUser = null;
-  accountPassword = "";
-  renderProfileScreen();
-  renderSkinsScreen();
-}
-document.getElementById("profileLoginBtn").onclick = ()=> doAccountLogin("profile");
-document.getElementById("skinsLoginBtn").onclick = ()=> doAccountLogin("skins");
-document.getElementById("profileLogoutBtn").onclick = doAccountLogout;
-document.getElementById("skinsLogoutBtn").onclick = doAccountLogout;
+document.getElementById("btnAccountMenu").onclick = ()=> openAccountModal(accountUser ? "profile" : "login");
 
 document.getElementById("profileSaveBtn").onclick = async ()=>{
   if(!accountUser) return;
@@ -1136,7 +1642,7 @@ document.getElementById("profileSaveBtn").onclick = async ()=>{
   const okEl = document.getElementById("profileSaveOk");
   errEl.textContent = ""; okEl.textContent = "";
   const gender = document.getElementById("profileGender").value;
-  const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, gender });
+  const data = await apiPost("/api/profile/update", { username: accountUser.username, password: accountPassword, token: accountSessionToken, gender });
   if(data.error){ errEl.textContent = data.error; return; }
   accountUser = data.user;
   okEl.textContent = "Сохранено.";
@@ -1146,7 +1652,7 @@ document.getElementById("profileChangePassBtn").onclick = async ()=>{
   const errEl = document.getElementById("profilePassErr");
   errEl.textContent = "";
   const newPassword = document.getElementById("profileNewPassword").value;
-  const data = await apiPost("/api/profile/password", { username: accountUser.username, password: accountPassword, newPassword });
+  const data = await apiPost("/api/profile/password", { username: accountUser.username, password: accountPassword, token: accountSessionToken, newPassword });
   if(data.error){ errEl.textContent = data.error; return; }
   accountPassword = newPassword;
   document.getElementById("profileNewPassword").value = "";
@@ -1166,7 +1672,7 @@ document.getElementById("profilePhotoFile").onchange = async (e)=>{
   errEl.textContent = "";
   try {
     const dataUrl = await resizePhotoFile(file, 256);
-    const data = await apiPost("/api/profile/photo", { username: accountUser.username, password: accountPassword, photoDataUrl: dataUrl });
+    const data = await apiPost("/api/profile/photo", { username: accountUser.username, password: accountPassword, token: accountSessionToken, photoDataUrl: dataUrl });
     if(data.error){ errEl.textContent = data.error; return; }
     accountUser = data.user;
     renderProfileScreen();
@@ -1204,7 +1710,6 @@ function renderSkinsScreen(){
   const content = document.getElementById("skinsContent");
   if(!accountUser){
     gate.style.display = "block"; content.style.display = "none";
-    try { const saved = localStorage.getItem("tm_username"); if(saved) document.getElementById("skinsLoginName").value = saved; } catch(e){}
     return;
   }
   gate.style.display = "none"; content.style.display = "block";
@@ -1250,7 +1755,7 @@ function renderSkinsScreen(){
 async function buySkin(skinId, kind){
   const errEl = document.getElementById("skinsErr");
   errEl.textContent = "";
-  const data = await apiPost("/api/skins/buy", { username: accountUser.username, password: accountPassword, skinId, kind });
+  const data = await apiPost("/api/skins/buy", { username: accountUser.username, password: accountPassword, token: accountSessionToken, skinId, kind });
   if(data.error){ errEl.textContent = data.error; return; }
   accountUser = data.user;
   renderSkinsScreen();
@@ -1258,7 +1763,7 @@ async function buySkin(skinId, kind){
 async function equipSkinAction(skinId, kind){
   const errEl = document.getElementById("skinsErr");
   errEl.textContent = "";
-  const data = await apiPost("/api/skins/equip", { username: accountUser.username, password: accountPassword, skinId, kind });
+  const data = await apiPost("/api/skins/equip", { username: accountUser.username, password: accountPassword, token: accountSessionToken, skinId, kind });
   if(data.error){ errEl.textContent = data.error; return; }
   accountUser = data.user;
   renderSkinsScreen();
@@ -1282,7 +1787,6 @@ document.getElementById("settingReduceMotion").onchange = (e)=>{
 };
 document.getElementById("settingsClearLogin").onclick = ()=>{
   try { localStorage.removeItem("tm_username"); } catch(e){}
-  document.getElementById("joinName").value = "";
 };
 try {
   if(localStorage.getItem("tm_reduce_motion") === "1") document.body.classList.add("reduce-motion");
@@ -1294,6 +1798,7 @@ document.getElementById("btnBackFromRules").onclick = ()=> showOnly("mainMenu");
 
 document.getElementById("btnExitToMenu").onclick = ()=>{
   if(mode === "online"){
+    stopReconnect();
     if(ws){ ws.onclose = null; ws.close(); ws = null; }
   }
   mode = null; latest = null; you = null; localRoom = null; pendingInsiderCard = null;
@@ -1311,30 +1816,23 @@ function refreshRoomList(){
     if(!list.length){ empty.style.display = "block"; return; }
     empty.style.display = "none";
     list.forEach(r=>{
-      const speed = r.tradeWindowMs===30000?"быстрые торги":r.tradeWindowMs===180000?"долгие торги":"стандартные торги";
-      const phaseLabel = r.phase==="ended" ? "игра окончена" : (r.phase==="trade" ? "фаза торгов" : (r.phase==="lobby" ? "ожидание игроков" : "фаза ходов"));
+      const phaseLabel = r.phase==="ended" ? "игра окончена" : (r.phase==="lobby" ? "ожидание игроков" : "идёт игра");
       const div = document.createElement("div");
       div.className = "room-card";
-      div.innerHTML = `<b>${r.code}</b> <span class="muted">— ${r.activeCount}/${r.totalPlayers} игроков · ${phaseLabel} · ${speed}</span>`;
+      div.innerHTML = `<b>${r.code}</b> <span class="muted">— ${r.activeCount}/${r.totalPlayers} игроков · ${phaseLabel}</span>`;
       div.onclick = ()=> doJoin(r.code);
       el.appendChild(div);
     });
   }).catch(()=>{});
 }
+// Вход в комнату теперь всегда требует уже выполненный вход в аккаунт (через
+// глобальную модалку) — сама комната доверяет только токену сессии.
 function currentAuthPayload(){
-  const username = document.getElementById("joinName").value.trim();
-  const password = document.getElementById("joinPassword").value;
-  const payload = { username, password, authMode };
-  if(authMode === "register"){
-    payload.gender = currentJoinGender();
-    payload.avatar = joinAvatar;
-  }
-  return payload;
+  if(!accountUser || !accountSessionToken) return null;
+  return { username: accountUser.username, sessionToken: accountSessionToken };
 }
 function validateAuthPayload(p){
-  if(!p.username) return "Введите ник.";
-  if(!p.password) return "Введите пароль.";
-  if(p.authMode === "register" && p.password.length < 4) return "Пароль должен быть не короче 4 символов.";
+  if(!p) return "Сначала войдите в аккаунт.";
   return null;
 }
 function doJoin(code){
@@ -1342,8 +1840,7 @@ function doJoin(code){
   const err = validateAuthPayload(auth);
   if(err){ document.getElementById("joinErr").textContent = err; return; }
   document.getElementById("joinErr").textContent = "";
-  saveUsernameLocal(auth.username);
-  connectOnline(code, undefined, auth);
+  connectOnline(code, auth);
 }
 document.getElementById("btnCreateRoom").onclick = ()=>{
   const auth = currentAuthPayload();
@@ -1351,28 +1848,49 @@ document.getElementById("btnCreateRoom").onclick = ()=>{
   if(err){ document.getElementById("joinErr").textContent = err; return; }
   const room = document.getElementById("joinRoom").value.trim() || ("R" + Math.random().toString(36).slice(2,6).toUpperCase());
   document.getElementById("joinErr").textContent = "";
-  const tradeWindowMs = parseInt(document.getElementById("createTradeSpeed").value);
-  saveUsernameLocal(auth.username);
-  connectOnline(room, tradeWindowMs, auth);
+  connectOnline(room, auth);
 };
-document.getElementById("joinName").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
-document.getElementById("joinPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("btnCreateRoom").click(); });
 
-function connectOnline(room, tradeWindowMs, auth){
+// ---------------------------------------------------------------------
+// Переподключение: если соединение обрывается посреди игры (сон вкладки,
+// нестабильный Wi-Fi, сервер перезапустился), молча пробуем переподключиться
+// с тем же токеном сессии — тем же именем, той же комнатой — вместо того
+// чтобы требовать перезагрузку страницы. engine.addPlayer уже умеет находить
+// существующего игрока по имени и восстанавливать его капитал/позицию, так
+// что переподключение не создаёт нового игрока и не двигает ход.
+let reconnectInfo = null;   // {room, auth} — что использовать для повторного join
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+let wantOnline = false;     // false после осознанного выхода в меню — не переподключаться
+
+function connectOnline(room, auth){
   mode = "online";
+  wantOnline = true;
   roomCode = room; myName = auth.username;
+  reconnectInfo = { room, auth };
   ws = new WebSocket(wsUrl());
-  ws.onopen = ()=>{ ws.send(JSON.stringify({type:"join", room, tradeWindowMs, username: auth.username, password: auth.password, authMode: auth.authMode, gender: auth.gender, avatar: auth.avatar})); };
+  ws.onopen = ()=>{
+    reconnectAttempts = 0;
+    ws.send(JSON.stringify({type:"join", room, username: auth.username, sessionToken: auth.sessionToken}));
+  };
   ws.onmessage = (ev)=>{
     const msg = JSON.parse(ev.data);
     if(msg.type === "joined"){
       you = msg.playerId;
+      // Сервер выдаёт (или подтверждает) токен сессии при каждом успешном
+      // входе — сохраняем его, чтобы дальнейшие переподключения обходились
+      // без пароля вообще, даже если он не был сохранён на вкладке.
+      if(msg.sessionToken){
+        saveSessionToken(msg.sessionToken);
+        if(reconnectInfo) reconnectInfo.auth.sessionToken = msg.sessionToken;
+      }
       if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
     } else if(msg.type === "state"){
       you = msg.you;
       const prevState = latest;
       latest = msg;
       detectNotifications(prevState, msg);
+      detectMarketEventPopup(prevState, msg);
       const mePlayer = msg.players && msg.players.find(p=>p.id===you);
       if(mePlayer) applyBoardSkin(mePlayer.equippedBoardSkin || "default");
       if(msg.phase === "lobby"){
@@ -1385,7 +1903,24 @@ function connectOnline(room, tradeWindowMs, auth){
     } else if(msg.type === "insiderCard"){
       pendingInsiderCard = msg.card;
       if(latest) renderControlPanel(latest);
+    } else if(msg.type === "measureResult"){
+      recordMeasureResult(msg.measure, msg);
     } else if(msg.type === "error"){
+      if(msg.sessionExpired){
+        // Токен, которым мы пытались переподключиться, больше не действует —
+        // дальше молча ретраить бессмысленно, возвращаем игрока к экрану входа.
+        wantOnline = false;
+        reconnectInfo = null;
+        saveSessionToken(null);
+        accountUser = null;
+        accountPassword = "";
+        mode = null; latest = null; you = null;
+        updateAccountCornerBtn();
+        showOnly("onlineScreen");
+        renderOnlineGate();
+        document.getElementById("joinErr").textContent = "Сессия истекла — войдите заново.";
+        return;
+      }
       if(!latest){
         document.getElementById("joinErr").textContent = msg.message;
       } else if(latest.phase === "lobby"){
@@ -1395,7 +1930,28 @@ function connectOnline(room, tradeWindowMs, auth){
       }
     }
   };
-  ws.onclose = ()=>{ flashError("Соединение с сервером потеряно. Обновите страницу для переподключения."); };
+  ws.onclose = ()=>{
+    if(!wantOnline || !reconnectInfo) return; // осознанный выход — не переподключаемся
+    scheduleReconnect();
+  };
+}
+function scheduleReconnect(){
+  if(reconnectTimer) return;
+  reconnectAttempts++;
+  flashError(reconnectAttempts === 1
+    ? "Соединение потеряно — переподключаемся..."
+    : `Нет связи с сервером — попытка переподключения ${reconnectAttempts}...`);
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+  reconnectTimer = setTimeout(()=>{
+    reconnectTimer = null;
+    if(wantOnline && reconnectInfo) connectOnline(reconnectInfo.room, reconnectInfo.auth);
+  }, delay);
+}
+function stopReconnect(){
+  wantOnline = false;
+  reconnectInfo = null;
+  reconnectAttempts = 0;
+  if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer = null; }
 }
 
 // ---------------------------------------------------------------------
@@ -1438,21 +1994,32 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   offlinePlayerNames.forEach(p=>{ const r = GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar); viewAs = viewAs || (r.player && r.player.id); });
   localRoom.phase = "roll"; // офлайн хот-сит — без комнаты ожидания, сразу к игре
   viewAs = localRoom.players[0].id;
+  lastSyncedCurrentPlayerId = viewAs;
   applyBoardSkin(accountUser ? (accountUser.equippedBoardSkin || "default") : "default");
   showOnly("app");
   refreshLocal();
 };
 
+let lastSyncedCurrentPlayerId = null;
 function refreshLocal(){
   if(mode !== "offline" || !localRoom) return;
+  // Автоматически переключаем «Ход как» на нового текущего игрока только когда
+  // ход реально перешёл к другому игроку (после endTurn) — это имитирует
+  // "передачу устройства по кругу". В остальное время выбор оставляем свободным,
+  // чтобы можно было переключиться на другого игрока и ответить на предложенную
+  // ему сделку, не дожидаясь его хода.
   if(localRoom.phase === "roll"){
     const cp = GameEngine.currentPlayerId(localRoom);
-    if(cp) viewAs = cp;
+    if(cp && cp !== lastSyncedCurrentPlayerId){
+      viewAs = cp;
+      lastSyncedCurrentPlayerId = cp;
+    }
   }
   you = viewAs;
   const prevState = latest;
   latest = GameEngine.buildStatePayload(localRoom, viewAs);
   detectNotifications(prevState, latest);
+  detectMarketEventPopup(prevState, latest);
   render();
 }
 function onViewAsChange(sel){
@@ -1467,14 +2034,27 @@ function onViewAsChange(sel){
 function doRoll(btn){
   btn.classList.add("rolling");
   btn.disabled = true;
-  setTimeout(()=> send({type:"roll"}), 280);
+  setTimeout(()=>{
+    const ok = send({type:"roll"});
+    // Раньше при потере соединения send() молча ничего не делал, кнопка
+    // оставалась disabled навсегда — игрок жал "бросить кубики" и не видел
+    // ни результата, ни ошибки. Теперь при неудаче возвращаем кнопку в
+    // рабочее состояние и явно показываем, что запрос не ушёл (обычно на
+    // фоне уже идёт автопереподключение — см. scheduleReconnect).
+    if(!ok){
+      btn.classList.remove("rolling");
+      btn.disabled = false;
+      flashError("Нет соединения с сервером — переподключаемся, попробуйте ещё раз через секунду.");
+    }
+  }, 280);
 }
 function send(obj){
   if(mode === "online"){
-    if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
-    return;
+    if(ws && ws.readyState === WebSocket.OPEN){ ws.send(JSON.stringify(obj)); return true; }
+    return false;
   }
-  if(mode === "offline") localDispatch(obj);
+  if(mode === "offline"){ localDispatch(obj); return true; }
+  return false;
 }
 function localDispatch(obj){
   let result;
@@ -1485,20 +2065,20 @@ function localDispatch(obj){
     case "setForcedPrice": result = GameEngine.setForcedPrice(localRoom, viewAs, obj.amount); break;
     case "payForcedPrice": result = GameEngine.payForcedPrice(localRoom, viewAs); break;
     case "skipRoll": result = GameEngine.skipRoll(localRoom, viewAs); break;
+    case "endTurn": result = GameEngine.endTurn(localRoom, viewAs); break;
     case "buyBank": result = GameEngine.buyBank(); break;
     case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
-    case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price); break;
+    case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price, obj.wantTicker, obj.wantPct); break;
     case "respondTrade": result = GameEngine.respondTrade(localRoom, viewAs, obj.id, obj.accept); break;
     case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
     case "newGame": {
       localRoom = GameEngine.newGameKeepPlayers(localRoom);
       viewAs = localRoom.players[0].id;
+      lastSyncedCurrentPlayerId = viewAs;
       result = { ok:true };
       break;
     }
     case "forceEvent": result = GameEngine.forceEvent(localRoom); break;
-    case "endTradeWindowManual": GameEngine.endTradeWindow(localRoom); result = { ok:true }; break;
-    case "readyEndTrade": result = GameEngine.readyEndTradeWindow(localRoom, viewAs); break;
     case "ctrlNegativeInfo": result = GameEngine.ctrlNegativeInfo(localRoom, viewAs, obj.ticker); break;
     case "ctrlPrCampaign": result = GameEngine.ctrlPrCampaign(localRoom, viewAs, obj.ticker); break;
     case "ctrlInsiderPeek": {
@@ -1517,19 +2097,83 @@ function localDispatch(obj){
     case "ctrlEspionage": result = GameEngine.ctrlEspionage(localRoom, viewAs, obj.target); break;
     case "ctrlDiscredit": result = GameEngine.ctrlDiscredit(localRoom, viewAs, obj.target); break;
     case "ctrlInvestigate": result = GameEngine.ctrlInvestigate(localRoom, viewAs); break;
+    case "personalPr": result = GameEngine.personalPr(localRoom, viewAs); break;
+    case "startKickVote": result = GameEngine.startKickVote(localRoom, viewAs, obj.target); break;
+    case "voteKick": result = GameEngine.voteKick(localRoom, viewAs, obj.target, !!obj.yes); break;
+    case "cancelKickVote": result = GameEngine.cancelKickVote(localRoom, viewAs); break;
+    case "reaction": result = GameEngine.sendReaction(localRoom, viewAs, obj.emoji); break;
     default: result = { error: "Неизвестное действие." };
   }
+  const measureKey = MEASURE_TYPE_MAP[obj.type];
+  if(measureKey) recordMeasureResult(measureKey, result);
   if(result && result.error) flashError(result.error);
   refreshLocal();
 }
+const MEASURE_TYPE_MAP = {
+  ctrlEspionage:"espionage", ctrlDiscredit:"discredit", ctrlInvestigate:"investigate",
+  ctrlNegativeInfo:"negativeInfo", ctrlPrCampaign:"prCampaign", ctrlInsiderPeek:"insiderPeek",
+  ctrlSqueezeOut:"squeezeOut", ctrlShort:"short", personalPr:"personalPr",
+};
 
+// ---------------------------------------------------------------------
+// Категории событий ленты (рынок / сделки игроков / спецдействия / шпионаж /
+// финансы / система / банкротство / победа) — каждой присвоен свой цвет
+// (см. .feed-* классы в CSS) и иконка, чтобы события разного рода было видно
+// с первого взгляда и в полноразмерной вкладке «Лента», и в компактной живой
+// панели сбоку от стола (см. renderCornerFeed).
+// ---------------------------------------------------------------------
+const LOG_TAG_META = {
+  header:    { cls:"feed-header",    icon:"📣" },
+  vol:       { cls:"feed-market",    icon:"💹" },
+  news:      { cls:"feed-market",    icon:"📰" },
+  deck:      { cls:"feed-market",    icon:"🗂️" },
+  buyback:   { cls:"feed-market",    icon:"🏦" },
+  trade:     { cls:"feed-trade",     icon:"🤝" },
+  realestate:{ cls:"feed-trade",     icon:"🏠" },
+  roll:      { cls:"feed-trade",     icon:"🎲" },
+  control:   { cls:"feed-control",   icon:"🎛️" },
+  short:     { cls:"feed-control",   icon:"📉" },
+  espionage: { cls:"feed-espionage", icon:"🕵️" },
+  loan:      { cls:"feed-finance",   icon:"🏦" },
+  tax:       { cls:"feed-finance",   icon:"💸" },
+  dividend:  { cls:"feed-finance",   icon:"💵" },
+  turn:      { cls:"feed-system",    icon:"🔁" },
+  player:    { cls:"feed-system",    icon:"👤" },
+  bankrupt:  { cls:"feed-danger",    icon:"💥" },
+  win:       { cls:"feed-win",       icon:"🏆" },
+};
+function logEntryMeta(tag){
+  return LOG_TAG_META[tag] || { cls:"feed-system", icon:"•" };
+}
+// Сколько записей уже было в s.log при прошлом рендере ленты — используется, чтобы
+// анимация появления (feed-entry-in) проигрывалась только у реально новых карточек,
+// а не у всех при каждом refresh/render (иначе лента бы постоянно "мигала").
+let lastFeedLogLen = 0;
+function renderCornerFeed(s){
+  const el = document.getElementById("cornerFeed");
+  if(!el) return;
+  const total = s.log.length;
+  const newSinceLast = (lastFeedLogLen && total >= lastFeedLogLen) ? (total - lastFeedLogLen) : 0;
+  lastFeedLogLen = total;
+  const entries = s.log.slice(-30).slice().reverse();
+  const rows = entries.map((e, i)=>{
+    const meta = logEntryMeta(e.tag);
+    const animCls = i < newSinceLast ? " feed-entry-in" : "";
+    if(meta.cls === "feed-header"){
+      return `<div class="feed-entry ${meta.cls}${animCls}">${e.text.replace(/<[^>]+>/g,"")}</div>`;
+    }
+    return `<div class="feed-entry ${meta.cls}${animCls}"><span class="feed-entry-icon">${meta.icon}</span>${e.text}</div>`;
+  }).join("");
+  el.innerHTML = `<div class="stage-panel">
+    <div class="feed-list">${rows || `<div class="muted" style="font-size:11px;">Событий пока нет.</div>`}</div>
+  </div>`;
+}
 function flashError(text){
   const log = document.getElementById("log");
   if(!log) return;
   const div = document.createElement("div");
-  div.className = "log-entry";
-  div.style.borderLeft = "3px solid var(--red)";
-  div.innerHTML = `<div class="tag">Ошибка</div>${text}`;
+  div.className = "log-entry feed-danger";
+  div.innerHTML = `<div class="tag">⚠️ Ошибка</div>${text}`;
   log.prepend(div);
 }
 
@@ -1626,6 +2270,56 @@ function detectNotifications(prev, msg){
 }
 
 // ---------------------------------------------------------------------
+// Всплывающее окно биржевого события. Раунд заканчивается, когда все игроки
+// сходили по разу — сервер (marketEvent в engine.js) разом обновляет цены,
+// разыгрывает карту новостей и т.п., увеличивая room.eventCount. Здесь мы
+// ловим этот момент по приходу нового состояния (у всех игроков одновременно,
+// т.к. это общий для комнаты этап) и показываем модалку со сводкой произошедшего,
+// которую можно закрыть — она не блокирует остальной интерфейс.
+// ---------------------------------------------------------------------
+let lastSeenMarketEventCount = null;
+function detectMarketEventPopup(prev, msg){
+  if(!msg || msg.eventCount == null) return;
+  if(!prev || prev.phase === "lobby" || msg.phase === "lobby"){
+    // Не показываем при первом входе или входе в лобби — только при реальном
+    // наступлении нового события в уже идущей партии. eventCount общий для всей
+    // комнаты и не зависит от того, чей вид сейчас выбран ("Смотреть как"), поэтому
+    // смена вида сама по себе никогда не увеличивает eventCount и не пройдёт проверку
+    // ниже — отдельно исключать её не нужно (раньше здесь была проверка prev.you !==
+    // msg.you, но в офлайн-режиме refreshLocal() сам переключает viewAs на нового
+    // текущего игрока ровно в момент завершения раунда, и эта проверка ошибочно
+    // принимала настоящее новое событие за смену вида и глушила попап).
+    lastSeenMarketEventCount = msg.eventCount;
+    return;
+  }
+  if(msg.eventCount > (prev.eventCount||0) && msg.eventCount !== lastSeenMarketEventCount){
+    lastSeenMarketEventCount = msg.eventCount;
+    openMarketEventModal(msg);
+  }
+}
+function openMarketEventModal(msg){
+  const tagLabel = `Событие ${msg.eventCount}`;
+  const entries = (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag !== "header");
+  const card = document.getElementById("marketEventModalCard");
+  if(!card) return;
+  const rowsHtml = entries.map(e=>{
+    const meta = logEntryMeta(e.tag);
+    return `<div class="log-entry ${meta.cls}"><div class="tag">${meta.icon}</div>${e.text}</div>`;
+  }).join("") || `<div class="muted">Подробности недоступны.</div>`;
+  card.innerHTML = `
+    <h2>📊 Биржевое событие №${msg.eventCount}</h2>
+    <div class="muted">Раунд завершён: цены компаний обновлены, разыграна карта новостей.</div>
+    <div class="market-event-list">${rowsHtml}</div>
+    <button type="button" class="market-event-close-btn" onclick="closeMarketEventModal()">Понятно, закрыть</button>
+  `;
+  document.getElementById("marketEventOverlay").style.display = "flex";
+}
+function closeMarketEventModal(){
+  const ov = document.getElementById("marketEventOverlay");
+  if(ov) ov.style.display = "none";
+}
+
+// ---------------------------------------------------------------------
 // Онлайн: комната ожидания (лобби) с чатом
 // ---------------------------------------------------------------------
 function renderLobby(s){
@@ -1673,6 +2367,7 @@ function sendLobbyChat(){
 document.getElementById("btnLobbyChatSend").onclick = sendLobbyChat;
 document.getElementById("lobbyChatInput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); sendLobbyChat(); } });
 document.getElementById("btnLeaveLobby").onclick = ()=>{
+  stopReconnect();
   if(ws){ ws.onclose = null; ws.close(); ws = null; }
   mode = null; latest = null; you = null;
   if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
@@ -1765,15 +2460,20 @@ function renderMarketTable(s){
   if(!body) return;
   body.innerHTML = "";
   const me = s.players.find(p=>p.id===you);
+  const filterPlayer = marketOwnFilter.startsWith("p") ? s.players.find(p=>p.id===parseInt(marketOwnFilter.slice(1))) : null;
   const rows = (s.companies||[]).filter(c=>{
     if(marketSectorFilter !== "all" && c.sector !== marketSectorFilter) return false;
     if(marketOwnFilter === "free" && c.owned !== 0) return false;
     if(marketOwnFilter === "mine" && !(me && me.holdings && me.holdings[c.ticker] > 0)) return false;
     if(marketOwnFilter === "control" && c.controllerId == null) return false;
+    if(filterPlayer && !(filterPlayer.holdings && filterPlayer.holdings[c.ticker] > 0)) return false;
     return true;
   });
   if(rows.length === 0){
-    body.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:18px 0;">Нет компаний под выбранные фильтры</td></tr>`;
+    const emptyMsg = (filterPlayer && filterPlayer.holdingsHidden)
+      ? `🔒 Портфель ${escapeHtml(filterPlayer.name)} скрыт — проведите шпионаж выше, чтобы увидеть его акции.`
+      : "Нет компаний под выбранные фильтры";
+    body.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:18px 0;">${emptyMsg}</td></tr>`;
     return;
   }
   rows.forEach(c=>{
@@ -1797,6 +2497,49 @@ function renderMarketTable(s){
   });
 }
 
+// Фильтр-чипы игроков — вставляются прямо в ряд с "Все/Свободные/Мои/Под
+// контролем" (по правке пользователя): выбор чипа фильтрует таблицу до тикеров,
+// которыми владеет выбранный игрок (пусто, если портфель ещё не раскрыт шпионажем).
+function renderMarketPlayerChips(s){
+  const wrap = document.getElementById("marketPlayerChips");
+  if(!wrap) return;
+  const others = s.players.filter(p=>p.id!==you && !p.bankrupt);
+  wrap.innerHTML = others.map(p=>{
+    const active = marketOwnFilter === ("p"+p.id) ? " active" : "";
+    const icon = p.holdingsHidden ? "🔒" : "🕵️";
+    return `<button type="button" class="chip${active}" data-own="p${p.id}">${icon} ${escapeHtml(p.name)}</button>`;
+  }).join("");
+  // Если игрок, на которого был выставлен фильтр, вышел из игры/обанкротился —
+  // сбрасываем фильтр на "Все", чтобы не залипать на несуществующей цели.
+  if(marketOwnFilter.startsWith("p") && !others.some(p=>("p"+p.id)===marketOwnFilter)){
+    marketOwnFilter = "all";
+    document.querySelectorAll("#marketOwnFilters .chip").forEach(b=> b.classList.toggle("active", b.dataset.own==="all"));
+  }
+}
+
+// Узкая инлайн-полоса под фильтрами: показывается только когда активен
+// чип-фильтр по игроку — статус портфеля (скрыт/раскрыт) + кнопка шпионажа.
+function renderMarketPlayerBar(s){
+  const bar = document.getElementById("marketPlayerBar");
+  if(!bar) return;
+  if(!marketOwnFilter.startsWith("p")){ bar.style.display = "none"; bar.innerHTML = ""; return; }
+  const targetId = parseInt(marketOwnFilter.slice(1));
+  const target = s.players.find(p=>p.id===targetId);
+  if(!target){ bar.style.display = "none"; bar.innerHTML = ""; return; }
+  bar.style.display = "flex";
+  const canSpy = s.currentPlayerId === you;
+  const statusHtml = target.holdingsHidden
+    ? `<span class="muted">🔒 портфель ${escapeHtml(target.name)} скрыт.</span>`
+    : `<span class="rep-badge" style="background:rgba(224,177,104,.22);color:#7a5300;">🕵️ раскрыто до соб. ${target.revealExpiresEvent}</span>`;
+  bar.innerHTML = `${statusHtml}<button class="small" id="marketPlayerSpyBtn">Шпионить ($8 000)</button>`;
+  const btn = document.getElementById("marketPlayerSpyBtn");
+  if(btn){
+    btn.disabled = !canSpy;
+    btn.title = canSpy ? "" : "Шпионаж доступен только в ваш ход";
+    btn.onclick = ()=> send({type:"ctrlEspionage", target: targetId});
+  }
+}
+
 function buildMarketFilters(){
   const sectorWrap = document.getElementById("marketSectorFilters");
   if(sectorWrap && !sectorWrap.dataset.built){
@@ -1816,12 +2559,14 @@ function buildMarketFilters(){
   const ownWrap = document.getElementById("marketOwnFilters");
   if(ownWrap && !ownWrap.dataset.built){
     ownWrap.dataset.built = "1";
-    ownWrap.querySelectorAll(".chip").forEach(btn=>{
-      btn.onclick = ()=>{
-        marketOwnFilter = btn.dataset.own;
-        ownWrap.querySelectorAll(".chip").forEach(b=> b.classList.toggle("active", b===btn));
-        if(latest) renderMarketTable(latest);
-      };
+    // Делегирование клика на контейнер — так работает и для чипов игроков,
+    // которые добавляются/перестраиваются динамически (renderMarketPlayerChips).
+    ownWrap.addEventListener("click", (ev)=>{
+      const btn = ev.target.closest(".chip");
+      if(!btn || !ownWrap.contains(btn)) return;
+      marketOwnFilter = btn.dataset.own;
+      ownWrap.querySelectorAll(".chip").forEach(b=> b.classList.toggle("active", b===btn));
+      if(latest){ renderMarketTable(latest); renderMarketPlayerBar(latest); }
     });
   }
 }
@@ -1835,7 +2580,9 @@ function render(){
 
   // market table
   recordPriceHistory(s);
+  renderMarketPlayerChips(s);
   renderMarketTable(s);
+  renderMarketPlayerBar(s);
 
   // players
   const playersList = document.getElementById("playersList");
@@ -1871,29 +2618,69 @@ function render(){
   const log = document.getElementById("log");
   log.innerHTML = "";
   s.log.slice().reverse().forEach(e=>{
+    const meta = logEntryMeta(e.tag);
     const div = document.createElement("div");
-    div.className = "log-entry";
-    div.innerHTML = `<div class="tag">${e.turnTag}</div>${e.text}`;
+    div.className = "log-entry " + meta.cls;
+    div.innerHTML = `<div class="tag">${meta.icon} ${e.turnTag}</div>${e.text}`;
     log.appendChild(div);
   });
 
-  renderStage(s);
-  renderStageBoard(s);
-  renderCapital(s);
-  renderControlPanel(s);
+  withPreservedInputs(["contextPopup","capitalBody","controlBody"], ()=>{
+    renderStage(s);
+    renderStageBoard(s);
+    renderCapital(s);
+    renderControlPanel(s);
+  });
+  renderCornerFeed(s);
   renderTicker(s);
+  renderKickVoteBanner(s);
   if(openModalTicker) refreshCompanyModal();
   if(openModalRE) refreshRealEstateModal();
+  if(openModalPlayerId) refreshPlayerModal();
+}
 
-  if(mode === "online" && s.phase === "trade" && s.tradeWindowEndsAt){
-    const tick = ()=>{
-      const el = document.getElementById("tradeCountdown");
-      if(!el) return;
-      const left = Math.max(0, Math.round((s.tradeWindowEndsAt - Date.now())/1000));
-      el.textContent = `(${left}с)`;
-    };
-    tick();
-    countdownTimer = setInterval(tick, 1000);
+// Многие панели (сделки, кредит, слайдеры покупки) перерисовываются целиком
+// (innerHTML) при КАЖДОМ входящем состоянии — в т.ч. вызванном действием
+// ДРУГОГО игрока. Без этой обёртки любой ввод (сумма кредита, цена сделки,
+// позиция слайдера), который печатает игрок А, стирается, как только
+// игрок Б сделал ход. Снимаем "снимок" значений полей и фокуса ДО перерисовки
+// и восстанавливаем ПОСЛЕ — так, чтобы не потерять то, что человек уже ввёл.
+function withPreservedInputs(containerIds, renderFn){
+  const active = document.activeElement;
+  let focusInfo = null;
+  const snapshot = [];
+  containerIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.querySelectorAll("input[id],select[id],textarea[id]").forEach(inp=>{
+      snapshot.push([inp.id, inp.value]);
+      if(inp === active){
+        focusInfo = {
+          id: inp.id,
+          selStart: (typeof inp.selectionStart === "number") ? inp.selectionStart : null,
+          selEnd: (typeof inp.selectionEnd === "number") ? inp.selectionEnd : null,
+        };
+      }
+    });
+  });
+  renderFn();
+  snapshot.forEach(([id, val])=>{
+    const inp = document.getElementById(id);
+    if(!inp || inp.value === val) return;
+    inp.value = val;
+    // Пересчитываем зависимые элементы (например подпись % под слайдером),
+    // как будто пользователь только что подвинул/напечатал это значение сам.
+    inp.dispatchEvent(new Event("input", { bubbles:true }));
+    inp.dispatchEvent(new Event("change", { bubbles:true }));
+  });
+  if(focusInfo){
+    const inp = document.getElementById(focusInfo.id);
+    if(inp){
+      inp.focus();
+      if(focusInfo.selStart != null && inp.setSelectionRange){
+        try { inp.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); } catch(e){}
+      }
+    }
   }
 }
 
@@ -1949,9 +2736,24 @@ function renderStageBoard(s){
       }
     }
   }
+  el.innerHTML = `<div class="stage-board-outer">
+    <div class="stage-board"><div class="stage-cells">${cellsHtml}</div></div>
+    <div id="tableAvatars">${computeAvatarsHtml(s)}</div>
+  </div>`;
+  applyBoardZoom();
+}
+
+// Аватары за столом рендерятся отдельной функцией (а не только внутри
+// renderStageBoard), чтобы можно было обновлять ТОЛЬКО их раз в секунду
+// (см. таймер ниже) — так реакции над головами гаснут сами по себе, даже
+// если от сервера долго не приходит новых состояний, без пересборки всей
+// доски целиком. Клик по своему аватару открывает выбор реакции, по
+// чужому — карточку игрока с голосованием за исключение (см. openPlayerModal).
+function computeAvatarsHtml(s){
   const players = s.players;
   const n = players.length || 1;
-  const avatarsHtml = players.map((p,i)=>{
+  const now = Date.now();
+  return players.map((p,i)=>{
     const angle = (-90 + (360/n)*i) * Math.PI/180;
     const radius = 58;
     const left = 50 + radius*Math.cos(angle);
@@ -1959,17 +2761,20 @@ function renderStageBoard(s){
     const isTurn = p.id === s.currentPlayerId && s.phase === "roll";
     const initial = (p.name.trim().charAt(0) || "?").toUpperCase();
     const avatarGlyph = p.bankrupt ? "💀" : (p.avatar || initial);
-    return `<div class="table-avatar${isTurn?" turn":""}${p.bankrupt?" bankrupt":""}" style="top:${top}%;left:${left}%;">
+    const activeReaction = (s.reactions||[]).filter(r=>r.playerId===p.id && (now-r.ts)<2600).pop();
+    return `<div class="table-avatar${isTurn?" turn":""}${p.bankrupt?" bankrupt":""}" style="top:${top}%;left:${left}%;" onclick="openPlayerModal(${p.id})">
+      ${activeReaction?`<div class="av-reaction">${activeReaction.emoji}</div>`:""}
       <div class="av-circle">${avatarGlyph}</div>
       <div class="av-name">${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':''}${p.points?` <span class="muted">🏆${p.points}</span>`:""}</div>
     </div>`;
   }).join("");
-  el.innerHTML = `<div class="stage-board-outer">
-    <div class="stage-board"><div class="stage-cells">${cellsHtml}</div></div>
-    ${avatarsHtml}
-  </div>`;
-  applyBoardZoom();
 }
+function renderTableAvatars(s){
+  const elA = document.getElementById("tableAvatars");
+  if(!elA || !s) return;
+  elA.innerHTML = computeAvatarsHtml(s);
+}
+setInterval(()=>{ if(latest) renderTableAvatars(latest); }, 900);
 
 // --- Приближение игрового поля -----------------------------------------
 // Масштабируем только .stage-board-outer через CSS transform (не меняет
@@ -2079,12 +2884,18 @@ function loanSectionHtml(s, me){
 
 function myAssetsSectionHtml(s, me){
   const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
+  const pnlMap = me.holdingsPnl || {};
+  let totalPnl = 0, totalBasis = 0;
   const rows = holdings.map(([t,v])=>{
     const c = s.companies.find(x=>x.ticker===t);
     if(!c) return "";
     const value = c.price * (v/100);
-    return `<div class="cap-row"><span class="tkr">${logoHtml(t,18)}${t}</span><span>${v}% · ${fmt(value)}</span>${recommendTag(c, v)}</div>`;
+    const pnl = pnlMap[t];
+    if(pnl){ totalPnl += pnl.pnl; totalBasis += pnl.basis; }
+    const pnlHtml = pnl ? `<span class="cap-pnl ${pnl.pnl>=0?'up':'down'}">${pnl.pnl>=0?"▲ +":"▼ "}${fmt(pnl.pnl)} (${pnl.pnl>=0?"+":""}${pnl.pnlPct.toFixed(1)}%)</span>` : "";
+    return `<div class="cap-row"><span class="tkr">${logoHtml(t,18)}${t}</span><span class="cap-row-mid"><span>${v}% · ${fmt(value)}</span>${pnlHtml}</span>${recommendTag(c, v)}</div>`;
   }).join("") || `<div class="muted" style="font-size:12.5px;">У вас пока нет акций.</div>`;
+  const totalPnlHtml = holdings.length ? `<div class="cap-summary" style="margin:-2px 0 8px;"><span>Прибыль/убыток по акциям</span><b class="${totalPnl>=0?'up':'down'}">${totalPnl>=0?"▲ +":"▼ "}${fmt(totalPnl)}${totalBasis>0?` (${totalPnl>=0?"+":""}${(totalPnl/totalBasis*100).toFixed(1)}%)`:""}</b></div>` : "";
 
   const myRe = (me.properties||[]);
   const reRows = myRe.map(re=>{
@@ -2096,6 +2907,7 @@ function myAssetsSectionHtml(s, me){
   return `
     <div class="mini-card">
       <h3>📦 Акции</h3>
+      ${totalPnlHtml}
       ${rows}
     </div>
     <div class="mini-card">
@@ -2194,36 +3006,58 @@ function renderControlPanel(s){
     return;
   }
 
-  if(s.phase !== "trade"){
-    el.innerHTML = `<div class="muted" style="font-size:12.5px;">Спецдействия, шпионаж и дискредитация доступны только во время фазы торгов (следующее биржевое событие откроет окно).</div>`;
-    return;
-  }
-  if(s.frozen){
-    el.innerHTML = `<div class="muted" style="font-size:12.5px;">🧊 Заморозка цен — спецдействия временно запрещены.</div>`;
+  // Спецдействия и шпионаж больше не привязаны к отдельной фазе торгов — доступны
+  // в любой момент собственного хода игрока (без ожидания особого окна).
+  if(s.currentPlayerId !== you){
+    el.innerHTML = `<div class="muted" style="font-size:12.5px;">Спецдействия, шпионаж и дискредитация доступны только в ваш ход.</div>`;
     return;
   }
 
   const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
   const targetOpts = otherPlayers.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} (⭐${p.reputation})</option>`).join("") || "<option>нет доступных целей</option>";
+  const measureCosts = s.myMeasureCosts || { espionage:0, negativeInfo:0, insiderPeek:0, shortDeposit:0 };
+  const discreditCosts = s.myDiscreditCosts || {};
+  const firstDiscreditTarget = otherPlayers[0] ? otherPlayers[0].id : null;
+  const firstDiscreditCost = firstDiscreditTarget != null ? (discreditCosts[firstDiscreditTarget]||0) : 0;
 
   let html = `
     <div class="control-card">
       <h3>🕵️ Шпионаж</h3>
-      <p>$8 000 · шанс раскрыть активы цели (акции и недвижимость) на 2 события · раз за событие на одну цель. При провале вас ловят — минус к вашей репутации.</p>
+      <p>${fmt(measureCosts.espionage)} · шанс раскрыть активы цели (акции и недвижимость) на 2 события · раз за событие на одну цель. При провале вас ловят — минус к вашей репутации.</p>
       <div class="row-inline">
         <select id="spyTarget" ${otherPlayers.length===0?"disabled":""}>${targetOpts}</select>
-        <button onclick="doCtrlEspionage()" ${otherPlayers.length===0?"disabled":""}>Шпионить</button>
+        <button onclick="doCtrlEspionage()" ${otherPlayers.length===0?"disabled":""}>Шпионить за ${fmt(measureCosts.espionage)}</button>
       </div>
+      ${measureResultBadgeHtml("espionage")}
     </div>
     <div class="control-card">
       <h3>🗞️ Дискредитация</h3>
-      <p>Стоимость растёт с репутацией цели (чем выше — тем дороже атаковать) · при успехе репутация цели падает · при провале падает ваша.</p>
+      <p>Стоимость растёт с вашим капиталом и репутацией цели (чем выше — тем дороже атаковать) · при успехе репутация цели падает · при провале падает ваша.</p>
       <div class="row-inline">
-        <select id="discreditTarget" ${otherPlayers.length===0?"disabled":""}>${targetOpts}</select>
-        <button onclick="doCtrlDiscredit()" ${otherPlayers.length===0?"disabled":""}>Дискредитировать</button>
+        <select id="discreditTarget" ${otherPlayers.length===0?"disabled":""} onchange="onDiscreditTargetChange()">${targetOpts}</select>
+        <button id="discreditBtn" onclick="doCtrlDiscredit()" ${otherPlayers.length===0?"disabled":""}>Дискредитировать за ${fmt(firstDiscreditCost)}</button>
       </div>
+      ${measureResultBadgeHtml("discredit")}
     </div>
   `;
+
+  {
+    const pr = s.myPersonalPr || { cost: 5000, usedThisEvent: false };
+    const myRep = me.reputation == null ? 50 : me.reputation;
+    const prMaxed = myRep >= 100;
+    const prDisabled = prMaxed || pr.usedThisEvent;
+    const prNote = prMaxed ? "Репутация уже максимальна." : pr.usedThisEvent ? "Уже использовано в это событие — попробуйте после следующего." : "";
+    html += `
+    <div class="control-card">
+      <h3>📣 Личный PR</h3>
+      <p>Проведите личную PR-кампанию: +4 к вашей репутации. Доступно любому игроку без контрольного пакета · раз в событие · стоимость растёт с каждым использованием за партию.</p>
+      <div class="row-inline">
+        <button onclick="send({type:'personalPr'})" ${prDisabled?"disabled":""}>Провести PR за ${fmt(pr.cost)}</button>
+      </div>
+      ${prNote ? `<div class="muted" style="font-size:11.5px;margin-top:4px;">${prNote}</div>` : ""}
+      ${measureResultBadgeHtml("personalPr")}
+    </div>`;
+  }
 
   const incidents = s.mySpyIncidents || [];
   if(incidents.length){
@@ -2235,11 +3069,18 @@ function renderControlPanel(s){
       <div class="row-inline">
         <button onclick="send({type:'ctrlInvestigate'})">Расследовать за ${fmt(prev.cost)} (шанс ${prev.chancePct}%)</button>
       </div>
+      ${measureResultBadgeHtml("investigate")}
     </div>`;
   }
 
   if(myControlled.length === 0){
     html += `<div class="muted" style="font-size:12px;padding:4px 2px;">👑 Спецдействия с контрольным пакетом (вброс новостей, PR-кампания, инсайд, выкуп миноритариев) появятся здесь, когда вы получите &gt;50% какой-либо компании.</div>`;
+    el.innerHTML = html;
+    return;
+  }
+
+  if(s.frozen){
+    html += `<div class="muted" style="font-size:12px;padding:4px 2px;">🧊 Заморозка цен — вброс новостей, PR-кампания, инсайд и выкуп миноритариев временно недоступны (шпионаж и дискредитация — доступны).</div>`;
     el.innerHTML = html;
     return;
   }
@@ -2250,45 +3091,55 @@ function renderControlPanel(s){
   const squeezeCandidates = s.companies.filter(c => (me.holdings[c.ticker]||0) > 75);
   const shortOpts = s.companies.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join("");
   const myShorts = (s.shorts||[]).filter(sh=>sh.playerId===you);
+  const firstOwnTicker = myControlled[0] ? myControlled[0].ticker : null;
+  const firstPrCost = firstOwnTicker != null ? myControlled[0].price*0.05 : 0;
+  const squeezeCosts = s.mySqueezeCosts || {};
+  const firstSqueezeTicker = squeezeCandidates[0] ? squeezeCandidates[0].ticker : null;
+  const firstSqueezeCost = firstSqueezeTicker != null ? (squeezeCosts[firstSqueezeTicker]||0) : 0;
 
   html += `
     <div class="control-card">
       <h3>📉 Вброс негативной информации</h3>
-      <p>$10 000 · цена чужой компании −15% · раз в 2 события на одну и ту же цель.</p>
+      <p>${fmt(measureCosts.negativeInfo)} · цена чужой компании −15% · раз в 2 события на одну и ту же цель.</p>
       <div class="row-inline">
         <select id="negTarget">${foreignOpts}</select>
-        <button onclick="doCtrlNegativeInfo()">Атаковать</button>
+        <button onclick="doCtrlNegativeInfo()">Атаковать за ${fmt(measureCosts.negativeInfo)}</button>
       </div>
+      ${measureResultBadgeHtml("negativeInfo")}
     </div>
     <div class="control-card">
       <h3>📈 PR-кампания / байбэк</h3>
       <p>5% капитализации своей компании · цена +10% · раз за событие.</p>
       <div class="row-inline">
-        <select id="prTarget">${ownOpts}</select>
-        <button onclick="doCtrlPrCampaign()">Провести</button>
+        <select id="prTarget" onchange="onPrTargetChange()">${ownOpts}</select>
+        <button id="prBtn" onclick="doCtrlPrCampaign()">Провести за ${fmt(firstPrCost)}</button>
       </div>
+      ${measureResultBadgeHtml("prCampaign")}
     </div>
     <div class="control-card">
       <h3>🕵️ Инсайд</h3>
-      <p>$5 000 · подсмотреть верхнюю карту колоды новостей, один раз за событие.</p>
-      <button style="width:100%;" onclick="send({type:'ctrlInsiderPeek'})">Подсмотреть карту</button>
+      <p>${fmt(measureCosts.insiderPeek)} · подсмотреть верхнюю карту колоды новостей, один раз за событие.</p>
+      <button style="width:100%;" onclick="send({type:'ctrlInsiderPeek'})">Подсмотреть карту за ${fmt(measureCosts.insiderPeek)}</button>
+      ${measureResultBadgeHtml("insiderPeek")}
     </div>
     <div class="control-card">
       <h3>🧹 Принудительный выкуп миноритариев</h3>
       <p>Нужно &gt;75% компании · выкупаете миноритариев по текущей цене · дивиденды по компании становятся ×2.</p>
       <div class="row-inline">
-        <select id="squeezeTarget" ${squeezeCandidates.length===0?"disabled":""}>${squeezeCandidates.length?squeezeCandidates.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join(""):"<option>нет доступных компаний</option>"}</select>
-        <button onclick="doCtrlSqueezeOut()" ${squeezeCandidates.length===0?"disabled":""}>Выкупить</button>
+        <select id="squeezeTarget" ${squeezeCandidates.length===0?"disabled":""} onchange="onSqueezeTargetChange()">${squeezeCandidates.length?squeezeCandidates.map(c=>`<option value="${c.ticker}">${c.name} (${c.ticker})</option>`).join(""):"<option>нет доступных компаний</option>"}</select>
+        <button id="squeezeBtn" onclick="doCtrlSqueezeOut()" ${squeezeCandidates.length===0?"disabled":""}>Выкупить за ${fmt(firstSqueezeCost)}</button>
       </div>
+      ${measureResultBadgeHtml("squeezeOut")}
     </div>
     <div class="control-card">
       <h3>🎲 Шорт</h3>
-      <p>$5 000 залог · ставка, что цена компании упадёт к следующему биржевому событию · выигрыш ×2 из банка.</p>
+      <p>${fmt(measureCosts.shortDeposit)} залог · ставка, что цена компании упадёт к следующему биржевому событию · выигрыш ×2 из банка.</p>
       <div class="row-inline">
         <select id="shortTarget">${shortOpts}</select>
-        <button onclick="doCtrlShort()">Открыть шорт</button>
+        <button onclick="doCtrlShort()">Открыть шорт за ${fmt(measureCosts.shortDeposit)}</button>
       </div>
       ${myShorts.length ? myShorts.map(sh=>`<div class="muted" style="font-size:11.5px;margin-top:6px;">Открыт шорт по ${sh.ticker} при цене ${fmt(sh.priceAtBet)} — ждём итогов события.</div>`).join("") : ""}
+      ${measureResultBadgeHtml("short")}
     </div>
   `;
   el.innerHTML = html;
@@ -2301,11 +3152,10 @@ function statusRowHtml(s){
   const cp = s.players.find(p=>p.id===s.currentPlayerId);
   let phaseHtml;
   if(s.phase === "roll") phaseHtml = `<span class="pill phase-roll">🎯 Ходит: <b>${cp ? cp.name : "—"}</b></span>`;
-  else if(s.phase === "trade") phaseHtml = `<span class="pill phase-trade">💱 Фаза торгов ${mode==="online" ? `<b id="tradeCountdown"></b>` : ""}</span>`;
   else phaseHtml = `<span class="pill phase-ended">🏁 Игра окончена</span>`;
 
-  const viewAsHtml = (mode==="offline" && localRoom) ? `<span class="pill">Ход как:
-    <select onchange="onViewAsChange(this)" ${s.phase==="roll"?"disabled":""}>
+  const viewAsHtml = (mode==="offline" && localRoom) ? `<span class="pill">Смотреть как:
+    <select onchange="onViewAsChange(this)">
       ${localRoom.players.map(p=>`<option value="${p.id}" ${p.id===viewAs?"selected":""}>${p.name}</option>`).join("")}
     </select></span>` : "";
 
@@ -2322,7 +3172,7 @@ function ratingHtml(s){
     const isTurn = p.id===s.currentPlayerId && s.phase==="roll";
     return `<div class="rating-row${p.id===you?' you':''}${p.bankrupt?' bankrupt':''}">
       <span class="rating-rank">${i+1}</span>
-      <span>${p.name}${p.id===you?' <span class="muted">(вы)</span>':''}${isTurn?' 🎯':''}${p.bankrupt?' 💀':''}</span>
+      <span class="rating-name">${p.name}${p.id===you?' <span class="muted">(вы)</span>':''}${isTurn?' 🎯':''}${p.bankrupt?' 💀':''}</span>
       <span class="rating-net">${fmt(p.netWorth)}</span>
     </div>`;
   }).join("");
@@ -2352,29 +3202,77 @@ function capSummaryHtml(s){
 function toggleStock(t){ expandedTicker = (expandedTicker===t) ? null : t; render(); }
 
 function stockActionsHtml(s, c, v){
-  if(s.phase !== "trade"){
-    return `<div class="stock-actions muted" style="font-size:12px;">Продажа и обмен доступны только в фазу торгов.</div>`;
+  const me = s.players.find(p=>p.id===you);
+  const pnl = me && me.holdingsPnl ? me.holdingsPnl[c.ticker] : null;
+  const pnlBlockHtml = pnl ? `<div class="cap-summary" style="margin:0 0 8px;padding-bottom:6px;"><span>Прибыль/убыток по пакету</span><b class="${pnl.pnl>=0?'up':'down'}">${pnl.pnl>=0?"▲ +":"▼ "}${fmt(pnl.pnl)} (${pnl.pnl>=0?"+":""}${pnl.pnlPct.toFixed(1)}%)</b></div>` : "";
+  // Продажа/обмен больше не привязаны к отдельной фазе торгов — доступны только
+  // ходящему игроку в любой момент его хода (до или после броска кубиков), чтобы
+  // не было сумбура от одновременных действий всех игроков сразу.
+  if(s.currentPlayerId !== you){
+    return `<div class="stock-actions">${pnlBlockHtml}<div class="muted" style="font-size:12px;">Продажа и обмен доступны только в ваш ход.</div></div>`;
   }
   if(s.frozen){
-    return `<div class="stock-actions muted" style="font-size:12px;">🧊 Заморозка цен — торги временно недоступны.</div>`;
+    return `<div class="stock-actions">${pnlBlockHtml}<div class="muted" style="font-size:12px;">🧊 Заморозка цен — торги временно недоступны.</div></div>`;
   }
   const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
   const playerOpts = otherPlayers.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  const wantCompanies = s.companies.filter(x=>x.ticker!==c.ticker);
+  const wantOpts = `<option value="">— не нужно —</option>` + wantCompanies.map(x=>`<option value="${x.ticker}">${x.ticker}</option>`).join("");
+  const sellMax = Math.min(25, v);
+  const tradeMax = Math.min(25, v);
+  const firstWant = wantCompanies[0];
   return `<div class="stock-actions">
-    <div class="row-inline">
-      <button class="small" style="flex:1;" onclick="doSellStock('${c.ticker}',10)" ${v<10?"disabled":""}>Продать 10% (${fmt(c.price*0.10)})</button>
-      <button class="small" style="flex:1;" onclick="doSellStock('${c.ticker}',25)" ${v<25?"disabled":""}>Продать 25% (${fmt(c.price*0.25)})</button>
-    </div>
-    <label style="display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;">Предложить сделку игроку</label>
+    ${pnlBlockHtml}
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin:0 0 4px;">Продать банку</label>
+    ${pctSliderHtml("sellSlider_"+c.ticker, sellMax, Math.min(10, sellMax), c.price/100)}
+    <button class="small" style="width:100%;" onclick="doSellStock('${c.ticker}', pctSliderVal('sellSlider_${c.ticker}'))">Продать</button>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;">Предложить сделку игроку (деньги и/или акции взамен)</label>
     <div class="row-inline">
       <select id="tradeTo_${c.ticker}" style="flex:1;">${playerOpts || "<option>нет других игроков</option>"}</select>
     </div>
+    <label style="display:block;font-size:11px;color:var(--muted);margin:8px 0 2px;">Сколько отдаёте</label>
+    ${pctSliderHtml("tradePct_"+c.ticker, tradeMax, Math.min(10, tradeMax), c.price/100)}
     <div class="row-inline">
-      <input id="tradePct_${c.ticker}" type="number" placeholder="%" value="10" min="1" max="${v}" style="width:70px;">
-      <input id="tradePrice_${c.ticker}" type="number" placeholder="цена $" style="flex:1;">
-      <button class="small" onclick="doProposeStockTrade('${c.ticker}')" ${otherPlayers.length===0?"disabled":""}>Предложить</button>
+      <input id="tradePrice_${c.ticker}" type="number" placeholder="цена $ (наличными)" style="flex:1;">
+    </div>
+    <label style="display:block;font-size:11px;color:var(--muted);margin:8px 0 2px;">Что хотите взамен (по желанию)</label>
+    <div class="row-inline">
+      <select id="tradeWantTicker_${c.ticker}" style="flex:1;" onchange="onTradeWantTickerChange('${c.ticker}')">${wantOpts}</select>
+    </div>
+    ${pctSliderHtml("tradeWantPct_"+c.ticker, 25, 10, firstWant ? firstWant.price/100 : 0)}
+    <div class="row-inline">
+      <button class="small" style="width:100%;" onclick="doProposeStockTrade('${c.ticker}')" ${otherPlayers.length===0?"disabled":""}>Предложить</button>
     </div>
   </div>`;
+}
+function onDiscreditTargetChange(){
+  const sel = document.getElementById("discreditTarget");
+  const btn = document.getElementById("discreditBtn");
+  if(!sel || !btn || !latest) return;
+  const cost = (latest.myDiscreditCosts || {})[sel.value] || 0;
+  btn.textContent = `Дискредитировать за ${fmt(cost)}`;
+}
+function onSqueezeTargetChange(){
+  const sel = document.getElementById("squeezeTarget");
+  const btn = document.getElementById("squeezeBtn");
+  if(!sel || !btn || !latest) return;
+  const cost = (latest.mySqueezeCosts || {})[sel.value] || 0;
+  btn.textContent = `Выкупить за ${fmt(cost)}`;
+}
+function onPrTargetChange(){
+  const sel = document.getElementById("prTarget");
+  const btn = document.getElementById("prBtn");
+  if(!sel || !btn || !latest) return;
+  const c = latest.companies.find(x=>x.ticker===sel.value);
+  btn.textContent = `Провести за ${fmt(c ? c.price*0.05 : 0)}`;
+}
+function onTradeWantTickerChange(ticker){
+  const sel = document.getElementById(`tradeWantTicker_${ticker}`);
+  const slider = document.getElementById(`tradeWantPct_${ticker}`);
+  if(!sel || !slider || !latest) return;
+  const wc = latest.companies.find(x=>x.ticker===sel.value);
+  slider.dataset.unit = wc ? (wc.price/100) : 0;
+  onPctSlider(slider);
 }
 
 function stocksListHtml(s){
@@ -2382,17 +3280,21 @@ function stocksListHtml(s){
   if(!me) return "";
   const holdings = Object.entries(me.holdings).filter(([,v])=>v>0);
   if(!holdings.length) return `<div class="mini-card"><h3>📦 Ваши акции</h3><div class="muted" style="font-size:12.5px;">У вас пока нет акций.</div></div>`;
+  const pnlMap = me.holdingsPnl || {};
   const rows = holdings.map(([t,v])=>{
     const c = s.companies.find(x=>x.ticker===t);
     if(!c) return "";
     const value = c.price * (v/100);
     const expanded = expandedTicker === t;
+    const pnl = pnlMap[t];
+    const pnlHtml = pnl ? `<span class="cap-pnl ${pnl.pnl>=0?'up':'down'}" style="font-size:11px;">${pnl.pnl>=0?"▲ +":"▼ "}${fmt(pnl.pnl)}</span>` : "";
     return `
       <div class="stock-row" onclick="toggleStock('${t}')">
         ${logoHtml(t,22)}
         <span class="stk-name"><b>${t}</b> <span class="muted">${v}%</span></span>
         <span class="price">${fmt(c.price)}</span>
         <span class="muted">${fmt(value)}</span>
+        ${pnlHtml}
         <span class="stk-caret">${expanded?"▾":"▸"}</span>
       </div>
       ${expanded ? stockActionsHtml(s, c, v) : ""}
@@ -2435,10 +3337,10 @@ function gameEndPopupHtml(s){
   }).join("");
   return `<div class="popup-card popup-wide" style="text-align:center;">
     <div class="end-screen-icon">${iAmWinner?"🏆":"🏁"}</div>
-    <h2 style="margin:8px 0 2px;">${iAmWinner?"Победа!":"Игра окончена"}</h2>
-    <div class="muted" style="margin-bottom:14px;font-size:13px;">Победитель — <b>${escapeHtml(gr.winnerName)}</b> с капиталом ${fmt(gr.netWorth)}</div>
-    <div style="display:flex;flex-direction:column;gap:6px;text-align:left;margin-bottom:14px;">${rankRows}</div>
-    <div class="mini-card" style="margin-bottom:14px;text-align:left;">
+    <h2 class="end-title">${iAmWinner?"Победа!":"Игра окончена"}</h2>
+    <div class="muted end-subtitle">Победитель — <b>${escapeHtml(gr.winnerName)}</b> с капиталом ${fmt(gr.netWorth)}</div>
+    <div class="end-rank-list">${rankRows}</div>
+    <div class="mini-card end-reward-card">
       <h3>🏆 Награда рейтинга</h3>
       ${iAmWinner
         ? `<div class="cap-mini"><span>Начислено очков</span><b>+${gr.pointsEarned}</b></div>`
@@ -2489,10 +3391,12 @@ function rollPopupHtml(s){
   const free = 100 - c.owned;
   let actionsHtml = "";
   let allowSkip = meta.ownersCount === 0;
-  if(free >= 10){
-    actionsHtml += `<div class="row-inline" style="margin-top:10px;">
-      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10})" ${free<10?"disabled":""}>Купить 10%</button>
-      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25})" ${free<25?"disabled":""}>Купить 25%</button>
+  if(free >= 1){
+    const buyMax = Math.min(25, Math.floor(free));
+    const buyUnit = c.price/100 * (1 + (s.bankFeePct||0));
+    actionsHtml += `<div style="margin-top:10px;">
+      ${pctSliderHtml("rpBuySlider", buyMax, Math.min(10, buyMax), buyUnit)}
+      <button style="width:100%;" onclick="send({type:'buyFromRoll',pct:pctSliderVal('rpBuySlider')})">Купить</button>
     </div>`;
   }
   if(meta.ownersCount > 0){
@@ -2521,21 +3425,19 @@ function rollPopupHtml(s){
   </div>`;
 }
 
-function tradePhaseHtml(s, me){
+// Список входящих/исходящих предложений сделок — переиспользуется и во всплывающем
+// окне ходящего игрока (вместе со списком его акций), и для игрока не в свой ход
+// (чтобы он мог принять/отклонить адресованное ему предложение, не дожидаясь
+// собственного хода — иначе он бы никогда не увидел запрос вовремя).
+function tradeOffersHtml(s){
   const incoming = s.pendingTrades.filter(t=>t.toId===you);
   const outgoing = s.pendingTrades.filter(t=>t.fromId===you);
-  const activeTraders = s.players.filter(p=>!p.bankrupt);
-  const readyIds = s.tradeReadyIds || [];
-  const iAmReady = readyIds.includes(you);
-  let html = `<div class="mini-card">
-    <div class="muted" style="font-size:12.5px;margin-bottom:10px;">Фаза свободных торгов — доступна всем одновременно. Покупка у банка закрыта. Нажмите на свою акцию ниже, чтобы продать банку или предложить сделку игроку.</div>
-    <button style="width:100%;" class="${iAmReady?"":"secondary"}" onclick="send({type:'readyEndTrade'})">${iAmReady?"✅ Вы готовы — ждём остальных":"⏭️ Готов завершить фазу торгов"} (${readyIds.length}/${activeTraders.length})</button>
-    ${mode==="offline" ? `<button style="width:100%;margin-top:8px;" class="secondary" onclick="send({type:'endTradeWindowManual'})">⏭️⏭️ Сразу завершить фазу торгов и передать ход дальше</button>` : ""}
-  </div>`;
+  const paymentDesc = (t)=> [t.price>0?fmt(t.price):"", t.wantTicker?`${t.wantPct}% ${t.wantTicker}`:""].filter(Boolean).join(" + ") || "бесплатно";
+  let html = "";
   if(incoming.length){
     html += `<div class="mini-card"><h3>📥 Предложения вам</h3>` + incoming.map(t=>{
       const from = s.players.find(p=>p.id===t.fromId);
-      return `<div class="trade-offer">${from?from.name:"?"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}
+      return `<div class="trade-offer">${from?from.name:"?"} предлагает вам ${t.pct}% ${t.ticker} за ${paymentDesc(t)}
         <div class="row-inline" style="margin-top:6px;margin-bottom:0;">
           <button class="small" onclick="send({type:'respondTrade',id:${t.id},accept:true})">Принять</button>
           <button class="small secondary" onclick="send({type:'respondTrade',id:${t.id},accept:false})">Отклонить</button>
@@ -2545,7 +3447,7 @@ function tradePhaseHtml(s, me){
   if(outgoing.length){
     html += `<div class="mini-card"><h3>📤 Ваши предложения</h3>` + outgoing.map(t=>{
       const to = s.players.find(p=>p.id===t.toId);
-      return `<div class="trade-offer muted">Вы предложили ${to?to.name:"?"} купить ${t.pct}% ${t.ticker} за ${fmt(t.price)} — ожидание ответа.</div>`;
+      return `<div class="trade-offer muted">Вы предложили ${to?to.name:"?"}: ${t.pct}% ${t.ticker} за ${paymentDesc(t)} — ожидание ответа.</div>`;
     }).join("") + `</div>`;
   }
   return html;
@@ -2595,23 +3497,33 @@ function renderStage(s){
     if(s.currentPlayerId !== you){
       const cp = s.players.find(p=>p.id===s.currentPlayerId);
       cornerAction.innerHTML = `<div class="stage-panel muted">${mode==="offline" ? `Передайте устройство игроку «${cp?cp.name:"?"}»...` : `Ожидание хода игрока «${cp?cp.name:"?"}»...`}</div>`;
-      popup.style.display = "none";
+      // Пока ходит другой игрок, вы всё ещё можете получить и ответить на
+      // адресованное вам предложение сделки — иначе оно "зависнет" до вашего хода.
+      const myIncoming = s.pendingTrades.filter(t=>t.toId===you);
+      if(myIncoming.length){
+        popup.style.display = "flex";
+        popup.innerHTML = `<div class="popup-card popup-wide">${tradeOffersHtml(s)}</div>`;
+      } else {
+        popup.style.display = "none";
+      }
       return;
     }
-    if(!s.pendingRoll){
-      cornerAction.innerHTML = `<button class="roll-btn stage-roll-btn" onclick="doRoll(this)"><span class="dice-emoji">🎲</span> Бросить кубики</button>`;
-      popup.style.display = "none";
+    if(s.pendingRoll){
+      cornerAction.innerHTML = "";
+      popup.style.display = "flex";
+      popup.innerHTML = rollPopupHtml(s);
       return;
     }
-    cornerAction.innerHTML = "";
+    // Мой ход: бросок ещё не сделан — предлагаем бросить, либо (если уже
+    // бросали в этот ход) завершить ход. В обоих случаях остаются доступны
+    // продажа/обмен акций и спецдействия — торговать можно и до, и после броска.
+    cornerAction.innerHTML = s.rolledThisTurn
+      ? `<button class="roll-btn stage-roll-btn" style="background:var(--green);" onclick="send({type:'endTurn'})">✅ Завершить ход</button>`
+      : `<button class="roll-btn stage-roll-btn" onclick="doRoll(this)"><span class="dice-emoji">🎲</span> Бросить кубики</button>`;
     popup.style.display = "flex";
-    popup.innerHTML = rollPopupHtml(s);
+    popup.innerHTML = `<div class="popup-card popup-wide">${tradeOffersHtml(s)}${stocksListHtml(s)}</div>`;
     return;
   }
-  // фаза торгов
-  cornerAction.innerHTML = "";
-  popup.style.display = "flex";
-  popup.innerHTML = `<div class="popup-card popup-wide">${tradePhaseHtml(s, me)}${stocksListHtml(s)}</div>`;
 }
 
 function doSellStock(ticker, pct){
@@ -2620,12 +3532,15 @@ function doSellStock(ticker, pct){
 function doProposeStockTrade(ticker){
   const toEl = document.getElementById(`tradeTo_${ticker}`);
   if(!toEl || !toEl.value) return;
+  const wantTicker = document.getElementById(`tradeWantTicker_${ticker}`).value || undefined;
   send({
     type:"proposeTrade",
     to: parseInt(toEl.value),
     ticker,
     pct: parseInt(document.getElementById(`tradePct_${ticker}`).value),
     price: parseFloat(document.getElementById(`tradePrice_${ticker}`).value)||0,
+    wantTicker,
+    wantPct: wantTicker ? (parseInt(document.getElementById(`tradeWantPct_${ticker}`).value)||0) : undefined,
   });
 }
 
@@ -2636,22 +3551,96 @@ function doProposeStockTrade(ticker){
 // ---------------------------------------------------------------------
 let openModalTicker = null;
 let openModalRE = null; // id города — открыта карточка недвижимости, а не компании
+let openModalPlayerId = null; // id игрока — открыта карточка реакций/голосования за кик
 function openCompanyModal(ticker){
   openModalTicker = ticker;
   openModalRE = null;
+  openModalPlayerId = null;
   document.getElementById("companyModalOverlay").style.display = "flex";
   refreshCompanyModal();
 }
 function openRealEstateModal(cityId){
   openModalRE = cityId;
   openModalTicker = null;
+  openModalPlayerId = null;
   document.getElementById("companyModalOverlay").style.display = "flex";
   refreshRealEstateModal();
+}
+function openPlayerModal(playerId){
+  openModalPlayerId = playerId;
+  openModalTicker = null;
+  openModalRE = null;
+  document.getElementById("companyModalOverlay").style.display = "flex";
+  refreshPlayerModal();
 }
 function closeCompanyModal(){
   openModalTicker = null;
   openModalRE = null;
+  openModalPlayerId = null;
   document.getElementById("companyModalOverlay").style.display = "none";
+}
+// Клик по своему аватару за столом — выбор реакции, видимой всем игрокам.
+// Клик по чужому аватару — запуск/поддержка голосования за исключение из
+// комнаты (нужно строго больше половины голосов оставшихся игроков).
+function refreshPlayerModal(){
+  if(!openModalPlayerId || !latest){ return; }
+  const s = latest;
+  const p = s.players.find(x=>x.id===openModalPlayerId);
+  if(!p){ closeCompanyModal(); return; }
+  const card = document.getElementById("companyModalCard");
+  if(!card) return;
+  const isSelf = p.id === you;
+  let bodyHtml;
+  if(isSelf){
+    const emojis = (GameEngine.REACTION_EMOJIS && GameEngine.REACTION_EMOJIS.length) ? GameEngine.REACTION_EMOJIS : ["😀","😂","😮","😡","👍","👎","🔥","💰","🤝","😢"];
+    bodyHtml = `
+      <div class="muted" style="margin:10px 0 12px;">Выберите реакцию — её увидят все игроки за столом.</div>
+      <div class="reaction-picker">
+        ${emojis.map(e=>`<button type="button" class="reaction-btn" onclick="send({type:'reaction', emoji:'${e}'}); closeCompanyModal();">${e}</button>`).join("")}
+      </div>`;
+  } else if(p.bankrupt){
+    bodyHtml = `<div class="muted" style="margin:10px 0 4px;">Этот игрок выбыл из игры.</div>`;
+  } else {
+    const kv = s.kickVote;
+    const active = kv && kv.targetId === p.id;
+    if(!active){
+      bodyHtml = `
+        <div class="muted" style="margin:10px 0 12px;">Если игрок ведёт себя недобросовестно, можно начать голосование за его исключение из комнаты. Для исключения нужно больше половины голосов оставшихся игроков.</div>
+        <button type="button" class="danger" onclick="send({type:'startKickVote', target:${p.id}});">🗳️ Начать голосование за исключение</button>`;
+    } else {
+      const isInitiator = kv.initiatorId === you;
+      bodyHtml = `
+        <div class="muted" style="margin:10px 0 8px;">Идёт голосование за исключение «${escapeHtml(kv.targetName)}»:</div>
+        <div style="font-weight:800;font-size:22px;margin-bottom:10px;">${kv.yesCount} / ${kv.needed} <span class="muted" style="font-size:12px;font-weight:500;">(нужно из ${kv.totalEligible})</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="${kv.myVote?'secondary':''}" onclick="send({type:'voteKick', target:${p.id}, yes:${kv.myVote?'false':'true'}});">${kv.myVote?'✓ Голос отдан — отозвать':'Проголосовать за исключение'}</button>
+          ${isInitiator?`<button type="button" class="secondary" onclick="send({type:'cancelKickVote'});">Отменить голосование</button>`:""}
+        </div>`;
+    }
+  }
+  card.innerHTML = `
+    <div class="company-modal-head">
+      <h2>${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':''}</h2>
+      <button class="company-modal-close" type="button" onclick="closeCompanyModal();">✕</button>
+    </div>
+    ${bodyHtml}
+  `;
+}
+// Плавающий баннер активного голосования за исключение — виден всем за
+// столом сразу, без необходимости открывать карточку игрока.
+function renderKickVoteBanner(s){
+  const el = document.getElementById("kickVoteBanner");
+  if(!el) return;
+  const kv = s && s.kickVote;
+  if(!kv){ el.classList.remove("show"); el.innerHTML = ""; return; }
+  const isTarget = kv.targetId === you;
+  const isInitiator = kv.initiatorId === you;
+  el.innerHTML = `
+    <span>🗳️ Кик «${escapeHtml(kv.targetName)}»: <b>${kv.yesCount}/${kv.needed}</b> <span class="muted" style="font-weight:500;">(из ${kv.totalEligible})</span></span>
+    ${!isTarget?`<button type="button" class="small${kv.myVote?' secondary':''}" onclick="send({type:'voteKick', target:${kv.targetId}, yes:${kv.myVote?'false':'true'}});">${kv.myVote?'Отозвать голос':'Голосовать'}</button>`:""}
+    ${isInitiator?`<button type="button" class="small secondary" onclick="send({type:'cancelKickVote'});">Отмена</button>`:""}
+  `;
+  el.classList.add("show");
 }
 function refreshRealEstateModal(){
   if(!openModalRE || !latest){ return; }
@@ -2693,30 +3682,118 @@ function refreshRealEstateModal(){
     ${actionsHtml}
   `;
 }
+// Сглаженная кривая через точки (Catmull-Rom -> кубические Безье) — вместо
+// ломаной линии, для более "инвесторского" вида графика (как в биржевых приложениях).
+function catmullRomPath(pts){
+  if(pts.length < 2) return "";
+  if(pts.length === 2) return `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} L${pts[1][0].toFixed(1)},${pts[1][1].toFixed(1)}`;
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} `;
+  for(let i=0;i<pts.length-1;i++){
+    const p0 = pts[i-1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i+1];
+    const p3 = pts[i+2] || p2;
+    const cp1x = p1[0] + (p2[0]-p0[0])/6;
+    const cp1y = p1[1] + (p2[1]-p0[1])/6;
+    const cp2x = p2[0] - (p3[0]-p1[0])/6;
+    const cp2y = p2[1] - (p3[1]-p1[1])/6;
+    d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} `;
+  }
+  return d;
+}
 function fullChartSvg(ticker, color){
   const w = 440, h = 140, pad = 6;
   const hist = priceHistoryClient[ticker] || [];
   if(hist.length < 2){
     const only = hist[0] || 0;
-    return { svg: `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity=".6"/></svg>`, min: only, max: only };
+    return { svg: `<svg id="fcSvg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" data-points="[]"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity=".6"/></svg>`, min: only, max: only };
   }
   const min = Math.min(...hist), max = Math.max(...hist);
   const span = (max - min) || 1;
   const step = (w - pad*2) / (hist.length - 1);
-  const pts = hist.map((v,i)=>{
-    const x = pad + i*step;
-    const y = h - pad - ((v-min)/span) * (h - pad*2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const line = pts.join(" ");
-  const area = `${pad},${h-pad} ${line} ${w-pad},${h-pad}`;
+  const pts = hist.map((v,i)=>[pad + i*step, h - pad - ((v-min)/span) * (h - pad*2), v]);
+  const pathD = catmullRomPath(pts.map(p=>[p[0],p[1]]));
+  const last = pts[pts.length-1];
+  const areaD = `${pathD} L${last[0].toFixed(1)},${(h-pad).toFixed(1)} L${pts[0][0].toFixed(1)},${(h-pad).toFixed(1)} Z`;
+  const gridLines = [0.25,0.5,0.75].map(f=>{
+    const y = (pad + (h-pad*2)*f).toFixed(1);
+    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="#000" stroke-width="1" opacity=".07" pointer-events="none"/>`;
+  }).join("");
+  const gradId = `fcGrad_${ticker}`;
+  const dataPoints = JSON.stringify(pts.map(p=>[Number(p[0].toFixed(2)), Number(p[1].toFixed(2)), p[2]]));
   return {
-    svg: `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polygon points="${area}" fill="${color}" opacity=".14"/>
-      <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    svg: `<svg id="fcSvg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" data-points='${dataPoints}' data-w="${w}" data-h="${h}">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity=".34"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <path d="${areaD}" fill="url(#${gradId})" stroke="none" pointer-events="none"/>
+      <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="5" fill="${color}" opacity=".22" pointer-events="none"/>
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="${color}" pointer-events="none"/>
+      <rect x="0" y="0" width="${w}" height="${h}" fill="transparent" pointer-events="all" style="cursor:crosshair;" id="fcHit"/>
+      <line id="fcCrossLine" x1="0" y1="${pad}" x2="0" y2="${h-pad}" stroke="${color}" stroke-width="1" stroke-dasharray="3,3" opacity="0" pointer-events="none"/>
+      <circle id="fcCrossDot" cx="0" cy="0" r="3.4" fill="#fff" stroke="${color}" stroke-width="1.8" opacity="0" pointer-events="none"/>
     </svg>`,
     min, max,
   };
+}
+function initFullChartInteractivity(){
+  const svg = document.getElementById("fcSvg");
+  const hit = document.getElementById("fcHit");
+  if(!svg || !hit) return;
+  let points;
+  try{ points = JSON.parse(svg.dataset.points || "[]"); }catch(e){ points = []; }
+  if(points.length < 2) return;
+  const w = Number(svg.dataset.w);
+  const crossLine = document.getElementById("fcCrossLine");
+  const crossDot = document.getElementById("fcCrossDot");
+  const tooltip = document.getElementById("fcTooltip");
+  function pickPoint(clientX){
+    const rect = svg.getBoundingClientRect();
+    const relX = (clientX - rect.left) / rect.width * w;
+    let nearest = points[0], nearestDist = Infinity, nearestIdx = 0;
+    points.forEach((p, i)=>{
+      const d = Math.abs(p[0]-relX);
+      if(d < nearestDist){ nearestDist = d; nearest = p; nearestIdx = i; }
+    });
+    return { p: nearest, idx: nearestIdx };
+  }
+  function onMove(ev){
+    const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+    if(clientX == null) return;
+    const { p, idx } = pickPoint(clientX);
+    if(!p) return;
+    crossLine.setAttribute("x1", String(p[0])); crossLine.setAttribute("x2", String(p[0])); crossLine.setAttribute("opacity","1");
+    crossDot.setAttribute("cx", String(p[0])); crossDot.setAttribute("cy", String(p[1])); crossDot.setAttribute("opacity","1");
+    if(tooltip){
+      const prev = points[idx-1];
+      let deltaHtml = "";
+      if(prev){
+        const diff = p[2]-prev[2];
+        deltaHtml = ` <span class="${diff>=0?'up':'down'}">${diff>=0?"▲":"▼"} ${fmt(Math.abs(diff))}</span>`;
+      }
+      const isLast = idx === points.length-1;
+      tooltip.style.display = "block";
+      tooltip.innerHTML = `<b>${fmt(p[2])}</b>${deltaHtml}${isLast?` <span class="muted">· сейчас</span>`:""}`;
+      const rect = svg.getBoundingClientRect();
+      const relXPx = (p[0]/w) * rect.width;
+      let left = relXPx + 10;
+      if(left + 100 > rect.width) left = relXPx - 100;
+      tooltip.style.left = Math.max(0, left) + "px";
+    }
+  }
+  function onLeave(){
+    crossLine.setAttribute("opacity","0");
+    crossDot.setAttribute("opacity","0");
+    if(tooltip) tooltip.style.display = "none";
+  }
+  hit.addEventListener("pointermove", onMove);
+  hit.addEventListener("pointerleave", onLeave);
+  hit.addEventListener("pointerdown", onMove);
 }
 function refreshCompanyModal(){
   if(!openModalTicker || !latest){ return; }
@@ -2730,21 +3807,27 @@ function refreshCompanyModal(){
   const chart = fullChartSvg(c.ticker, color);
   const me = s.players.find(p=>p.id===you);
   const myHolding = me ? (me.holdings[c.ticker]||0) : 0;
+  const myPnl = me && me.holdingsPnl ? me.holdingsPnl[c.ticker] : null;
   const canBuyNow = s.pendingRoll && s.pendingRoll.ticker === c.ticker && s.pendingRoll.playerId === you;
   let actionsHtml = "";
   if(canBuyNow){
     const free = 100 - c.owned;
-    actionsHtml += `<div class="row-inline" style="margin-top:6px;">
-      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:10});closeCompanyModal();" ${free<10?"disabled":""}>Купить 10%</button>
-      <button style="flex:1;" onclick="send({type:'buyFromRoll',pct:25});closeCompanyModal();" ${free<25?"disabled":""}>Купить 25%</button>
-    </div>`;
+    if(free >= 1){
+      const buyMax = Math.min(25, Math.floor(free));
+      const buyUnit = c.price/100 * (1 + (s.bankFeePct||0));
+      actionsHtml += `<div style="margin-top:6px;">
+        ${pctSliderHtml("cmBuySlider", buyMax, Math.min(10, buyMax), buyUnit)}
+        <button style="width:100%;" onclick="send({type:'buyFromRoll',pct:pctSliderVal('cmBuySlider')});closeCompanyModal();">Купить</button>
+      </div>`;
+    }
   } else {
     actionsHtml += `<div class="muted" style="font-size:11.5px;margin-top:6px;">Купить акции у банка можно, только когда фишка попадёт на эту компанию.</div>`;
   }
-  if(myHolding > 0 && s.phase === "trade" && !s.frozen){
-    actionsHtml += `<div class="row-inline" style="margin-top:10px;">
-      <button class="small secondary" style="flex:1;" onclick="doSellStock('${c.ticker}',10);" ${myHolding<10?"disabled":""}>Продать 10%</button>
-      <button class="small secondary" style="flex:1;" onclick="doSellStock('${c.ticker}',25);" ${myHolding<25?"disabled":""}>Продать 25%</button>
+  if(myHolding > 0 && s.currentPlayerId === you && !s.frozen){
+    const sellMax = Math.min(25, myHolding);
+    actionsHtml += `<div style="margin-top:10px;">
+      ${pctSliderHtml("cmSellSlider_"+c.ticker, sellMax, Math.min(10, sellMax), c.price/100)}
+      <button class="small secondary" style="width:100%;" onclick="doSellStock('${c.ticker}', pctSliderVal('cmSellSlider_${c.ticker}'));">Продать</button>
     </div>`;
   }
   document.getElementById("companyModalCard").innerHTML = `
@@ -2763,11 +3846,13 @@ function refreshCompanyModal(){
       <div class="cap-mini"><span>Волатильность</span><b>${c.volLabel}</b></div>
       ${controller ? `<div class="cap-mini"><span>Контрольный пакет</span><b>👑 ${escapeHtml(controller.name)}</b></div>` : ""}
       ${myHolding ? `<div class="cap-mini"><span>У вас</span><b>${myHolding}% (${fmt(c.price*myHolding/100)})</b></div>` : ""}
+      ${myPnl ? `<div class="cap-mini"><span>Прибыль/убыток</span><b class="${myPnl.pnl>=0?'up':'down'}">${myPnl.pnl>=0?"▲ +":"▼ "}${fmt(myPnl.pnl)} (${myPnl.pnl>=0?"+":""}${myPnl.pnlPct.toFixed(1)}%)</b></div>` : ""}
     </div>
-    <div class="full-chart-wrap">${chart.svg}</div>
+    <div class="full-chart-wrap"><div class="fc-tooltip" id="fcTooltip"></div>${chart.svg}</div>
     <div class="full-chart-minmax"><span>мин ${fmt(chart.min)}</span><span>макс ${fmt(chart.max)}</span></div>
     ${actionsHtml}
   `;
+  initFullChartInteractivity();
 }
 
 function doCtrlNegativeInfo(){
@@ -2829,6 +3914,13 @@ function doPayForcedPrice(){ send({type:"payForcedPrice"}); }
 
 initProfileUI();
 buildMarketFilters();
+restoreSession().then(()=>{
+  // Если пользователь уже успел открыть экран профиля/скинов/онлайна до того,
+  // как сессия восстановилась — перерисуем его, чтобы гейт сменился на контент.
+  if(document.getElementById("profileScreen").style.display !== "none") renderProfileScreen();
+  if(document.getElementById("skinsScreen").style.display !== "none") renderSkinsScreen();
+  if(document.getElementById("onlineScreen").style.display !== "none") renderOnlineGate();
+});
 </script>
 </body>
 </html>

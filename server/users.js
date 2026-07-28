@@ -31,6 +31,36 @@ function usernameKey(username) {
   return String(username || "").trim().toLowerCase();
 }
 
+// ---------------------------------------------------------------------
+// Сессионные токены — чтобы не заставлять игрока вводить пароль заново на
+// каждой перезагрузке страницы/переподключении. Токен не заменяет пароль
+// (регистрация/смена пароля всё ещё требуют его), но безопаснее, чем хранить
+// сам пароль в куке: его можно один клик отозвать (logout) без смены пароля.
+function createSession(username) {
+  const key = usernameKey(username);
+  const rec = users[key];
+  if (!rec) return null;
+  rec.sessionToken = crypto.randomBytes(24).toString("hex");
+  rec.sessionTokenCreatedAt = Date.now();
+  saveUsers();
+  return rec.sessionToken;
+}
+
+function loginWithToken(token) {
+  token = String(token || "");
+  if (!token) return { error: "Сессия недействительна — войдите заново." };
+  const rec = Object.values(users).find((r) => r.sessionToken && r.sessionToken === token);
+  if (!rec) return { error: "Сессия недействительна — войдите заново." };
+  return { ok: true, user: publicProfile(rec) };
+}
+
+function invalidateSession(username, token) {
+  const key = usernameKey(username);
+  const rec = users[key];
+  if (rec && rec.sessionToken === token) { rec.sessionToken = null; saveUsers(); }
+  return { ok: true };
+}
+
 function hashPassword(password, salt) {
   salt = salt || crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -74,7 +104,8 @@ function register(username, password, gender, avatar) {
   };
   users[key] = rec;
   saveUsers();
-  return { ok: true, user: publicProfile(rec) };
+  const sessionToken = createSession(username);
+  return { ok: true, user: publicProfile(rec), sessionToken };
 }
 
 function login(username, password) {
@@ -83,17 +114,18 @@ function login(username, password) {
   if (!rec) return { error: "Аккаунт с таким ником не найден. Проверьте ник или зарегистрируйтесь." };
   const { hash } = hashPassword(String(password || ""), rec.salt);
   if (hash !== rec.hash) return { error: "Неверный пароль." };
-  return { ok: true, user: publicProfile(rec) };
+  const sessionToken = createSession(username);
+  return { ok: true, user: publicProfile(rec), sessionToken };
 }
 
-// Общий помощник: проверяет пароль и возвращает запись пользователя или
-// {error}. Используется всеми HTTP-эндпойнтами управления профилем — они
-// не хранят сессий, поэтому каждый запрос заново подтверждается паролем
-// (та же модель доверия, что и при входе в комнату по ws).
-function authenticate(username, password) {
+// Общий помощник: проверяет пароль (или токен сессии из куки, если пароля
+// под рукой нет — например, вкладка была просто перезагружена) и возвращает
+// запись пользователя или {error}.
+function authenticate(username, password, token) {
   const key = usernameKey(username);
   const rec = users[key];
   if (!rec) return { error: "Аккаунт не найден." };
+  if (!password && token && rec.sessionToken && rec.sessionToken === token) return { ok: true, rec };
   const { hash } = hashPassword(String(password || ""), rec.salt);
   if (hash !== rec.hash) return { error: "Неверный пароль." };
   return { ok: true, rec };
@@ -115,8 +147,8 @@ function getLeaderboard(limit) {
     .slice(0, limit || 50);
 }
 
-function updateProfile(username, password, gender, avatar) {
-  const auth = authenticate(username, password);
+function updateProfile(username, password, gender, avatar, token) {
+  const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   const rec = auth.rec;
   if (gender != null) rec.gender = String(gender || "").trim().slice(0, 24);
@@ -136,8 +168,8 @@ function updateProfile(username, password, gender, avatar) {
   return { ok: true, user: publicProfile(rec) };
 }
 
-function changePassword(username, password, newPassword) {
-  const auth = authenticate(username, password);
+function changePassword(username, password, newPassword, token) {
+  const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   newPassword = String(newPassword || "");
   if (newPassword.length < 4) return { error: "Новый пароль должен быть не короче 4 символов." };
@@ -148,8 +180,8 @@ function changePassword(username, password, newPassword) {
   return { ok: true };
 }
 
-function setPhoto(username, password, photoDataUrl) {
-  const auth = authenticate(username, password);
+function setPhoto(username, password, photoDataUrl, token) {
+  const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   photoDataUrl = String(photoDataUrl || "");
   if (!/^data:image\/(png|jpeg|jpg|webp);base64,/.test(photoDataUrl)) return { error: "Неверный формат изображения." };
@@ -161,8 +193,8 @@ function setPhoto(username, password, photoDataUrl) {
   return { ok: true, user: publicProfile(rec) };
 }
 
-function buySkin(username, password, skinId, kind) {
-  const auth = authenticate(username, password);
+function buySkin(username, password, skinId, kind, token) {
+  const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   const rec = auth.rec;
   const catalog = kind === "boardSkin" ? Skins.BOARD_SKINS : kind === "avatarPack" ? Skins.AVATAR_PACKS : null;
@@ -179,8 +211,8 @@ function buySkin(username, password, skinId, kind) {
   return { ok: true, user: publicProfile(rec) };
 }
 
-function equipSkin(username, password, skinId, kind) {
-  const auth = authenticate(username, password);
+function equipSkin(username, password, skinId, kind, token) {
+  const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   const rec = auth.rec;
   const ownedKey = kind === "boardSkin" ? "ownedBoardSkins" : kind === "avatarPack" ? "ownedAvatarPacks" : null;
@@ -195,4 +227,5 @@ function equipSkin(username, password, skinId, kind) {
 module.exports = {
   register, login, addPoints, publicProfile, getLeaderboard,
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
+  createSession, loginWithToken, invalidateSession,
 };

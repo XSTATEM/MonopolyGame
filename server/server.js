@@ -10,35 +10,14 @@ function fmt(n) { return "$" + Math.round(n).toLocaleString("ru-RU"); }
 // ---------------------------------------------------------------------
 // Room registry — сетевой слой поверх engine.js (правила игры живут там).
 // ---------------------------------------------------------------------
-const TRADE_WINDOW_MS = Number(process.env.TRADE_WINDOW_MS) || engine.DEFAULT_TRADE_WINDOW_MS; // окно свободных торгов по умолчанию для новых комнат
-const ALLOWED_TRADE_WINDOWS = [30000, 90000, 180000];
 const rooms = new Map(); // code -> room
 const connections = new Map(); // ws -> {roomCode, playerId, name}
 
-function getOrCreateRoom(code, tradeWindowMs) {
-  if (!rooms.has(code)) rooms.set(code, engine.freshRoom(code, tradeWindowMs || TRADE_WINDOW_MS));
+function getOrCreateRoom(code) {
+  if (!rooms.has(code)) rooms.set(code, engine.freshRoom(code));
   return rooms.get(code);
 }
 function requireRoom(conn) { return rooms.get(conn.roomCode); }
-
-// ---------------------------------------------------------------------
-// Таймер фазы торгов — чисто сетевая обвязка вокруг engine (движок сам
-// таймеров не заводит, чтобы одинаково работать и офлайн в браузере).
-// ---------------------------------------------------------------------
-function syncTradeTimer(room) {
-  if (room.phase === "trade" && room.tradeWindowEndsAt) {
-    const ms = Math.max(0, room.tradeWindowEndsAt - Date.now());
-    if (room.tradeTimer) clearTimeout(room.tradeTimer);
-    room.tradeTimer = setTimeout(() => {
-      engine.endTradeWindow(room);
-      syncTradeTimer(room);
-      broadcast(room);
-    }, ms);
-  } else if (room.tradeTimer) {
-    clearTimeout(room.tradeTimer);
-    room.tradeTimer = null;
-  }
-}
 
 // ---------------------------------------------------------------------
 // WS helpers
@@ -62,7 +41,37 @@ function run(conn, result) {
     if (!result.stillChanged) return;
   }
   const room = requireRoom(conn);
-  if (room) { syncTradeTimer(room); syncAccountPoints(room); broadcast(room); }
+  if (room) { syncAccountPoints(room); broadcast(room); }
+}
+
+// Как run(), но дополнительно уведомляет ТОЛЬКО инициатора платной меры об её
+// итоге (успех/провал/выполнено) отдельным сообщением — это не часть общего
+// state-снапшота (он одинаков для всех), а адресная подсказка для UI, чтобы
+// результат сразу показывался прямо на карточке действия, а не терялся в ленте.
+function runWithResult(conn, ws, measure, result) {
+  if (result && !result.error) sendTo(ws, { type: "measureResult", measure, success: result.success !== false, suspectName: result.suspectName || null });
+  return run(conn, result);
+}
+
+// После голосования за кик игрок помечается kicked+disconnected в движке, но
+// его собственный WS-сокет остаётся открытым, пока сервер сам его не закроет —
+// иначе клиент кикнутого продолжил бы получать (и мог бы попытаться слать)
+// команды в уже недоступной для него комнате. Закрываем с небольшой задержкой,
+// чтобы прощальный state/error успел дойти до его вкладки.
+function disconnectKickedPlayers(room) {
+  for (const [ws, c] of connections) {
+    if (c.roomCode !== room.code) continue;
+    const p = room.players.find((x) => x.id === c.playerId);
+    if (p && p.kicked && ws.readyState === ws.OPEN) {
+      sendTo(ws, { type: "error", message: "Вы исключены из комнаты голосованием игроков." });
+      setTimeout(() => { try { ws.close(); } catch (e) {} }, 150);
+    }
+  }
+}
+function runKick(conn, result) {
+  run(conn, result);
+  const room = requireRoom(conn);
+  if (room) disconnectKickedPlayers(room);
 }
 
 // Победа в игре начисляет очки на persistent-аккаунт игрока (engine.js лишь
@@ -87,28 +96,35 @@ function syncAccountPoints(room) {
 // присвоить или потерять, просто зная чужой ник.
 function handleJoin(ws, msg) {
   const code = String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
-  const authMode = msg.authMode === "register" ? "register" : "login";
-  const username = String(msg.username || "").trim().slice(0, 20);
-  const password = String(msg.password || "");
-  if (!username) return sendTo(ws, { type: "error", message: "Введите ник." });
-  if (!password) return sendTo(ws, { type: "error", message: "Введите пароль." });
 
-  const authResult = authMode === "register"
-    ? users.register(username, password, msg.gender, msg.avatar)
-    : users.login(username, password);
-  if (authResult.error) return sendTo(ws, { type: "error", message: authResult.error });
+  // Три способа подтвердить личность: свежий логин, регистрация, либо (новое)
+  // токен сессии из куки — так игрока не выкидывает из аккаунта при обновлении
+  // страницы/переподключении, и ему не нужно каждый раз печатать пароль заново.
+  let authResult;
+  const sessionToken = String(msg.sessionToken || "");
+  if (sessionToken) {
+    authResult = users.loginWithToken(sessionToken);
+  } else {
+    const authMode = msg.authMode === "register" ? "register" : "login";
+    const username = String(msg.username || "").trim().slice(0, 20);
+    const password = String(msg.password || "");
+    if (!username) return sendTo(ws, { type: "error", message: "Введите ник." });
+    if (!password) return sendTo(ws, { type: "error", message: "Введите пароль." });
+    authResult = authMode === "register"
+      ? users.register(username, password, msg.gender, msg.avatar)
+      : users.login(username, password);
+  }
+  if (authResult.error) return sendTo(ws, { type: "error", message: authResult.error, sessionExpired: !!sessionToken });
   const profile = authResult.user;
+  const effectiveToken = authResult.sessionToken || sessionToken;
 
-  const isNew = !rooms.has(code);
-  const twm = ALLOWED_TRADE_WINDOWS.includes(Number(msg.tradeWindowMs)) ? Number(msg.tradeWindowMs) : undefined;
-  const room = isNew ? getOrCreateRoom(code, twm) : getOrCreateRoom(code);
+  const room = getOrCreateRoom(code);
 
   const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points, profile.equippedBoardSkin);
   if (result.error) return sendTo(ws, { type: "error", message: result.error });
 
   connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name: profile.username, accountUsername: profile.username });
-  sendTo(ws, { type: "joined", playerId: result.player.id, room: code });
-  syncTradeTimer(room);
+  sendTo(ws, { type: "joined", playerId: result.player.id, room: code, sessionToken: effectiveToken, username: profile.username });
   broadcast(room);
 }
 
@@ -127,44 +143,47 @@ function handleMessage(ws, raw) {
     case "setForcedPrice": return run(conn, engine.setForcedPrice(room, conn.playerId, msg.amount));
     case "payForcedPrice": return run(conn, engine.payForcedPrice(room, conn.playerId));
     case "skipRoll": return run(conn, engine.skipRoll(room, conn.playerId));
-    case "readyEndTrade": return run(conn, engine.readyEndTradeWindow(room, conn.playerId));
+    case "endTurn": return run(conn, engine.endTurn(room, conn.playerId));
     case "buyBank": return run(conn, engine.buyBank());
     case "sellBank": return run(conn, engine.sellBank(room, conn.playerId, msg.ticker, msg.pct));
-    case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price));
+    case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price, msg.wantTicker, msg.wantPct));
     case "respondTrade": return run(conn, engine.respondTrade(room, conn.playerId, msg.id, msg.accept));
     case "declareBankruptcy": return run(conn, engine.declareBankruptcy(room, conn.playerId));
     case "newGame": return handleNewGame(conn);
     case "startGame": return run(conn, engine.startGame(room, conn.playerId));
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": return run(conn, engine.forceEvent(room));
-    case "ctrlNegativeInfo": return run(conn, engine.ctrlNegativeInfo(room, conn.playerId, msg.ticker));
-    case "ctrlPrCampaign": return run(conn, engine.ctrlPrCampaign(room, conn.playerId, msg.ticker));
+    case "ctrlNegativeInfo": return runWithResult(conn, ws, "negativeInfo", engine.ctrlNegativeInfo(room, conn.playerId, msg.ticker));
+    case "ctrlPrCampaign": return runWithResult(conn, ws, "prCampaign", engine.ctrlPrCampaign(room, conn.playerId, msg.ticker));
     case "ctrlInsiderPeek": {
       const result = engine.ctrlInsiderPeek(room, conn.playerId);
       if (result.error) { sendError(conn, result.error); return; }
       sendTo(ws, { type: "insiderCard", card: result.card });
-      syncTradeTimer(room);
       broadcast(room);
       return;
     }
     case "ctrlInsiderResolve": return run(conn, engine.ctrlInsiderResolve(room, conn.playerId, msg.action));
-    case "ctrlSqueezeOut": return run(conn, engine.ctrlSqueezeOut(room, conn.playerId, msg.ticker));
-    case "ctrlShort": return run(conn, engine.ctrlShort(room, conn.playerId, msg.ticker));
+    case "ctrlSqueezeOut": return runWithResult(conn, ws, "squeezeOut", engine.ctrlSqueezeOut(room, conn.playerId, msg.ticker));
+    case "ctrlShort": return runWithResult(conn, ws, "short", engine.ctrlShort(room, conn.playerId, msg.ticker));
     case "takeLoan": return run(conn, engine.takeLoan(room, conn.playerId, msg.amount));
     case "repayLoan": return run(conn, engine.repayLoan(room, conn.playerId, msg.amount));
     case "buyRealEstateFromRoll": return run(conn, engine.buyRealEstateFromRoll(room, conn.playerId));
     case "upgradeRealEstateFromRoll": return run(conn, engine.upgradeRealEstateFromRoll(room, conn.playerId));
     case "payRealEstateRentFromRoll": return run(conn, engine.payRealEstateRentFromRoll(room, conn.playerId));
-    case "ctrlEspionage": return run(conn, engine.ctrlEspionage(room, conn.playerId, msg.target));
-    case "ctrlDiscredit": return run(conn, engine.ctrlDiscredit(room, conn.playerId, msg.target));
-    case "ctrlInvestigate": return run(conn, engine.ctrlInvestigate(room, conn.playerId));
+    case "ctrlEspionage": return runWithResult(conn, ws, "espionage", engine.ctrlEspionage(room, conn.playerId, msg.target));
+    case "ctrlDiscredit": return runWithResult(conn, ws, "discredit", engine.ctrlDiscredit(room, conn.playerId, msg.target));
+    case "ctrlInvestigate": return runWithResult(conn, ws, "investigate", engine.ctrlInvestigate(room, conn.playerId));
+    case "personalPr": return runWithResult(conn, ws, "personalPr", engine.personalPr(room, conn.playerId));
+    case "startKickVote": return runKick(conn, engine.startKickVote(room, conn.playerId, msg.target));
+    case "voteKick": return runKick(conn, engine.voteKick(room, conn.playerId, msg.target, !!msg.yes));
+    case "cancelKickVote": return run(conn, engine.cancelKickVote(room, conn.playerId));
+    case "reaction": return run(conn, engine.sendReaction(room, conn.playerId, msg.emoji));
   }
 }
 
 function handleNewGame(conn) {
   const room = requireRoom(conn);
   if (!room) return;
-  if (room.tradeTimer) { clearTimeout(room.tradeTimer); room.tradeTimer = null; }
   const fresh = engine.newGameKeepPlayers(room);
   rooms.set(room.code, fresh);
   for (const [, c] of connections) {
@@ -173,7 +192,6 @@ function handleNewGame(conn) {
       if (np) c.playerId = np.id;
     }
   }
-  syncTradeTimer(fresh);
   broadcast(fresh);
 }
 
@@ -200,15 +218,22 @@ function readJsonBody(req, maxLen) {
     req.on("error", reject);
   });
 }
-function sendJson(res, status, obj) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+function sendJson(res, status, obj, headers) {
+  res.writeHead(status, Object.assign({ "Content-Type": "application/json; charset=utf-8" }, headers || {}));
   res.end(JSON.stringify(obj));
+}
+// При успешном логине/регистрации сервер, помимо токена в теле ответа,
+// проставляет и обычную куку — так браузер сам пришлёт её при следующем
+// заходе, даже если клиентский JS почему-то не сохранит токен сам.
+function sessionCookieHeader(token) {
+  return { "Set-Cookie": `tm_session=${encodeURIComponent(token)}; Max-Age=2592000; Path=/; SameSite=Lax` };
 }
 function handleApiPost(req, res, fn) {
   readJsonBody(req, 800000)
     .then((body) => {
       const result = fn(body) || {};
-      sendJson(res, result.error ? 400 : 200, result);
+      const headers = result.sessionToken ? sessionCookieHeader(result.sessionToken) : null;
+      sendJson(res, result.error ? 400 : 200, result, headers);
     })
     .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
 }
@@ -226,7 +251,6 @@ const server = http.createServer((req, res) => {
         activeCount: r.players.filter((p) => !p.bankrupt).length,
         phase: r.phase,
         eventCount: r.eventCount,
-        tradeWindowMs: r.tradeWindowMs,
         createdAt: r.createdAt,
       }))
       .sort((a, b) => b.createdAt - a.createdAt);
@@ -241,20 +265,32 @@ const server = http.createServer((req, res) => {
   if (reqPath === "/api/login" && req.method === "POST") {
     return handleApiPost(req, res, (b) => users.login(b.username, b.password));
   }
+  if (reqPath === "/api/register" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.register(b.username, b.password, b.gender, b.avatar));
+  }
+  // Проверка куки/токена сессии при загрузке страницы — без пароля, только
+  // чтобы молча восстановить "вы вошли как X" (или тихо промолчать, если
+  // токен истёк/невалиден — тогда клиент просто покажет экран входа).
+  if (reqPath === "/api/session" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.loginWithToken(b.token));
+  }
+  if (reqPath === "/api/logout" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.invalidateSession(b.username, b.token));
+  }
   if (reqPath === "/api/profile/update" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.updateProfile(b.username, b.password, b.gender, b.avatar));
+    return handleApiPost(req, res, (b) => users.updateProfile(b.username, b.password, b.gender, b.avatar, b.token));
   }
   if (reqPath === "/api/profile/password" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.changePassword(b.username, b.password, b.newPassword));
+    return handleApiPost(req, res, (b) => users.changePassword(b.username, b.password, b.newPassword, b.token));
   }
   if (reqPath === "/api/profile/photo" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl));
+    return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl, b.token));
   }
   if (reqPath === "/api/skins/buy" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind));
+    return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind, b.token));
   }
   if (reqPath === "/api/skins/equip" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind));
+    return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind, b.token));
   }
 
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";

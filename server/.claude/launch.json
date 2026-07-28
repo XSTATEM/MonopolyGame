@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8791", "--directory", "F:\\desk games"],
+      "port": 8791
+    },
+    {
+      "name": "birzha-multiplayer",
+      "runtimeExecutable": "C:\\Users\\user\\tools\\node\\node.exe",
+      "runtimeArgs": ["F:\\desk games\\server\\server.js"],
+      "port": 8792
+    }
+  ]
+}
