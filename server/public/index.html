@@ -91,7 +91,7 @@
   .player-head b{font-size:14px;}
   .holdings{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono);}
   .holdings span{display:inline-block;margin-right:10px;}
-  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;gap:8px;}
+  .log{max-height:340px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column;gap:8px;}
   /* Карточки ленты событий — «жидкое стекло» (liquid glass): полупрозрачная
      размытая подложка со стеклянным бликом сверху, тонкая светлая обводка и
      мягкая тень, плюс лёгкий диагональный градиент-подсветка под категорию
@@ -155,8 +155,9 @@
   .game-menu-panel > *:last-child{margin-bottom:0;}
 
   .tab-bar{max-width:1300px;margin:0 auto;padding:2px;display:flex;gap:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .tab-btn{flex:1 1 0;min-width:60px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:var(--radius-md);padding:8px 4px;font-size:11px;white-space:nowrap;}
+  .tab-btn{position:relative;flex:1 1 0;min-width:60px;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:var(--radius-md);padding:8px 4px;font-size:11px;white-space:nowrap;}
   .tab-btn.active{background:var(--accent);color:#fff;}
+  .tab-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;background:#e74c3c;color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3);}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
   .tab-panel[data-panel="turn"]{display:block;} /* стол — всегда база под остальными вкладками */
@@ -994,7 +995,34 @@
     <label>Аватар</label>
     <div class="avatar-picker" id="offlineAvatarPicker"></div>
     <button class="small secondary" style="width:100%;margin-top:8px;" id="btnAddOfflinePlayer">Добавить игрока</button>
+    <button class="small secondary" style="width:100%;margin-top:6px;" id="btnAddOfflineBot">🤖 Добавить бота</button>
     <div class="err" id="offlineErr"></div>
+    <label style="margin-top:10px;">Настройки комнаты</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div>
+        <label style="font-size:12px;">Стартовый капитал</label>
+        <input type="number" id="offlineStartingCash" value="100000" min="10000" step="10000" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:12px;">Зарплата за ход</label>
+        <input type="number" id="offlineTurnSalary" value="15000" min="0" step="1000" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:12px;">Интервал событий (ходов)</label>
+        <input type="number" id="offlineEventInterval" value="3" min="1" max="10" style="width:100%;">
+      </div>
+      <div>
+        <label style="font-size:12px;">Принуд. выкуп A/B/C (%)</label>
+        <input type="text" id="offlineForcedPayment" value="20/15/10" placeholder="20/15/10" style="width:100%;">
+      </div>
+    </div>
+    <label style="margin-top:10px;">Длительность партии</label>
+    <select id="offlineMaxRounds">
+      <option value="0">Без лимита — до банкротства всех соперников</option>
+      <option value="15">Быстрая — 15 раундов, победа по капиталу</option>
+      <option value="30" selected>Средняя — 30 раундов, победа по капиталу</option>
+      <option value="50">Долгая — 50 раундов, победа по капиталу</option>
+    </select>
     <button style="width:100%;margin-top:16px;" id="btnStartOffline">Начать игру</button>
     <button class="secondary" style="width:100%;margin-top:8px;" id="btnBackFromOffline">← Назад в меню</button>
   </div>
@@ -1959,8 +1987,17 @@ function stopReconnect(){
 // ---------------------------------------------------------------------
 function renderOfflinePlayersBox(){
   const box = document.getElementById("offlinePlayersBox");
-  box.innerHTML = offlinePlayerNames.map((p,i)=>`<span class="offline-chip">${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}<button onclick="removeOfflinePlayer(${i})">✕</button></span>`).join("") || `<div class="muted" style="font-size:12px;">Пока никого не добавили.</div>`;
+  box.innerHTML = offlinePlayerNames.map((p,i)=>`<span class="offline-chip">${p.avatar?p.avatar+" ":""}${escapeHtml(p.name)}${p.isBot?` <span class="muted" style="font-size:11px;">(бот)</span>`:""}<button onclick="removeOfflinePlayer(${i})">✕</button></span>`).join("") || `<div class="muted" style="font-size:12px;">Пока никого не добавили.</div>`;
 }
+function addOfflineBot(){
+  if(offlinePlayerNames.length >= 6){ document.getElementById("offlineErr").textContent = "Максимум 6 игроков."; return; }
+  let n = 1;
+  while(offlinePlayerNames.some(p=>p.name === `Бот ${n}`)) n++;
+  document.getElementById("offlineErr").textContent = "";
+  offlinePlayerNames.push({ name: `Бот ${n}`, gender: "", avatar: "🤖", isBot: true });
+  renderOfflinePlayersBox();
+}
+document.getElementById("btnAddOfflineBot").onclick = addOfflineBot;
 function removeOfflinePlayer(i){ offlinePlayerNames.splice(i,1); renderOfflinePlayersBox(); }
 function currentOfflineGender(){
   const sel = document.getElementById("offlineNewGender").value;
@@ -1991,9 +2028,28 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   document.getElementById("offlineErr").textContent = "";
   mode = "offline";
   localRoom = GameEngine.freshRoom("OFFLINE");
-  offlinePlayerNames.forEach(p=>{ const r = GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar); viewAs = viewAs || (r.player && r.player.id); });
+
+  // Применяем настройки из UI
+  const startingCash = Number(document.getElementById("offlineStartingCash").value) || 100000;
+  const turnSalary = Number(document.getElementById("offlineTurnSalary").value) || 15000;
+  const eventInterval = Number(document.getElementById("offlineEventInterval").value) || 3;
+  const forcedPaymentStr = document.getElementById("offlineForcedPayment").value || "20/15/10";
+  const forcedPaymentArr = forcedPaymentStr.split('/').map(x => Number(x.trim()) || 0);
+  if (forcedPaymentArr.length !== 3) forcedPaymentArr.push(20, 15, 10);
+  localRoom.settings = {
+    startingCash,
+    turnSalary,
+    eventIntervalTurns: eventInterval,
+    tierForcedPaymentPct: forcedPaymentArr.slice(0, 3),
+  };
+
+  offlinePlayerNames.forEach(p=>{ GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar, 0, "default", !!p.isBot); });
+  const maxRounds = Number(document.getElementById("offlineMaxRounds").value) || null;
+  localRoom.maxRounds = maxRounds;
   localRoom.phase = "roll"; // офлайн хот-сит — без комнаты ожидания, сразу к игре
-  viewAs = localRoom.players[0].id;
+  // По умолчанию смотрим на первого игрока-человека (не бота) — если добавлены
+  // только боты, откатываемся на первого игрока вообще.
+  viewAs = (localRoom.players.find(p=>!p.isBot) || localRoom.players[0]).id;
   lastSyncedCurrentPlayerId = viewAs;
   applyBoardSkin(accountUser ? (accountUser.equippedBoardSkin || "default") : "default");
   showOnly("app");
@@ -2021,6 +2077,26 @@ function refreshLocal(){
   detectNotifications(prevState, latest);
   detectMarketEventPopup(prevState, latest);
   render();
+  scheduleBotPump();
+}
+
+// ---------------------------------------------------------------------
+// Боты в офлайн-режиме: botStep выполняет ровно одно действие движка за вызов
+// (свой ход бота ИЛИ внеочередное обязательство другого бота — назначение цены
+// выкупа, ответ на сделку — независимо от того, чей сейчас ход). Пока боту есть
+// что делать, шагаем с небольшой паузой, чтобы ходы бота были видны на экране,
+// а не резолвились мгновенно и незаметно.
+// ---------------------------------------------------------------------
+let botPumpTimer = null;
+function scheduleBotPump(){
+  if(mode !== "offline" || !localRoom || localRoom.phase !== "roll") return;
+  if(botPumpTimer) return; // цепочка уже запланирована
+  botPumpTimer = setTimeout(()=>{
+    botPumpTimer = null;
+    if(mode !== "offline" || !localRoom || localRoom.phase !== "roll") return;
+    const r = GameEngine.botStep(localRoom);
+    if(r.acted) refreshLocal(); // сам вызовет scheduleBotPump() дальше по цепочке
+  }, 650);
 }
 function onViewAsChange(sel){
   viewAs = parseInt(sel.value);
@@ -2089,6 +2165,7 @@ function localDispatch(obj){
     case "ctrlInsiderResolve": result = GameEngine.ctrlInsiderResolve(localRoom, viewAs, obj.action); break;
     case "ctrlSqueezeOut": result = GameEngine.ctrlSqueezeOut(localRoom, viewAs, obj.ticker); break;
     case "ctrlShort": result = GameEngine.ctrlShort(localRoom, viewAs, obj.ticker); break;
+    case "ctrlMergeCompanies": result = GameEngine.ctrlMergeCompanies(localRoom, viewAs, obj.targetTicker, obj.absorbTickers); break;
     case "takeLoan": result = GameEngine.takeLoan(localRoom, viewAs, obj.amount); break;
     case "repayLoan": result = GameEngine.repayLoan(localRoom, viewAs, obj.amount); break;
     case "buyRealEstateFromRoll": result = GameEngine.buyRealEstateFromRoll(localRoom, viewAs); break;
@@ -2106,8 +2183,8 @@ function localDispatch(obj){
   }
   const measureKey = MEASURE_TYPE_MAP[obj.type];
   if(measureKey) recordMeasureResult(measureKey, result);
-  if(result && result.error) flashError(result.error);
   refreshLocal();
+  if(result && result.error) flashError(result.error);
 }
 const MEASURE_TYPE_MAP = {
   ctrlEspionage:"espionage", ctrlDiscredit:"discredit", ctrlInvestigate:"investigate",
@@ -2155,15 +2232,15 @@ function renderCornerFeed(s){
   const total = s.log.length;
   const newSinceLast = (lastFeedLogLen && total >= lastFeedLogLen) ? (total - lastFeedLogLen) : 0;
   lastFeedLogLen = total;
-  const entries = s.log.slice(-30).slice().reverse();
+  const entries = s.log.slice(-30);
   const rows = entries.map((e, i)=>{
     const meta = logEntryMeta(e.tag);
-    const animCls = i < newSinceLast ? " feed-entry-in" : "";
+    const animCls = (i >= entries.length - newSinceLast) ? " feed-entry-in" : "";
     if(meta.cls === "feed-header"){
       return `<div class="feed-entry ${meta.cls}${animCls}">${e.text.replace(/<[^>]+>/g,"")}</div>`;
     }
     return `<div class="feed-entry ${meta.cls}${animCls}"><span class="feed-entry-icon">${meta.icon}</span>${e.text}</div>`;
-  }).join("");
+  }).reverse().join("");
   el.innerHTML = `<div class="stage-panel">
     <div class="feed-list">${rows || `<div class="muted" style="font-size:11px;">Событий пока нет.</div>`}</div>
   </div>`;
@@ -2174,7 +2251,8 @@ function flashError(text){
   const div = document.createElement("div");
   div.className = "log-entry feed-danger";
   div.innerHTML = `<div class="tag">⚠️ Ошибка</div>${text}`;
-  log.prepend(div);
+  log.appendChild(div);
+  div.scrollIntoView({block:"end",behavior:"smooth"});
 }
 
 // ---------------------------------------------------------------------
@@ -2335,12 +2413,54 @@ function renderLobby(s){
   document.getElementById("lobbyPlayers").innerHTML = playersHtml || `<div class="muted" style="font-size:12px;">Пока никого нет.</div>`;
 
   const startArea = document.getElementById("lobbyStartArea");
+  const maxRoundsVal = s.maxRounds || 0;
+  const roundsLabel = maxRoundsVal ? `Лимит партии: ${maxRoundsVal} раундов, победа по капиталу` : "Без лимита — до банкротства всех соперников";
   if(s.hostPlayerId === s.you){
     const enough = s.players.length >= 2;
-    startArea.innerHTML = `<button style="width:100%;" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"🚀 Начать игру":"Нужно минимум 2 игрока"}</button>`;
+    startArea.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:12px;">Стартовый капитал</label>
+          <input type="number" id="lobbyStartingCash" value="${s.settings?.startingCash || 100000}" min="10000" step="10000" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;">Зарплата за ход</label>
+          <input type="number" id="lobbyTurnSalary" value="${s.settings?.turnSalary || 15000}" min="0" step="1000" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;">Интервал событий (ходов)</label>
+          <input type="number" id="lobbyEventInterval" value="${s.settings?.eventIntervalTurns || 3}" min="1" max="10" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;">Принуд. выкуп A/B/C (%)</label>
+          <input type="text" id="lobbyForcedPayment" value="${(s.settings?.tierForcedPaymentPct || [20,15,10]).join('/')}" placeholder="20/15/10" style="width:100%;">
+        </div>
+      </div>
+      <label style="font-size:12.5px;">Длительность партии</label>
+      <select id="lobbyMaxRounds" style="margin-bottom:10px;">
+        <option value="0" ${maxRoundsVal===0?"selected":""}>Без лимита — до банкротства всех соперников</option>
+        <option value="15" ${maxRoundsVal===15?"selected":""}>Быстрая — 15 раундов, победа по капиталу</option>
+        <option value="30" ${maxRoundsVal===30?"selected":""}>Средняя — 30 раундов, победа по капиталу</option>
+        <option value="50" ${maxRoundsVal===50?"selected":""}>Долгая — 50 раундов, победа по капиталу</option>
+      </select>
+      <button style="width:100%;" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"🚀 Начать игру":"Нужно минимум 2 игрока"}</button>`;
     document.getElementById("btnStartLobby").onclick = ()=> send({type:"startGame"});
+    document.getElementById("lobbyMaxRounds").onchange = (e)=> send({type:"setMaxRounds", maxRounds:Number(e.target.value)||0});
+
+    const sendSettings = ()=> {
+      const startingCash = Number(document.getElementById("lobbyStartingCash").value) || 100000;
+      const turnSalary = Number(document.getElementById("lobbyTurnSalary").value) || 15000;
+      const eventIntervalTurns = Number(document.getElementById("lobbyEventInterval").value) || 3;
+      const forcedPaymentStr = document.getElementById("lobbyForcedPayment").value;
+      const tierForcedPaymentPct = forcedPaymentStr.split('/').map(x => Number(x.trim()) || 0);
+      send({type:"updateRoomSettings", settings: {startingCash, turnSalary, eventIntervalTurns, tierForcedPaymentPct}});
+    };
+    document.getElementById("lobbyStartingCash").onchange = sendSettings;
+    document.getElementById("lobbyTurnSalary").onchange = sendSettings;
+    document.getElementById("lobbyEventInterval").onchange = sendSettings;
+    document.getElementById("lobbyForcedPayment").onchange = sendSettings;
   } else {
-    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">Ждите, пока хост начнёт игру…</div>`;
+    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">${roundsLabel}<br>Ждите, пока хост начнёт игру…</div>`;
   }
 
   const chatLog = document.getElementById("lobbyChatLog");
@@ -2428,11 +2548,19 @@ const priceHistoryClient = {};
 const PRICE_HISTORY_MAX = 24;
 
 function recordPriceHistory(s){
+  // Сервер уже ведёт полную историю цены по каждому тикеру (переживает
+  // reload/reconnect) — просто зеркалим её, а не досэмплируем на клиенте:
+  // между двумя рендерами могло пройти несколько ходов/событий, и клиентская
+  // выборка "что видно сейчас" пропускала промежуточные точки.
   (s.companies||[]).forEach(c=>{
-    const arr = priceHistoryClient[c.ticker] || (priceHistoryClient[c.ticker] = []);
-    if(arr.length === 0 || arr[arr.length-1] !== c.price){
-      arr.push(c.price);
-      if(arr.length > PRICE_HISTORY_MAX) arr.shift();
+    if(c.priceHistory && c.priceHistory.length){
+      priceHistoryClient[c.ticker] = c.priceHistory.slice(-PRICE_HISTORY_MAX).map(h=>h.p);
+    } else {
+      const arr = priceHistoryClient[c.ticker] || (priceHistoryClient[c.ticker] = []);
+      if(arr.length === 0 || arr[arr.length-1] !== c.price){
+        arr.push(c.price);
+        if(arr.length > PRICE_HISTORY_MAX) arr.shift();
+      }
     }
   });
 }
@@ -2617,13 +2745,15 @@ function render(){
   // log
   const log = document.getElementById("log");
   log.innerHTML = "";
-  s.log.slice().reverse().forEach(e=>{
+  s.log.forEach(e=>{
     const meta = logEntryMeta(e.tag);
     const div = document.createElement("div");
     div.className = "log-entry " + meta.cls;
     div.innerHTML = `<div class="tag">${meta.icon} ${e.turnTag}</div>${e.text}`;
     log.appendChild(div);
   });
+  // Автоскролл к последнему элементу (естественное направление чтения)
+  if(log.lastElementChild) log.lastElementChild.scrollIntoView({block:"end",behavior:"auto"});
 
   withPreservedInputs(["contextPopup","capitalBody","controlBody"], ()=>{
     renderStage(s);
@@ -2631,6 +2761,7 @@ function render(){
     renderCapital(s);
     renderControlPanel(s);
   });
+  updateControlBadge(s);
   renderCornerFeed(s);
   renderTicker(s);
   renderKickVoteBanner(s);
@@ -2833,7 +2964,7 @@ function renderTicker(s){
     if(Math.abs(pct) < 0.01) return;
     items.push(`<span class="${delta>0?'up':'down'}">${c.ticker} ${fmt(c.price)} (${delta>0?"▲":"▼"}${Math.abs(pct).toFixed(1)}%)</span>`);
   });
-  s.log.slice(-6).reverse().forEach(e=> items.push(`<span>📰 ${e.text.replace(/<[^>]+>/g,"")}</span>`));
+  s.log.slice(-6).forEach(e=> items.push(`<span>📰 ${e.text.replace(/<[^>]+>/g,"")}</span>`));
   if(items.length === 0) items.push(`<span>Trade Monopoly открыта. Удачных сделок!</span>`);
   const html = items.join("");
   track.innerHTML = html + html; // дублируем для бесшовной прокрутки
@@ -3073,6 +3204,29 @@ function renderControlPanel(s){
     </div>`;
   }
 
+  // Народное IPO: контригра против fullyOwned компаний конкурентов
+  // (доступно всем игрокам, не требует собственного контрольного пакета)
+  if (!s.frozen) {
+    const opponentFullyOwned = s.companies.filter(c => c.fullyOwned && c.controllerId && c.controllerId !== you);
+    if (opponentFullyOwned.length > 0) {
+      const publicIPOCost = Math.round(me.netWorth * 0.08);
+      const ipoOpts = opponentFullyOwned.map(c => {
+        const owner = s.players.find(p => p.id === c.controllerId);
+        return `<option value="${c.ticker}">${c.name} (${c.ticker}) — владелец: ${owner ? owner.name : '?'} — ${fmt(c.price)}</option>`;
+      }).join("");
+      html += `
+      <div class="control-card" style="border-color:#ff9800;">
+        <h3>📢 Народное IPO</h3>
+        <p>Контригра против монополиста: вторичное размещение отнимает у владельца 25% компании, возвращает акции в банк, цена падает на 12%.</p>
+        <div class="row-inline">
+          <select id="ipoTarget">${ipoOpts}</select>
+          <button onclick="doCtrlPublicIPO()">Провести народное IPO за ${fmt(publicIPOCost)}</button>
+        </div>
+        ${measureResultBadgeHtml("publicIPO")}
+      </div>`;
+    }
+  }
+
   if(myControlled.length === 0){
     html += `<div class="muted" style="font-size:12px;padding:4px 2px;">👑 Спецдействия с контрольным пакетом (вброс новостей, PR-кампания, инсайд, выкуп миноритариев) появятся здесь, когда вы получите &gt;50% какой-либо компании.</div>`;
     el.innerHTML = html;
@@ -3142,7 +3296,131 @@ function renderControlPanel(s){
       ${measureResultBadgeHtml("short")}
     </div>
   `;
+
+  // Слияние компаний: если есть 2+ fullyOwned компаний в одном секторе
+  const myFullyOwned = s.companies.filter(c => c.fullyOwned && (me.holdings[c.ticker]||0) >= 100);
+  if (myFullyOwned.length >= 2) {
+    const bySector = {};
+    myFullyOwned.forEach(c => {
+      if (!bySector[c.sector]) bySector[c.sector] = [];
+      bySector[c.sector].push(c);
+    });
+    const mergeable = Object.entries(bySector).filter(([, comps]) => comps.length >= 2);
+    if (mergeable.length > 0) {
+      html += `
+      <div class="control-card" style="border-color:#4caf50;">
+        <h3>🏢 Слияние компаний</h3>
+        <p>У вас есть 2+ компании с полным контролем (100%) в одном секторе. Можете объединить их в мега-компанию (цена = сумма цен). Раз в событие.</p>`;
+      mergeable.forEach(([sector, comps]) => {
+        const opts = comps.map(c => `<option value="${c.ticker}">${c.name} (${c.ticker}) — ${fmt(c.price)}</option>`).join("");
+        html += `
+        <div style="margin-top:12px;padding:8px;background:rgba(76,175,80,.1);border-radius:6px;">
+          <b>Сектор: ${sector}</b>
+          <div class="row-inline" style="margin-top:6px;">
+            <select id="mergeTarget_${sector.replace(/\s+/g, '_')}">${opts}</select>
+            <button onclick="doCtrlMerge('${sector.replace(/\s+/g, '_')}')">Поглотить остальные</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
   el.innerHTML = html;
+}
+
+function updateControlBadge(s){
+  const me = s.players.find(p=>p.id===you);
+  if(!me || me.bankrupt || s.currentPlayerId !== you || s.phase !== "roll"){
+    document.querySelectorAll(".tab-btn-control .tab-badge").forEach(b=>b.remove());
+    return;
+  }
+
+  let count = 0;
+  const measureCosts = s.myMeasureCosts || { espionage:0, negativeInfo:0, insiderPeek:0, shortDeposit:0 };
+  const otherPlayers = s.players.filter(p=>p.id!==you && !p.bankrupt);
+  const myControlled = s.companies.filter(c => (me.holdings[c.ticker]||0) > 50);
+
+  // Шпионаж — если есть цели и достаточно денег
+  if(otherPlayers.length > 0 && me.cash >= measureCosts.espionage) count++;
+
+  // Дискредитация — если есть цели и достаточно денег (проверка упрощённая)
+  if(otherPlayers.length > 0){
+    const discreditCosts = s.myDiscreditCosts || {};
+    const minCost = Math.min(...otherPlayers.map(p=>discreditCosts[p.id]||0));
+    if(me.cash >= minCost) count++;
+  }
+
+  // Личный PR — если не использован и репутация < 100
+  const pr = s.myPersonalPr || { cost: 5000, usedThisEvent: false };
+  const myRep = me.reputation == null ? 50 : me.reputation;
+  if(!pr.usedThisEvent && myRep < 100 && me.cash >= pr.cost) count++;
+
+  // Расследование — если есть инциденты
+  const incidents = s.mySpyIncidents || [];
+  if(incidents.length > 0){
+    const prev = s.investigationPreview || {cost:0};
+    if(me.cash >= prev.cost) count++;
+  }
+
+  if(!s.frozen && myControlled.length > 0){
+    // Вброс новостей — если есть чужие компании
+    const foreignCompanies = s.companies.filter(c=>!(myControlled.some(m=>m.ticker===c.ticker)));
+    if(foreignCompanies.length > 0 && me.cash >= measureCosts.negativeInfo) count++;
+
+    // PR-кампания — если есть своя компания
+    if(myControlled.length > 0){
+      const firstPrCost = myControlled[0].price*0.05;
+      if(me.cash >= firstPrCost) count++;
+    }
+
+    // Инсайд — если достаточно денег
+    if(me.cash >= measureCosts.insiderPeek) count++;
+
+    // Сквиз-аут — если есть компании >75%
+    const squeezeCandidates = s.companies.filter(c => (me.holdings[c.ticker]||0) > 75);
+    if(squeezeCandidates.length > 0){
+      const squeezeCosts = s.mySqueezeCosts || {};
+      const firstSqueezeCost = squeezeCosts[squeezeCandidates[0].ticker]||0;
+      if(me.cash >= firstSqueezeCost) count++;
+    }
+
+    // Народное IPO — если есть fullyOwned компании конкурентов
+    const opponentFullyOwned = s.companies.filter(c => c.fullyOwned && c.controllerId && c.controllerId !== me.id);
+    if(opponentFullyOwned.length > 0){
+      const publicIPOCost = Math.round(me.netWorth * 0.08);
+      if(me.cash >= publicIPOCost) count++;
+    }
+
+    // Шорт — если достаточно денег
+    if(me.cash >= measureCosts.shortDeposit) count++;
+
+    // Слияние компаний — если есть 2+ fullyOwned в одном секторе
+    const myFullyOwned = s.companies.filter(c => c.fullyOwned && (me.holdings[c.ticker]||0) >= 100);
+    if(myFullyOwned.length >= 2){
+      const bySector = {};
+      myFullyOwned.forEach(c => {
+        if(!bySector[c.sector]) bySector[c.sector] = [];
+        bySector[c.sector].push(c);
+      });
+      const mergeable = Object.values(bySector).filter(comps => comps.length >= 2);
+      if(mergeable.length > 0) count++;
+    }
+  }
+
+  const btn = document.querySelector(".tab-btn-control");
+  if(!btn) return;
+  let badge = btn.querySelector(".tab-badge");
+  if(count > 0){
+    if(!badge){
+      badge = document.createElement("span");
+      badge.className = "tab-badge";
+      btn.appendChild(badge);
+    }
+    badge.textContent = count;
+  } else {
+    if(badge) badge.remove();
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -3160,9 +3438,10 @@ function statusRowHtml(s){
     </select></span>` : "";
 
   const roomText = mode === "online" ? `Комната ${roomCode}` : "Офлайн-партия";
+  const maxRoundsText = s.maxRounds ? ` · Партия: ${Math.min(s.roundNumber||1, s.maxRounds)}/${s.maxRounds}` : "";
   return `
     <div class="status-row">${phaseHtml}${viewAsHtml}</div>
-    <div class="muted" style="font-size:11px;margin:2px 0 14px;">${roomText} · Раунд ${s.turn}/${s.roundLen||3} · Событий: ${s.eventCount} · Колода: ${s.deckRemaining}</div>
+    <div class="muted" style="font-size:11px;margin:2px 0 14px;">${roomText} · Раунд ${s.turn}/${s.roundLen||3} · Событий: ${s.eventCount} · Колода: ${s.deckRemaining}${maxRoundsText}</div>
   `;
 }
 
@@ -3492,6 +3771,18 @@ function renderStage(s){
       cornerAction.innerHTML = "";
       popup.style.display = "flex";
       popup.innerHTML = forcedPriceWaitingPopupHtml(s);
+      return;
+    }
+    const curPlayer = s.players.find(p=>p.id===s.currentPlayerId);
+    if(mode==="offline" && curPlayer && curPlayer.isBot){
+      cornerAction.innerHTML = `<div class="stage-panel muted">🤖 ${escapeHtml(curPlayer.name)} думает...</div>`;
+      const myIncoming = s.pendingTrades.filter(t=>t.toId===you);
+      if(myIncoming.length){
+        popup.style.display = "flex";
+        popup.innerHTML = `<div class="popup-card popup-wide">${tradeOffersHtml(s)}</div>`;
+      } else {
+        popup.style.display = "none";
+      }
       return;
     }
     if(s.currentPlayerId !== you){
@@ -3874,6 +4165,37 @@ function doCtrlShort(){
   const el = document.getElementById("shortTarget");
   if(!el || !el.value) return;
   send({type:"ctrlShort", ticker: el.value});
+}
+function doCtrlPublicIPO(){
+  const el = document.getElementById("ipoTarget");
+  if(!el || !el.value) return;
+  send({type:"ctrlPublicIPO", ticker: el.value});
+}
+function doCtrlMerge(sectorKey){
+  const el = document.getElementById("mergeTarget_" + sectorKey);
+  if(!el || !el.value) return;
+  const targetTicker = el.value;
+
+  // Найти все fullyOwned компании в том же секторе
+  if(!latest || !latest.companies) return;
+  const me = latest.players.find(p => p.id === you);
+  if(!me) return;
+
+  const target = latest.companies.find(c => c.ticker === targetTicker);
+  if(!target) return;
+
+  const absorbTickers = latest.companies
+    .filter(c => c.sector === target.sector && c.ticker !== targetTicker && c.fullyOwned && (me.holdings[c.ticker]||0) >= 100)
+    .map(c => c.ticker);
+
+  if(absorbTickers.length === 0) {
+    flashError("Нет других компаний для поглощения в этом секторе.");
+    return;
+  }
+
+  if(!confirm(`Объединить компании ${absorbTickers.join(", ")} в ${target.name}? Поглощённые компании исчезнут с доски.`)) return;
+
+  send({type:"ctrlMergeCompanies", targetTicker, absorbTickers});
 }
 function doCtrlInsiderResolve(action){
   send({type:"ctrlInsiderResolve", action});

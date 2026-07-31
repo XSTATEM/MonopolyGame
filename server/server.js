@@ -151,6 +151,18 @@ function handleMessage(ws, raw) {
     case "declareBankruptcy": return run(conn, engine.declareBankruptcy(room, conn.playerId));
     case "newGame": return handleNewGame(conn);
     case "startGame": return run(conn, engine.startGame(room, conn.playerId));
+    case "setMaxRounds": return run(conn, engine.setMaxRounds(room, conn.playerId, msg.maxRounds));
+    case "updateRoomSettings": {
+      if (!room) return;
+      if (room.phase !== "lobby") return;
+      const host = room.players.find(p => p.id === room.hostPlayerId);
+      if (!host || host.id !== conn.playerId) return;
+      if (!room.settings) room.settings = {};
+      Object.assign(room.settings, msg.settings);
+      broadcast(room);
+      return;
+    }
+    case "deleteRoom": return handleDeleteRoom(conn);
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": return run(conn, engine.forceEvent(room));
     case "ctrlNegativeInfo": return runWithResult(conn, ws, "negativeInfo", engine.ctrlNegativeInfo(room, conn.playerId, msg.ticker));
@@ -165,6 +177,8 @@ function handleMessage(ws, raw) {
     case "ctrlInsiderResolve": return run(conn, engine.ctrlInsiderResolve(room, conn.playerId, msg.action));
     case "ctrlSqueezeOut": return runWithResult(conn, ws, "squeezeOut", engine.ctrlSqueezeOut(room, conn.playerId, msg.ticker));
     case "ctrlShort": return runWithResult(conn, ws, "short", engine.ctrlShort(room, conn.playerId, msg.ticker));
+    case "ctrlPublicIPO": return runWithResult(conn, ws, "publicIPO", engine.ctrlPublicIPO(room, conn.playerId, msg.ticker));
+    case "ctrlMergeCompanies": return runWithResult(conn, ws, "merge", engine.ctrlMergeCompanies(room, conn.playerId, msg.targetTicker, msg.absorbTickers));
     case "takeLoan": return run(conn, engine.takeLoan(room, conn.playerId, msg.amount));
     case "repayLoan": return run(conn, engine.repayLoan(room, conn.playerId, msg.amount));
     case "buyRealEstateFromRoll": return run(conn, engine.buyRealEstateFromRoll(room, conn.playerId));
@@ -193,6 +207,24 @@ function handleNewGame(conn) {
     }
   }
   broadcast(fresh);
+}
+
+function handleDeleteRoom(conn) {
+  const room = requireRoom(conn);
+  if (!room) return;
+  const result = engine.deleteRoom(room, conn.playerId);
+  if (result.error) return sendError(conn, result.error);
+  if (result.deleted) {
+    // Отключить всех игроков из этой комнаты
+    for (const [ws, c] of connections) {
+      if (c.roomCode === room.code) {
+        sendTo(ws, { type: "roomDeleted", message: "Комната была удалена хостом." });
+        setTimeout(() => { try { ws.close(); } catch (e) {} }, 150);
+      }
+    }
+    // Удалить комнату из реестра
+    rooms.delete(room.code);
+  }
 }
 
 // ---------------------------------------------------------------------
