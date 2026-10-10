@@ -120,6 +120,23 @@ function handleJoin(ws, msg) {
 
   const room = getOrCreateRoom(code);
 
+  // Тот же аккаунт уже сидит в этой комнате через другой сокет. Чаще всего это
+  // «полуоткрытое» соединение после смены сети на телефоне (Wi-Fi → LTE):
+  // клиент уже переподключился, а сервер ещё не заметил обрыв и без этого
+  // минуту отвечал бы «имя уже занято». Сессию забирает новый сокет; старому
+  // (если он на самом деле жив — вторая вкладка) сообщаем, чтобы он не
+  // переподключался и не отбирал её обратно.
+  for (const [otherWs, c] of connections) {
+    if (c.roomCode !== code || c.accountUsername !== profile.username) continue;
+    connections.delete(otherWs);
+    const p = room.players.find((x) => x.id === c.playerId);
+    if (p) p.connected = false; // без setConnected: хост и лог не меняются
+    if (otherWs !== ws) {
+      sendTo(otherWs, { type: "replaced" });
+      try { otherWs.close(4001, "replaced"); } catch (e) {}
+    }
+  }
+
   const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points, profile.equippedBoardSkin);
   if (result.error) return sendTo(ws, { type: "error", message: result.error });
 
@@ -152,16 +169,7 @@ function handleMessage(ws, raw) {
     case "newGame": return handleNewGame(conn);
     case "startGame": return run(conn, engine.startGame(room, conn.playerId));
     case "setMaxRounds": return run(conn, engine.setMaxRounds(room, conn.playerId, msg.maxRounds));
-    case "updateRoomSettings": {
-      if (!room) return;
-      if (room.phase !== "lobby") return;
-      const host = room.players.find(p => p.id === room.hostPlayerId);
-      if (!host || host.id !== conn.playerId) return;
-      if (!room.settings) room.settings = {};
-      Object.assign(room.settings, msg.settings);
-      broadcast(room);
-      return;
-    }
+    case "updateRoomSettings": return run(conn, engine.updateRoomSettings(room, conn.playerId, msg.settings));
     case "deleteRoom": return handleDeleteRoom(conn);
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": return run(conn, engine.forceEvent(room));
@@ -198,6 +206,11 @@ function handleMessage(ws, raw) {
 function handleNewGame(conn) {
   const room = requireRoom(conn);
   if (!room) return;
+  // Сбросить идущую партию может только хост; после конца партии реванш
+  // доступен любому. Иначе любой игрок мог перезапустить чужую игру.
+  if (room.phase !== "ended" && room.hostPlayerId !== conn.playerId) {
+    return sendError(conn, "Начать новую партию до её окончания может только хост комнаты.");
+  }
   const fresh = engine.newGameKeepPlayers(room);
   rooms.set(room.code, fresh);
   for (const [, c] of connections) {

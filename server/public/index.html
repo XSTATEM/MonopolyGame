@@ -1181,6 +1181,7 @@ document.getElementById("btnCreateRoom").onclick = ()=>{
 let reconnectInfo = null;   // {room, auth} — что использовать для повторного join
 let reconnectAttempts = 0;
 let reconnectTimer = null;
+let rejoinAfterDrop = false; // текущее подключение — восстановление после обрыва
 let wantOnline = false;     // false после осознанного выхода в меню — не переподключаться
 
 function connectOnline(room, auth){
@@ -1190,6 +1191,7 @@ function connectOnline(room, auth){
   reconnectInfo = { room, auth };
   ws = new WebSocket(wsUrl());
   ws.onopen = ()=>{
+    rejoinAfterDrop = reconnectAttempts > 0;
     reconnectAttempts = 0;
     ws.send(JSON.stringify({type:"join", room, username: auth.username, sessionToken: auth.sessionToken}));
   };
@@ -1205,10 +1207,25 @@ function connectOnline(room, auth){
         if(reconnectInfo) reconnectInfo.auth.sessionToken = msg.sessionToken;
       }
       if(roomListPollTimer){ clearInterval(roomListPollTimer); roomListPollTimer = null; }
+      if(rejoinAfterDrop){
+        rejoinAfterDrop = false;
+        document.querySelectorAll('#toastStack [data-key="conn-lost"]').forEach(dismissToast);
+        showToast({ kind:"good", icon:"check", title:"Соединение восстановлено", duration:2500 });
+      }
+    } else if(msg.type === "replaced"){
+      // Этот же аккаунт вошёл в комнату с другого устройства или вкладки —
+      // не переподключаемся, иначе две вкладки отбирали бы сессию друг у друга.
+      stopReconnect();
+      mode = null; latest = null;
+      showOnly("onlineScreen");
+      renderOnlineGate();
+      document.getElementById("joinErr").textContent = "Партия открыта на другом устройстве или в другой вкладке.";
+      return;
     } else if(msg.type === "state"){
       you = msg.you;
       const prevState = latest;
       latest = msg;
+      if(!prevState || prevState.room !== msg.room) primeReactions(msg);
       detectNotifications(prevState, msg);
       detectMarketEventPopup(prevState, msg);
       const mePlayer = msg.players && msg.players.find(p=>p.id===you);
@@ -1259,7 +1276,7 @@ function scheduleReconnect(){
   if(reconnectTimer) return;
   reconnectAttempts++;
   if(reconnectAttempts === 1){
-    showToast({ kind:"warn", icon:"refresh", title:"Соединение потеряно", text:"Переподключаемся к серверу…", duration:4000 });
+    showToast({ kind:"warn", icon:"refresh", title:"Соединение потеряно", text:"Переподключаемся к серверу…", duration:15000, key:"conn-lost" });
   }
   const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
   reconnectTimer = setTimeout(()=>{
@@ -1630,6 +1647,7 @@ function showToast(opts){
   if(!stack) return;
   const div = document.createElement("div");
   div.className = "toast-item" + (opts.kind ? " toast-"+opts.kind : "");
+  if(opts.key) div.dataset.key = opts.key;
   div.setAttribute("role", opts.kind === "danger" ? "alert" : "status");
   div.innerHTML = `
     <div class="toast-icon">${ico(opts.icon||"info")}</div>
@@ -1675,11 +1693,14 @@ function detectNotifications(prev, msg){
   (msg.pendingTrades||[]).forEach(t=>{
     if(t.status === "pending" && t.toId === msg.you && !prevTradeIds.has(t.id)){
       const fromP = msg.players.find(p=>p.id===t.fromId);
-      showToast({ kind:"good", icon:"swap", title:"Новое предложение сделки",
+      showToast({ kind:"good", icon:"swap", title:"Новое предложение сделки", key:"trade-"+t.id,
         text:`${fromP?fromP.name:"Игрок"} предлагает продать вам ${t.pct}% ${t.ticker} за ${fmt(t.price)}.`,
         onClick: ()=> switchTab("capital") });
     }
   });
+  // Сделку уже приняли, отклонили или отозвали — её тост больше не нужен.
+  const pendingNow = new Set((msg.pendingTrades||[]).filter(t=>t.status==="pending").map(t=>"trade-"+t.id));
+  document.querySelectorAll('#toastStack [data-key^="trade-"]').forEach(el=>{ if(!pendingNow.has(el.dataset.key)) dismissToast(el); });
 
   if(msg.myLoan && prev.myLoan && (msg.myLoan.missedPayments||0) > (prev.myLoan.missedPayments||0)){
     showToast({ kind:"danger", icon:"bank", title:"Пропущен платёж по кредиту",
@@ -1817,26 +1838,38 @@ function renderLobby(s){
 
   const startArea = document.getElementById("lobbyStartArea");
   const maxRoundsVal = s.maxRounds || 0;
+  const st = s.settings || {};
+  const stCash = st.startingCash || 100000, stSalary = st.turnSalary ?? 450, stInterval = st.eventIntervalTurns || 4;
+  const stForced = (st.tierForcedPaymentPct || [20,15,10]).join("/");
   const roundsLabel = maxRoundsVal ? `Лимит партии: ${maxRoundsVal} раундов, победа по капиталу` : "Без лимита — до банкротства всех соперников";
-  if(s.hostPlayerId === s.you){
+  // Хост уже видит форму: обновляем значения, а не пересобираем её — иначе
+  // сообщение в чате или вход игрока стирали бы число, которое он сейчас вводит.
+  if(s.hostPlayerId === s.you && document.getElementById("lobbyStartingCash")){
+    const setVal = (id, v)=>{ const el = document.getElementById(id); if(el && el !== document.activeElement) el.value = v; };
+    setVal("lobbyStartingCash", stCash); setVal("lobbyTurnSalary", stSalary);
+    setVal("lobbyEventInterval", stInterval); setVal("lobbyForcedPayment", stForced);
+    setVal("lobbyMaxRounds", String(maxRoundsVal));
+    const enough = s.players.length >= 2, btn = document.getElementById("btnStartLobby");
+    btn.disabled = !enough; btn.textContent = enough ? "Начать игру" : "Нужно минимум 2 игрока";
+  } else if(s.hostPlayerId === s.you){
     const enough = s.players.length >= 2;
     startArea.innerHTML = `
       <div class="settings-grid">
         <div>
           <label>Стартовый капитал</label>
-          <input type="number" id="lobbyStartingCash" value="${s.settings?.startingCash || 100000}" min="10000" step="10000" style="width:100%;">
+          <input type="number" id="lobbyStartingCash" value="${stCash}" min="10000" step="10000" style="width:100%;">
         </div>
         <div>
           <label>Зарплата за ход</label>
-          <input type="number" id="lobbyTurnSalary" value="${s.settings?.turnSalary || 15000}" min="0" step="1000" style="width:100%;">
+          <input type="number" id="lobbyTurnSalary" value="${stSalary}" min="0" step="50" style="width:100%;">
         </div>
         <div>
           <label>Событие каждые N ходов</label>
-          <input type="number" id="lobbyEventInterval" value="${s.settings?.eventIntervalTurns || 3}" min="1" max="10" style="width:100%;">
+          <input type="number" id="lobbyEventInterval" value="${stInterval}" min="1" max="10" style="width:100%;">
         </div>
         <div>
           <label>Плата за отказ A/B/C, %</label>
-          <input type="text" id="lobbyForcedPayment" value="${(s.settings?.tierForcedPaymentPct || [20,15,10]).join('/')}" placeholder="20/15/10" style="width:100%;">
+          <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="20/15/10" style="width:100%;">
         </div>
       </div>
       <label for="lobbyMaxRounds">Длительность партии</label>
@@ -1850,13 +1883,14 @@ function renderLobby(s){
     document.getElementById("btnStartLobby").onclick = ()=> send({type:"startGame"});
     document.getElementById("lobbyMaxRounds").onchange = (e)=> send({type:"setMaxRounds", maxRounds:Number(e.target.value)||0});
 
+    // Пустое или нечисловое поле не отправляем — сервер оставит прежнее значение.
     const sendSettings = ()=> {
-      const startingCash = Number(document.getElementById("lobbyStartingCash").value) || 100000;
-      const turnSalary = Number(document.getElementById("lobbyTurnSalary").value) || 15000;
-      const eventIntervalTurns = Number(document.getElementById("lobbyEventInterval").value) || 3;
-      const forcedPaymentStr = document.getElementById("lobbyForcedPayment").value;
-      const tierForcedPaymentPct = forcedPaymentStr.split('/').map(x => Number(x.trim()) || 0);
-      send({type:"updateRoomSettings", settings: {startingCash, turnSalary, eventIntervalTurns, tierForcedPaymentPct}});
+      const numOf = (id)=>{ const v = document.getElementById(id).value.trim(); return v === "" || !Number.isFinite(Number(v)) ? undefined : Number(v); };
+      const tierForcedPaymentPct = document.getElementById("lobbyForcedPayment").value.split("/").map(x => Number(x.trim()));
+      send({type:"updateRoomSettings", settings: {
+        startingCash: numOf("lobbyStartingCash"), turnSalary: numOf("lobbyTurnSalary"), eventIntervalTurns: numOf("lobbyEventInterval"),
+        tierForcedPaymentPct: tierForcedPaymentPct.length === 3 && tierForcedPaymentPct.every(Number.isFinite) ? tierForcedPaymentPct : undefined,
+      }});
     };
     document.getElementById("lobbyStartingCash").onchange = sendSettings;
     document.getElementById("lobbyTurnSalary").onchange = sendSettings;
@@ -2279,12 +2313,35 @@ function renderStageBoard(s){
 // Игроки за столом — лента чипов (на телефоне горизонтальная, на десктопе
 // вертикальный список). Клик по своему чипу — выбор реакции, по чужому —
 // карточка игрока с голосованием за исключение (см. openPlayerModal).
+// Реакции живут REACTION_MS с момента, когда ЭТОТ клиент их впервые увидел:
+// серверный ts сравнивать с Date.now() нельзя — часы телефона могут спешить
+// или отставать на минуты.
+const REACTION_MS = 2600;
+const reactionSeenAt = new Map(); // id реакции → Date.now() при первом получении
+function reactionAge(r, now){
+  if(!reactionSeenAt.has(r.id)){
+    reactionSeenAt.set(r.id, now);
+    if(reactionSeenAt.size > 200) reactionSeenAt.delete(reactionSeenAt.keys().next().value);
+  }
+  return now - reactionSeenAt.get(r.id);
+}
+// Первое состояние комнаты: реакции, отправленные до нашего входа, уже старые
+// (а id реакций в другой комнате могли совпасть — поэтому карту очищаем).
+function primeReactions(s){
+  reactionSeenAt.clear();
+  const old = Date.now() - REACTION_MS;
+  (s.reactions||[]).forEach(r=> reactionSeenAt.set(r.id, old));
+}
+function liveReactionsKey(s){
+  const now = Date.now();
+  return (s.reactions||[]).filter(r=> reactionAge(r, now) < REACTION_MS).map(r=>r.id).join(",");
+}
 function computeAvatarsHtml(s){
   const now = Date.now();
   const chips = s.players.map(p=>{
     const isTurn = p.id === s.currentPlayerId && s.phase === "roll" && !p.bankrupt;
     const isYou = p.id === you;
-    const reaction = (s.reactions||[]).filter(r=>r.playerId===p.id && (now-r.ts)<2600).pop();
+    const reaction = (s.reactions||[]).filter(r=>r.playerId===p.id && reactionAge(r, now) < REACTION_MS).pop();
     const tag = isTurn ? `<span class="pchip-tag turn">ход</span>`
       : isYou ? `<span class="pchip-tag you">вы</span>`
       : p.isBot ? `<span class="pchip-tag bot">бот</span>` : "";
@@ -2292,27 +2349,50 @@ function computeAvatarsHtml(s){
     const sub = p.bankrupt ? "выбыл" : (p.connected===false && !p.isBot ? "не в сети" : fmtShort(p.netWorth));
     const label = `${p.name}${isYou?" (вы)":""}: капитал ${fmt(p.netWorth)}${isTurn?", сейчас ходит":""}`;
     return `<button type="button" class="${cls}" style="--seat:${seatColor(s, p.id)}" onclick="openPlayerModal(${p.id})" aria-label="${escapeHtml(label)}">
-      ${reaction?`<span class="av-reaction" aria-hidden="true">${reaction.emoji}</span>`:""}
+      ${reaction?`<span class="av-reaction" aria-hidden="true" data-rid="${reaction.id}">${reaction.emoji}</span>`:""}
       <span class="pchip-av">${avatarInner(p)}</span>
       <span class="pchip-txt"><span class="pchip-name">${escapeHtml(p.name)}${tag}</span><span class="pchip-worth">${sub}</span></span>
     </button>`;
   }).join("");
   return `<div class="players-rail">${chips}</div>`;
 }
-function renderTableAvatars(s){
-  // Перерисовываем ленту игроков раз в ~секунду только пока над кем-то висит
-  // реакция — чтобы она погасла сама, без лишней перестройки DOM в остальное время.
-  const el = document.getElementById("cornerRating");
-  if(!el || !s || !s.players) return;
-  const now = Date.now();
-  const live = (s.reactions||[]).some(r=> now - r.ts < 3200);
-  if(!live && !el.dataset.reacting) return;
-  el.dataset.reacting = live ? "1" : "";
+// Лента игроков пересобирается только когда её разметка действительно
+// изменилась: иначе анимация реакции перезапускалась бы на каждом тике и
+// каждом новом состоянии. Пересобранная реакция продолжает анимацию с того
+// места, где была (отрицательная задержка по возрасту реакции).
+function setRailHtml(el, s){
+  const html = computeAvatarsHtml(s);
+  if(el._railHtml === html) return;
+  el._railHtml = html;
   const rail = el.querySelector(".players-rail");
   const scrollLeft = rail ? rail.scrollLeft : 0;
-  el.innerHTML = computeAvatarsHtml(s);
+  el.innerHTML = html;
+  const now = Date.now();
+  el.querySelectorAll(".av-reaction[data-rid]").forEach(node=>{
+    const seen = reactionSeenAt.get(Number(node.dataset.rid));
+    if(seen) node.style.animationDelay = `-${Math.max(0, now - seen)}ms`;
+  });
   const rail2 = el.querySelector(".players-rail");
-  if(rail2) rail2.scrollLeft = scrollLeft;
+  if(rail2){
+    rail2.scrollLeft = scrollLeft;
+    // На телефоне чип того, кто ходит, может оказаться за краем ленты.
+    const turnChip = rail2.querySelector(".pchip.turn");
+    const turnKey = turnChip ? turnChip.getAttribute("aria-label") : "";
+    if(turnChip && rail2.scrollWidth > rail2.clientWidth && el._turnKey !== turnKey){
+      el._turnKey = turnKey;
+      const rr = rail2.getBoundingClientRect(), cr = turnChip.getBoundingClientRect();
+      if(cr.left < rr.left || cr.right > rr.right) rail2.scrollLeft += cr.left - rr.left - 8;
+    }
+  }
+}
+function renderTableAvatars(s){
+  const el = document.getElementById("cornerRating");
+  if(!el || !s || !s.players) return;
+  // Раз в ~секунду проверяем только, не пора ли погасить реакцию.
+  const key = liveReactionsKey(s);
+  if(!key && !el.dataset.reacting) return;
+  el.dataset.reacting = key;
+  setRailHtml(el, s);
 }
 setInterval(()=>{ if(latest) renderTableAvatars(latest); }, 900);
 
@@ -3034,9 +3114,11 @@ function renderStage(s){
     return;
   }
 
+  const newGameBtn = document.getElementById("btnNewGame");
+  if(newGameBtn) newGameBtn.hidden = mode === "online" && s.phase !== "ended" && s.hostPlayerId !== you;
   cornerStatus.innerHTML = statusRowHtml(s);
   cornerCapital.innerHTML = capSummaryHtml(s);
-  cornerRating.innerHTML = ratingHtml(s);
+  setRailHtml(cornerRating, s);
   const waitHtml = (p, text, spin)=> `<div class="dock-wait" role="status">
       ${p ? `<span class="pchip-av" style="--seat:${seatColor(s, p.id)}">${avatarInner(p)}</span>` : ""}
       <span>${text}</span>${spin ? `<span class="spinner" aria-hidden="true"></span>` : ""}
@@ -3531,6 +3613,12 @@ function handleBackNavigation(){
   for(const id in backBtn){ if(visible(id)){ document.getElementById(backBtn[id]).click(); return true; } }
   return false;
 }
+
+// Esc на компьютере работает как «Назад»: закрывает модалку, меню или вкладку.
+document.addEventListener("keydown", (e)=>{
+  if(e.key !== "Escape" || e.defaultPrevented) return;
+  if(handleBackNavigation()) e.preventDefault();
+});
 
 // PWA: офлайн-оболочка (sw.js). В нативной сборке файлы и так локальные.
 if("serviceWorker" in navigator && !TMNative.isNative && (location.protocol === "https:" || location.hostname === "localhost")){

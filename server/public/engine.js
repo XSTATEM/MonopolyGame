@@ -912,8 +912,39 @@
     if (room.phase !== "lobby") return { error: "Игра уже началась." };
     if (room.hostPlayerId !== playerId) return { error: "Начать игру может только хост комнаты." };
     if (room.players.length < 2) return { error: "Нужно минимум 2 игрока." };
+    // Капитал выдаётся при входе в лобби, а хост мог поменять стартовый капитал
+    // уже после этого — выравниваем всех по текущей настройке комнаты.
+    const startingCash = room.settings?.startingCash || STARTING_CASH;
+    room.players.forEach((p) => { p.cash = startingCash; });
     room.phase = "roll";
     addLog(room, "🚀 Хост начал игру.", "header");
+    return { ok: true };
+  }
+
+  // Настройки комнаты от хоста (только в лобби). Значения приходят от клиента,
+  // поэтому каждое приводим к числу в разумных пределах; неизвестные ключи
+  // и нечисловые значения игнорируются.
+  function updateRoomSettings(room, playerId, patch) {
+    if (!room) return { error: "Комната не найдена." };
+    if (room.phase !== "lobby") return { error: "Настройки можно менять только в лобби." };
+    if (room.hostPlayerId !== playerId) return { error: "Изменить настройки может только хост." };
+    if (!patch || typeof patch !== "object") return { error: "Некорректные настройки." };
+    const num = (v, min, max) => {
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
+    };
+    const next = Object.assign({}, room.settings || {});
+    const cash = num(patch.startingCash, 10000, 10000000);
+    if (cash != null) next.startingCash = cash;
+    const salary = num(patch.turnSalary, 0, 1000000);
+    if (salary != null) next.turnSalary = salary;
+    const interval = num(patch.eventIntervalTurns, 1, 10);
+    if (interval != null) next.eventIntervalTurns = interval;
+    if (Array.isArray(patch.tierForcedPaymentPct) && patch.tierForcedPaymentPct.length === 3) {
+      const pcts = patch.tierForcedPaymentPct.map((v) => num(v, 0, 100));
+      if (pcts.every((v) => v != null)) next.tierForcedPaymentPct = pcts;
+    }
+    room.settings = next;
     return { ok: true };
   }
 
@@ -1039,14 +1070,19 @@
   }
 
   function newGameKeepPlayers(room) {
-    const prev = room.players.map((p) => ({ name: p.name, gender: p.gender, avatar: p.avatar, points: p.points || 0, equippedBoardSkin: p.equippedBoardSkin || "default", isBot: !!p.isBot }));
+    // Исключённые голосованием в реванш не переходят.
+    const hostName = (room.players.find((p) => p.id === room.hostPlayerId) || {}).name;
+    const prev = room.players.filter((p) => !p.kicked).map((p) => ({ name: p.name, gender: p.gender, avatar: p.avatar, points: p.points || 0, equippedBoardSkin: p.equippedBoardSkin || "default", isBot: !!p.isBot, connected: p.connected !== false }));
     const fresh = freshRoom(room.code);
     fresh.phase = "roll"; // реванш — сразу к игре, без комнаты ожидания
     fresh.maxRounds = room.maxRounds || null; // лимит раундов — настройка комнаты, переживает реванш
+    if (room.settings) fresh.settings = JSON.parse(JSON.stringify(room.settings)); // и остальные настройки тоже
+    const startingCash = fresh.settings?.startingCash || STARTING_CASH;
     prev.forEach((pp) => {
-      const p = { id: fresh.nextPlayerId++, name: pp.name, gender: pp.gender, avatar: pp.avatar, points: pp.points, equippedBoardSkin: pp.equippedBoardSkin, cash: STARTING_CASH, holdings: {}, costBasis: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null, isBot: !!pp.isBot };
+      const p = { id: fresh.nextPlayerId++, name: pp.name, gender: pp.gender, avatar: pp.avatar, points: pp.points, equippedBoardSkin: pp.equippedBoardSkin, cash: startingCash, holdings: {}, costBasis: {}, bankrupt: false, connected: pp.connected, reputation: REPUTATION_START, loan: null, isBot: !!pp.isBot };
       fresh.players.push(p);
       fresh.turnOrder.push(p.id);
+      if (pp.name === hostName) fresh.hostPlayerId = p.id;
     });
     addLog(fresh, "🆕 Новая партия началась.", "header");
     return fresh;
@@ -1066,7 +1102,7 @@
     const col = 1 + Math.floor(Math.random() * 12);
     const cell = BOARD[row - 1][col - 1];
     const p = room.players.find((x) => x.id === playerId);
-    const turnSalary = room.settings?.turnSalary || TURN_SALARY;
+    const turnSalary = room.settings?.turnSalary ?? TURN_SALARY;
     p.cash += turnSalary;
     const salaryNote = ` (+${fmt(turnSalary)} зарплата)`;
     if (isRealEstateCell(cell)) {
@@ -2091,6 +2127,12 @@
       room: room.code,
       turn: room.turn,
       roundLen: room.settings?.eventIntervalTurns || EVENT_INTERVAL_TURNS,
+      settings: {
+        startingCash: room.settings?.startingCash || STARTING_CASH,
+        turnSalary: room.settings?.turnSalary ?? TURN_SALARY,
+        eventIntervalTurns: room.settings?.eventIntervalTurns || EVENT_INTERVAL_TURNS,
+        tierForcedPaymentPct: room.settings?.tierForcedPaymentPct || [20, 15, 10],
+      },
       roundNumber: room.roundNumber || 1,
       maxRounds: room.maxRounds || null,
       eventCount: room.eventCount,
@@ -2219,7 +2261,7 @@
     totalOwnedPct, ownerOfControl, controlledTickers, netWorth, applyPriceDelta, ambientJitter, activePlayers, currentPlayerId,
     requireOwnTurn,
     settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
-    addPlayer, setConnected, newGameKeepPlayers, startGame, setMaxRounds, deleteRoom, sendChatMessage,
+    addPlayer, setConnected, newGameKeepPlayers, startGame, updateRoomSettings, setMaxRounds, deleteRoom, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
     setForcedPrice, payForcedPrice, botStep,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort, ctrlPublicIPO, ctrlMergeCompanies,

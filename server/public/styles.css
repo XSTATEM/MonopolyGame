@@ -129,6 +129,9 @@ h2{font-size:13px;margin:0 0 12px;color:var(--text-2);text-transform:uppercase;l
 .ico-sm{width:16px;height:16px;vertical-align:-3px;}
 .ico-lg{width:24px;height:24px;}
 
+/* Атрибут hidden сильнее любых display у компонентов (кнопки — inline-flex). */
+[hidden]{display:none !important;}
+
 /* ---------------------------------------------------------------------
    Кнопки и поля
    --------------------------------------------------------------------- */
@@ -358,7 +361,7 @@ main{margin:0;padding:0;}
 .pchip-tag.turn{background:var(--primary);color:var(--on-primary);}
 .pchip-tag.you{background:var(--surface-3);color:var(--text-2);}
 .pchip-tag.bot{background:var(--surface-3);color:var(--text-3);}
-.pchip .av-reaction{position:absolute;top:-18px;left:22px;font-size:22px;pointer-events:none;animation:reactionPop 2.6s ease-out forwards;}
+.pchip .av-reaction{position:absolute;z-index:2;top:-18px;left:22px;font-size:22px;pointer-events:none;animation:reactionPop 2.6s ease-out forwards;}
 @keyframes reactionPop{
   0%{opacity:0;transform:translate(-50%,6px) scale(.6);}
   15%{opacity:1;transform:translate(-50%,-6px) scale(1.15);}
@@ -651,7 +654,9 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .market-event-list .log-entry{margin:0;}
 .market-event-close-btn{width:100%;min-height:52px;font-size:16px;}
 
-.kickvote-banner{position:fixed;top:calc(62px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:45;display:none;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+/* Баннер голосования: на телефоне — поверх шапки партии (не закрывает имена
+   игроков и поле, оставляет кнопку меню), на десктопе — над правой колонкой. */
+.kickvote-banner{position:fixed;top:calc(6px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:45;display:none;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
   max-width:min(92vw,460px);background:var(--surface);color:var(--text);border:1px solid var(--line-strong);border-radius:var(--r-lg);padding:10px 14px;box-shadow:var(--shadow-2);font-size:13.5px;font-weight:700;}
 .kickvote-banner.show{display:flex;}
 .kickvote-banner button{min-height:36px;font-size:13px;padding:6px 12px;}
@@ -824,3 +829,21 @@ body.debug .debug-only{display:flex !important;}
 .menu-continue-text span{font-size:13px;font-weight:600;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 body.overlay-open .game-menu-btn{display:none;}
+
+/* Реакции на телефоне: лента чипов прокручивается по горизонтали и обрезает
+   всё, что выше неё, поэтому реакция всплывает поверх аватара, внутри чипа. */
+@media (max-width:1023px), (max-height:599px){
+  .pchip .av-reaction{top:6px;left:27px;font-size:24px;animation-name:reactionPopInside;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));}
+  .kickvote-banner{left:calc(14px + var(--safe-l));right:calc(66px + var(--safe-r));transform:none;max-width:none;justify-content:flex-start;}
+}
+@keyframes reactionPopInside{
+  0%{opacity:0;transform:translate(-50%,8px) scale(.5);}
+  15%{opacity:1;transform:translate(-50%,0) scale(1.2);}
+  75%{opacity:1;transform:translate(-50%,-2px) scale(1);}
+  100%{opacity:0;transform:translate(-50%,-6px) scale(.9);}
+}
+@media (min-width:1024px) and (min-height:600px){
+  /* Таблице биржи с семью столбцами нужно больше места, чем текстовым вкладкам. */
+  .overlay-panel[data-panel="market"] > section{max-width:1120px;}
+  .kickvote-banner{left:auto;right:calc(24px + var(--safe-r));transform:none;max-width:340px;top:calc(16px + var(--safe-t));}
+}
