@@ -1,0 +1,25 @@
+{
+  "appId": "com.xstatem.trademonopoly",
+  "appName": "Trade Monopoly",
+  "webDir": "www",
+  "backgroundColor": "#EFE8DA",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "style": "LIGHT"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#EFE8DA",
+      "showSpinner": false
+    }
+  }
+}

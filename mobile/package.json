@@ -1,0 +1,33 @@
+{
+  "name": "trade-monopoly-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Нативное приложение Trade Monopoly (Android/iOS) на Capacitor — оболочка вокруг веб-клиента из server/public",
+  "scripts": {
+    "copy-web": "node scripts/copy-web.mjs",
+    "icons": "python3 scripts/make-icons.py",
+    "assets": "capacitor-assets generate --iconBackgroundColor \"#EFE8DA\" --iconBackgroundColorDark \"#140F0B\" --splashBackgroundColor \"#EFE8DA\" --splashBackgroundColorDark \"#140F0B\"",
+    "sync": "npm run copy-web && cap sync",
+    "android:init": "npm run copy-web && cap add android && node scripts/patch-android.mjs && npm run assets -- --android && cap sync android",
+    "android:apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "android:open": "cap open android",
+    "ios:init": "npm run copy-web && cap add ios && npm run assets -- --ios && cap sync ios",
+    "ios:open": "cap open ios"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/ios": "^8.5.3"
+  }
+}

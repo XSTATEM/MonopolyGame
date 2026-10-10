@@ -1,0 +1,6 @@
+node_modules/
+www/
+# Нативные проекты генерируются командами npm run android:init / ios:init
+# (и в CI) из capacitor.config.json и resources/ — в репозитории не храним.
+android/
+ios/

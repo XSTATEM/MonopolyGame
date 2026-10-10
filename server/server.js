@@ -231,7 +231,28 @@ function handleDeleteRoom(conn) {
 // HTTP + WS server
 // ---------------------------------------------------------------------
 const PUBLIC_DIR = path.join(__dirname, "public");
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png", ".ico": "image/x-icon" };
+const MIME = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8",
+};
+// Файлы, которые браузер должен перепроверять при каждом заходе: HTML и
+// service worker — иначе обновление клиента дойдёт до игроков не сразу.
+const NO_CACHE = new Set(["/index.html", "/sw.js", "/manifest.json"]);
+
+// Нативное приложение (Capacitor, папка mobile/) открывает страницу со своего
+// локального адреса и ходит в API этого сервера кросс-доменно. Разрешаем
+// только эти источники; WebSocket CORS не подчиняется.
+const APP_ORIGINS = new Set(["https://localhost", "http://localhost", "capacitor://localhost", "ionic://localhost"]);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (!origin || !APP_ORIGINS.has(origin)) return;
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
 
 // Читает и парсит JSON-тело POST-запроса (без внешних зависимостей типа
 // body-parser — сервер намеренно минималистичный, только встроенный http).
@@ -271,7 +292,15 @@ function handleApiPost(req, res, fn) {
 }
 
 const server = http.createServer((req, res) => {
-  let reqPath = decodeURIComponent(req.url.split("?")[0]);
+  let reqPath;
+  // Некорректная %-последовательность в адресе раньше роняла весь процесс
+  // (URIError) вместе со всеми комнатами.
+  try { reqPath = decodeURIComponent(req.url.split("?")[0]); }
+  catch (e) { res.writeHead(400); return res.end("Bad request"); }
+  if (reqPath.startsWith("/api/")) {
+    applyCors(req, res);
+    if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+  }
 
   if (reqPath === "/api/rooms") {
     const list = [...rooms.values()]
@@ -327,18 +356,24 @@ const server = http.createServer((req, res) => {
 
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";
   const filePath = path.join(PUBLIC_DIR, reqPath);
-  if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Forbidden"); }
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end("Forbidden"); }
   fs.readFile(filePath, (err, data) => {
     if (err) {
+      // Отсутствующий файл с расширением (.js, .png…) — честный 404, а не
+      // index.html с кодом 200: иначе service worker кеширует страницу вместо файла.
+      if (path.extname(reqPath)) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("Not found"); }
       fs.readFile(path.join(PUBLIC_DIR, "index.html"), (err2, data2) => {
         if (err2) { res.writeHead(404); return res.end("Not found"); }
-        res.writeHead(200, { "Content-Type": MIME[".html"] });
+        res.writeHead(200, { "Content-Type": MIME[".html"], "Cache-Control": "no-cache" });
         res.end(data2);
       });
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+    if (NO_CACHE.has(reqPath)) headers["Cache-Control"] = "no-cache";
+    else if (reqPath.startsWith("/fonts/")) headers["Cache-Control"] = "public, max-age=31536000, immutable";
+    res.writeHead(200, headers);
     res.end(data);
   });
 });
@@ -347,7 +382,12 @@ const wss = new WebSocketServer({ server });
 wss.on("connection", (ws) => {
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
-  ws.on("message", (raw) => handleMessage(ws, raw));
+  ws.on("message", (raw) => {
+    // Ошибка в обработке одного сообщения (например, тикер "__proto__")
+    // не должна останавливать сервер со всеми комнатами.
+    try { handleMessage(ws, raw); }
+    catch (e) { console.error("handleMessage:", e); }
+  });
   ws.on("close", () => {
     const conn = connections.get(ws);
     if (conn) {

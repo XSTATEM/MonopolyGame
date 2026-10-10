@@ -1,0 +1,94 @@
+# Сборка Android-приложения (APK) из веб-клиента server/public через Capacitor.
+# Готовый файл — во вкладке Actions → запуск → Artifacts → trade-monopoly-android.
+# Подписанная релизная сборка включается, если в Settings → Secrets заданы
+# ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# (см. mobile/README.md).
+name: Android APK
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "server/public/**"
+      - "mobile/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "server/public/**"
+      - "mobile/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "Адрес онлайн-сервера (https://…)"
+        required: false
+        default: "https://birzha-multiplayer.onrender.com"
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      TM_SERVER_URL: ${{ github.event.inputs.server_url || 'https://birzha-multiplayer.onrender.com' }}
+      # Секреты нельзя проверять в if напрямую — пробрасываем в env задачи.
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Установить зависимости
+        run: npm ci
+
+      - name: Сгенерировать Android-проект, иконки и сплэш
+        run: npm run android:init
+
+      - name: Номер версии из номера сборки
+        run: |
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"$/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+
+      - name: Собрать отладочный APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Собрать подписанный релиз (если заданы секреты)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        working-directory: mobile/android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          ./gradlew assembleRelease bundleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.keystore" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trade-monopoly-android
+          path: |
+            mobile/android/app/build/outputs/apk/**/*.apk
+            mobile/android/app/build/outputs/bundle/**/*.aab
+          if-no-files-found: error
