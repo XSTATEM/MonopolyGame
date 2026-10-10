@@ -1,5 +1,7 @@
 # Сборка Android-приложения (APK) из веб-клиента server/public через Capacitor.
-# Готовый файл — во вкладке Actions → запуск → Artifacts → trade-monopoly-android.
+# Готовый файл trade-monopoly.apk — на странице Releases репозитория (прямая ссылка,
+# без zip и входа: тег android-latest для master, android-branch-<ветка>-<хеш> для
+# остальных веток) и во вкладке Actions → запуск → Artifacts → trade-monopoly-android.
 # Подписанная релизная сборка включается, если в Settings → Secrets заданы
 # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 # (см. mobile/README.md).
@@ -25,10 +27,6 @@ on:
         required: false
         default: "https://birzha-multiplayer.onrender.com"
 
-concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
-
 # Токену сборки нужно только чтение кода.
 permissions:
   contents: read
@@ -37,6 +35,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Новый push отменяет незаконченную сборку той же ветки.
+    concurrency:
+      group: android-build-${{ github.ref }}
+      cancel-in-progress: true
+    outputs:
+      stable_debug_key: ${{ steps.dbgkey.outputs.stable }}
     defaults:
       run:
         working-directory: mobile
@@ -75,6 +79,23 @@ jobs:
           sed -i "s/versionName \"1.0\"$/versionName \"1.0.${{ github.run_number }}\"/" android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
 
+      # Без постоянного ключа gradle на чистой машине создаёт новый debug-ключ,
+      # и Android не ставит новую сборку поверх прежней («Приложение не установлено»).
+      # Ключ задаётся секретом ANDROID_DEBUG_KEYSTORE_BASE64 (см. mobile/README.md).
+      - name: Постоянный ключ отладочной сборки (если задан)
+        id: dbgkey
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/debug.keystore"
+            echo "ANDROID_USER_HOME=$HOME/.android" >> "$GITHUB_ENV"
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Собрать отладочный APK
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon
@@ -104,3 +125,89 @@ jobs:
             mobile/android/app/build/outputs/apk/**/*.apk
             mobile/android/app/build/outputs/bundle/**/*.aab
           if-no-files-found: error
+
+  # Прямая ссылка на APK: свежая сборка ветки публикуется на странице Releases
+  # под постоянным тегом, поэтому адрес файла не меняется от сборки к сборке.
+  # Право на запись есть только у этой задачи; она не видит ни секретов, ни
+  # зависимостей сборки — только готовый артефакт. Pull request'ы не публикуются,
+  # ручной запуск со своим адресом сервера — тоже (чтобы не подменить общую ссылку).
+  release:
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') && (github.event_name != 'workflow_dispatch' || github.event.inputs.server_url == '' || github.event.inputs.server_url == 'https://birzha-multiplayer.onrender.com') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Начатую публикацию не отменяем: иначе релиз мог остаться удалённым.
+    concurrency:
+      group: android-release-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: trade-monopoly-android
+          path: dist
+
+      - name: Опубликовать APK в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          STABLE_DEBUG_KEY: ${{ needs.build.outputs.stable_debug_key }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          # Файл всегда называется trade-monopoly.apk, чтобы ссылка не менялась.
+          # Подписанный релиз — только для master; иначе отладочная сборка.
+          release_apk=$(find dist -name 'app-release.apk' | head -n 1)
+          debug_apk=$(find dist -name 'app-debug.apk' | head -n 1)
+          if [ "$BRANCH" = "master" ] && [ -n "$release_apk" ]; then
+            cp "$release_apk" out/trade-monopoly.apk
+            kind="Подписанная сборка: новая версия ставится поверх прежней, офлайн-партии сохраняются."
+          elif [ -n "$debug_apk" ]; then
+            cp "$debug_apk" out/trade-monopoly.apk
+            if [ "$STABLE_DEBUG_KEY" = "true" ]; then
+              kind="Отладочная сборка с постоянным ключом: новая версия ставится поверх прежней, офлайн-партии сохраняются."
+            else
+              kind="Отладочная сборка. Чтобы поставить новую версию, сначала удалите прежнюю (офлайн-партия при этом пропадёт): каждая такая сборка подписана новым ключом. Чтобы обновления ставились поверх, задайте постоянный ключ — см. mobile/README.md."
+            fi
+          else
+            echo "APK не найден в артефакте"; exit 1
+          fi
+
+          if [ "$BRANCH" = "master" ]; then
+            tag="android-latest"
+            title="Trade Monopoly для Android"
+            flags="--latest"
+          else
+            # Отдельное пространство имён и хеш имени ветки: разные ветки (в том
+            # числе с кириллицей или с именем latest) не затирают чужие релизы.
+            slug=$(printf '%s' "$BRANCH" | tr -c 'A-Za-z0-9_-' '-' | cut -c1-40)
+            hash=$(printf '%s' "$BRANCH" | sha1sum | cut -c1-7)
+            tag="android-branch-${slug}-${hash}"
+            title="Тестовая сборка для Android: $BRANCH"
+            flags="--prerelease"
+          fi
+
+          notes=$(cat <<EOF
+          Сборка из ветки $BRANCH, коммит ${SHA:0:7}.
+
+          Как установить: скачайте trade-monopoly.apk прямо на телефон, откройте файл и разрешите установку из неизвестных источников.
+
+          $kind
+
+          Журнал сборки: $RUN_URL
+          EOF
+          )
+
+          # Пересоздаём релиз: тег переезжает на текущий коммит, ссылка на файл остаётся прежней.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release delete "$tag" --cleanup-tag --yes
+          elif gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
+            # Тег без релиза (прошлая публикация оборвалась) — иначе create не сдвинет его.
+            gh api -X DELETE "repos/$GH_REPO/git/refs/tags/$tag"
+          fi
+          gh release create "$tag" out/trade-monopoly.apk --target "$SHA" --title "$title" --notes "$notes" $flags
+          echo "Готово: ${GITHUB_SERVER_URL}/${GH_REPO}/releases/download/${tag}/trade-monopoly.apk"

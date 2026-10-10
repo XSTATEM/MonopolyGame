@@ -775,5 +775,8 @@ myLoan, realEstate[] (id/название/позиция на доске/вла�
 - **Сервер** разрешает CORS для `/api/*` только с адресов приложения
   (`APP_ORIGINS` в `server.js`: `https://localhost`, `capacitor://localhost`…).
 - **Сборка APK** — `.github/workflows/android.yml` при каждом push с изменениями в
-  `server/public/**` или `mobile/**`; подписанный релиз и AAB — при наличии
-  секретов `ANDROID_KEYSTORE_*`.
+  `server/public/**` или `mobile/**`. Задача `release` выкладывает `trade-monopoly.apk` на
+  страницу Releases под постоянным тегом (`android-latest` для master,
+  `android-branch-<ветка>-<хеш>` для остальных), так что ссылка на файл не меняется.
+  Постоянный ключ отладочной сборки — секрет `ANDROID_DEBUG_KEYSTORE_BASE64`. Подписанный релиз и AAB — при
+  наличии секретов `ANDROID_KEYSTORE_*`, только из master, тегов или ручного запуска.
