@@ -1841,10 +1841,10 @@ function renderLobby(s){
       </div>
       <label for="lobbyMaxRounds">Длительность партии</label>
       <select id="lobbyMaxRounds" style="margin-bottom:10px;">
-        <option value="0" ${maxRoundsVal===0?"selected":""}>Без лимита — до банкротства всех соперников</option>
-        <option value="15" ${maxRoundsVal===15?"selected":""}>Быстрая — 15 раундов, победа по капиталу</option>
-        <option value="30" ${maxRoundsVal===30?"selected":""}>Средняя — 30 раундов, победа по капиталу</option>
-        <option value="50" ${maxRoundsVal===50?"selected":""}>Долгая — 50 раундов, победа по капиталу</option>
+        <option value="0" ${maxRoundsVal===0?"selected":""}>Без лимита · до последнего</option>
+        <option value="15" ${maxRoundsVal===15?"selected":""}>Быстрая · 15 раундов</option>
+        <option value="30" ${maxRoundsVal===30?"selected":""}>Средняя · 30 раундов</option>
+        <option value="50" ${maxRoundsVal===50?"selected":""}>Долгая · 50 раундов</option>
       </select>
       <button style="width:100%;" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"Начать игру":"Нужно минимум 2 игрока"}</button>`;
     document.getElementById("btnStartLobby").onclick = ()=> send({type:"startGame"});
