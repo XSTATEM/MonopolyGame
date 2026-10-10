@@ -2089,7 +2089,7 @@ function renderMarketTable(s){
     tr.onkeydown = (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); openCompanyModal(c.ticker); } };
     const ctrlBadge = controller ? `<span class="badge control" style="--seat:${seatColor(s, controller.id)}">${ico("crown","ico-sm")} ${escapeHtml(controller.id===you?"вы":controller.name)}</span>` : "";
     tr.innerHTML = `
-      <td><span class="co-cell">${logoHtml(c.ticker,34)}<span class="co-name"><b>${escapeHtml(c.name)}${ctrlBadge}</b><span>${c.ticker} · ${escapeHtml(String(c.volLabel||"").toLowerCase())} волатильность${mine?` · у вас ${mine}%`:""}</span></span></span></td>
+      <td><span class="co-cell">${logoHtml(c.ticker,34)}<span class="co-name"><b>${escapeHtml(c.name)}${ctrlBadge}</b><span>${c.ticker}${mine?` · <b class="co-mine">у вас ${mine}%</b>`:""} · ${escapeHtml(String(c.volLabel||"").toLowerCase())} волатильность</span></span></span></td>
       <td><span class="sector-tag">${escapeHtml(c.sector)}</span></td>
       <td class="price">${fmt(c.price)}</td>
       <td>${deltaPill(c.price, c.prevPrice)}</td>
@@ -2805,7 +2805,7 @@ function statusRowHtml(s){
   const sub = s.phase === "ended"
     ? `<span>Партия окончена</span><span class="sep">·</span><span>${roomText}</span>`
     : `<span class="g-dot" aria-hidden="true"></span><span>Событие через ${turnsLeft} ${turnsWord}</span><span class="sep">·</span><span>${roomText}</span>`;
-  const viewAsHtml = (mode==="offline" && localRoom) ? `<div class="g-viewas"><label class="pill">Смотреть как
+  const viewAsHtml = (mode==="offline" && localRoom) ? `<div class="g-viewas"><label class="pill"><span class="g-viewas-label">Смотреть как</span>
       <select onchange="onViewAsChange(this)" aria-label="Смотреть как игрок">
         ${localRoom.players.map(p=>`<option value="${p.id}" ${p.id===viewAs?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}
       </select></label></div>` : "";

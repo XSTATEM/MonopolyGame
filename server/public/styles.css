@@ -32,10 +32,10 @@
   --bg:#EFE8DA; --bg-patch1:rgba(255,214,168,.35); --bg-patch2:rgba(198,224,214,.45);
   --surface:#F8F4EC; --surface-2:#FFFFFF; --surface-3:#E7DECD;
   --line:rgba(36,31,26,.10); --line-strong:rgba(36,31,26,.18);
-  --text:#241F1A; --text-2:#625B50; --text-3:#7D7468;
+  --text:#241F1A; --text-2:#625B50; --text-3:#6E6559;
   --primary:#4C7A6B; --on-primary:#FFFFFF;
   --accent:#4C7A6B; --on-accent:#FFFFFF;
-  --clay:#B0653A; --on-clay:#FFFFFF;
+  --clay:#A95E35; --on-clay:#FFFFFF;
   --amber:#E0B168; --on-amber:#1A140F;
   --danger:#A8543E; --on-danger:#FFFFFF;
   --up:#3E7358; --down:#A8543E; --warn:#8A5A00;
@@ -48,10 +48,10 @@
 
   /* стол и поле (переопределяются скинами стола) */
   --stage-c1:#3B2A1D; --stage-c2:#1F1712; --stage-c3:#140F0B; --stage-accent:#E0B168;
-  --frame:#5A3E28; --board:#EFE3C6; --board-label:#8A7A5E;
+  --frame:#5A3E28; --board:#EFE3C6; --board-label:#72644C;
 
   /* секторы и места за столом */
-  --sec-tech:#3F63C9; --sec-media:#8A54D6; --sec-consumer:#C9702F; --sec-industrial:#56656F; --sec-finance:#2B8F63; --sec-re:#2F5D45;
+  --sec-tech:#3F63C9; --sec-media:#8A54D6; --sec-consumer:#B26026; --sec-industrial:#56656F; --sec-finance:#26825A; --sec-re:#2F5D45;
   --seat-1:#E0B168; --seat-2:#7DB8E8; --seat-3:#C58BE6; --seat-4:#E88C8C; --seat-5:#8CC2AE; --seat-6:#D9D2C3;
 
   --tabbar-h:64px;
@@ -68,11 +68,11 @@
   --bg:#140F0B;
   --surface:#241C16; --surface-2:#2E251E; --surface-3:#3A3028;
   --line:rgba(243,238,228,.10); --line-strong:rgba(243,238,228,.16);
-  --text:#F3EEE4; --text-2:#BDB1A1; --text-3:#998D7D;
+  --text:#F3EEE4; --text-2:#BDB1A1; --text-3:#A39785;
   --primary:#E0B168; --on-primary:#1A140F;
   --accent:#8CC2AE; --on-accent:#1A140F;
   --clay:#D08A5C; --on-clay:#1A140F;
-  --danger:#B65A41; --on-danger:#FFF6EE;
+  --danger:#AD5540; --on-danger:#FFF6EE;
   --up:#7FD1A3; --down:#EE8A6E; --warn:#E0B168;
   --up-bg:rgba(127,209,163,.12); --down-bg:rgba(238,138,110,.13); --warn-bg:rgba(224,177,104,.14);
   --focus:#E0B168;
@@ -221,10 +221,10 @@ button.chip{min-height:36px;}
 .menu-card{display:flex;align-items:center;gap:14px;width:100%;min-height:76px;padding:16px 18px;border-radius:var(--r-xl);border:none;color:#fff;text-align:left;font-size:16px;font-weight:800;justify-content:flex-start;}
 .menu-card .menu-card-icon{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex:none;}
 .menu-card .menu-card-icon .ico{width:24px;height:24px;}
-.menu-card .menu-card-sub{display:block;font-size:13px;font-weight:600;opacity:.9;margin-top:2px;}
+.menu-card .menu-card-sub{display:block;font-size:13px;font-weight:600;margin-top:2px;}
 .menu-card .menu-card-go{margin-left:auto;opacity:.85;}
 .menu-card.online{background:#4C7A6B;}
-.menu-card.offline{background:#B0653A;}
+.menu-card.offline{background:var(--clay);}
 .menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px;}
 .menu-tile{background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-lg);min-height:76px;padding:12px 4px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;}
@@ -357,10 +357,10 @@ main{margin:0;padding:0;}
 .pchip-txt{display:flex;flex-direction:column;gap:1px;min-width:0;}
 .pchip-name{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;white-space:nowrap;}
 .pchip-worth{font-family:var(--font-mono);font-size:12.5px;font-weight:500;color:var(--text-2);white-space:nowrap;}
-.pchip-tag{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:1px 6px;}
+.pchip-tag{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:1px 6px;}
 .pchip-tag.turn{background:var(--primary);color:var(--on-primary);}
 .pchip-tag.you{background:var(--surface-3);color:var(--text-2);}
-.pchip-tag.bot{background:var(--surface-3);color:var(--text-3);}
+.pchip-tag.bot{background:var(--surface-3);color:var(--text-2);}
 .pchip .av-reaction{position:absolute;z-index:2;top:-18px;left:22px;font-size:22px;pointer-events:none;animation:reactionPop 2.6s ease-out forwards;}
 @keyframes reactionPop{
   0%{opacity:0;transform:translate(-50%,6px) scale(.6);}
@@ -417,10 +417,10 @@ main{margin:0;padding:0;}
   box-shadow:0 22px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.12);}
 .stage-cells{width:100%;height:100%;border-radius:13px;background:var(--board);padding:5px 6px 6px 4px;display:grid;
   grid-template-columns:14px repeat(12,minmax(0,1fr));grid-template-rows:14px repeat(12,minmax(0,1fr));gap:2px;}
-.stage-label{display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;font-weight:500;color:var(--board-label);border-radius:4px;user-select:none;}
+.stage-label{display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--board-label);border-radius:4px;user-select:none;}
 .stage-label.hot{background:var(--stage-accent);color:#1A140F;font-weight:700;}
 .stage-cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:var(--r-xs);
-  color:#fff;font-family:var(--font-mono);font-weight:700;font-size:clamp(7px, 2.35vw, 11px);letter-spacing:-.02em;line-height:1;
+  color:#fff;font-family:var(--font-mono);font-weight:700;font-size:clamp(8px, 2.35vw, 11px);letter-spacing:-.02em;line-height:1;
   box-shadow:inset 0 -2px 0 rgba(0,0,0,.18);transition:opacity .2s, transform .2s, box-shadow .2s;padding:0;min-height:0;border:none;user-select:none;}
 .stage-cell:hover{filter:brightness(1.12);}
 .stage-cell.sec-tech{background:var(--sec-tech);} .stage-cell.sec-media{background:var(--sec-media);} .stage-cell.sec-consumer{background:var(--sec-consumer);}
@@ -428,7 +428,7 @@ main{margin:0;padding:0;}
 .stage-cell.re-cell{background:var(--sec-re);}
 .stage-cell .ico{width:58%;height:58%;max-width:15px;max-height:15px;stroke-width:2.2;}
 .cell-owner{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:4px;background:var(--owner,#fff);box-shadow:0 0 0 1.5px var(--board);pointer-events:none;}
-.re-stars{position:absolute;bottom:1px;left:0;right:0;font-size:6px;line-height:1;text-align:center;color:#FFD76B;letter-spacing:-1px;pointer-events:none;}
+.re-stars{position:absolute;bottom:1px;left:0;right:0;font-size:7px;line-height:1;text-align:center;color:#FFD76B;letter-spacing:-1px;pointer-events:none;}
 /* Перекрестие броска: строка и столбец подсвечены, остальное приглушено. */
 .stage-cells.has-roll .stage-cell{opacity:.32;}
 .stage-cells.has-roll .stage-cell.on-line{opacity:1;box-shadow:0 0 0 1.5px var(--stage-accent);}
@@ -461,7 +461,7 @@ main{margin:0;padding:0;}
 .dice-pair{display:flex;gap:6px;margin-bottom:12px;align-items:center;}
 .die{width:40px;height:40px;border-radius:11px;background:#F3EEE4;color:#1A140F;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.4);flex:none;}
 .die b{font-family:var(--font-mono);font-size:17px;line-height:1;}
-.die span{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8A7A5E;}
+.die span{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--board-label);}
 .dice-pair .dice-caption{font-size:13px;color:var(--text-2);font-weight:600;margin-left:6px;}
 .own-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--track);gap:2px;}
 .own-bar i{display:block;height:100%;}
@@ -541,7 +541,7 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .owned-fill{height:100%;background:var(--accent);}
 .spark{display:block;}
 .col-spark{white-space:nowrap;}
-@media (max-width:719px){
+@media (max-width:1023px), (orientation:landscape) and (max-height:540px){
   #marketTable thead{display:none;}
   #marketTable, #marketTable tbody{display:block;}
   #marketTable tr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"co spark price" "co spark delta" "own own own";column-gap:12px;row-gap:2px;padding:12px 14px;border-bottom:1px solid var(--line);}
@@ -752,7 +752,7 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
   .corner-feed .stage-panel{display:flex;flex-direction:column;min-height:0;height:100%;padding:14px 12px 12px;}
   .corner-feed .feed-title{font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);margin:0 4px 10px;}
   .zoom-controls{display:flex;}
-  .context-popup{inset:0 340px var(--tabbar-h) 300px;align-items:flex-end;padding:0 24px 24px;bottom:auto;}
+  .context-popup{inset:0 340px var(--tabbar-h) 300px;align-items:flex-end;padding:0 24px 24px;}
   .popup-card{border-radius:var(--r-2xl);border-bottom:1px solid var(--line-strong);box-shadow:var(--shadow-2);max-height:min(72vh, 640px);}
   .popup-card::before{display:none;}
   .company-modal-overlay, .market-event-overlay{align-items:center;padding:24px;}
@@ -866,4 +866,60 @@ body.overlay-open .game-menu-btn{display:none;}
 /* Подвкладки портфеля на узком телефоне: «Недвижимость» помещается в ячейку. */
 @media (max-width:400px){
   .cap-subtabs button{font-size:12px;letter-spacing:-.01em;padding:6px 0;}
+}
+
+/* --- Уточнения после визуального QA на 9 размерах экрана ---------------- */
+/* Узкий ландшафт (667×375): поле не шире своей колонки, боковые колонки уже. */
+@media (orientation:landscape) and (max-height:540px){
+  .stage{grid-template-columns:minmax(150px,1fr) auto minmax(170px,1fr);}
+  .stage-board-outer{max-width:min(440px, calc(100vw - 368px - var(--safe-l) - var(--safe-r)));}
+  /* Кнопка меню — в левом верхнем углу, рядом с шапкой, а не на списке игроков. */
+  .game-menu-btn{top:calc(8px + var(--safe-t));bottom:auto;}
+  .game-menu-panel{top:calc(56px + var(--safe-t));bottom:auto;}
+  .corner-tl .g-top{padding-left:48px;}
+  #cornerRating{padding-bottom:0;}
+}
+/* 1024–1279 (iPad в ландшафте, небольшие ноутбуки): две колонки, ленту видно
+   во вкладке «Лента» — иначе полю оставалось меньше 300px. */
+@media (min-width:1024px) and (max-width:1279px) and (min-height:600px){
+  .stage{grid-template-columns:280px minmax(0,1fr);
+    grid-template-areas:"top board" "players board" "capital board" "capital dock";}
+  .corner-feed{display:none !important;}
+  .context-popup{inset:0 0 var(--tabbar-h) 280px;}
+  .game-menu-btn{left:calc(24px + 280px - 44px);}
+  #marketTable th:nth-child(2), #marketTable td:nth-child(2){display:none;}
+}
+/* Низкие экраны: кнопки листа броска всегда видны, пояснения прячем. */
+.popup-card .sheet-actions{position:sticky;bottom:-18px;z-index:1;background:var(--surface);padding:10px 0 18px;margin-bottom:-18px;}
+@media (orientation:landscape) and (max-height:540px){
+  .popup-card .sheet-actions{bottom:-12px;padding-bottom:12px;margin-bottom:-12px;}
+}
+@media (max-height:640px){
+  .sheet-box .sheet-note{display:none;}
+}
+/* Подвкладки портфеля: «Недвижимость» шире остальных. */
+@media (max-width:400px){
+  .cap-subtabs{grid-template-columns:minmax(0,1fr) minmax(0,1.55fr) minmax(0,1fr) minmax(0,1fr);}
+}
+/* Настройки партии: поля в одной строке сетки — на одной высоте. */
+.settings-grid > div{display:flex;flex-direction:column;justify-content:flex-end;}
+/* Главное меню: кнопка аккаунта не заходит на карточки. */
+#mainMenu{padding-top:calc(64px + var(--safe-t));}
+.co-name .co-mine{display:inline;font-weight:700;color:var(--stage-accent);}
+/* Десктоп: справа от поля — место под кнопки зума. Поле по центру колонки,
+   если места хватает, иначе сдвигается влево ровно на ширину кнопок. */
+@media (min-width:1024px) and (min-height:600px){
+  #tableBody{--bw:min(100% - 52px, 100vh - var(--tabbar-h) - var(--dock-h) - 96px, 760px);--bx:min((100% - var(--bw)) / 2, 100% - var(--bw) - 52px);}
+  .stage-board-outer{width:var(--bw);margin:0 0 0 var(--bx);}
+  .zoom-controls{right:auto;left:calc(var(--bx) + var(--bw) + 10px);}
+}
+@media (min-width:1024px) and (max-width:1279px) and (min-height:600px){
+  .cap-strip{grid-template-columns:1fr;}
+  .cap-strip > div{flex-direction:row;justify-content:space-between;align-items:baseline;padding:8px 12px;}
+}
+/* Узкий ландшафт: в «Смотреть как» остаётся только выбор игрока. */
+@media (orientation:landscape) and (max-height:540px){
+  .g-viewas-label{display:none;}
+  .g-viewas .pill{max-width:100%;}
+  .g-viewas select{min-width:0;max-width:100%;}
 }
