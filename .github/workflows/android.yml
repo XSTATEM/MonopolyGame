@@ -6,8 +6,9 @@
 name: Android APK
 
 on:
+  # Любая ветка: APK собирается и для веток с правками интерфейса, чтобы их
+  # можно было поставить на телефон до слияния.
   push:
-    branches: [master, main]
     paths:
       - "server/public/**"
       - "mobile/**"

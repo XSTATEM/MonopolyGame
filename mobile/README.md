@@ -14,8 +14,9 @@
 
 ## APK без установки SDK
 
-Workflow `.github/workflows/android.yml` собирает APK при каждом изменении `server/public/**`
-или `mobile/**` в `master`, а также вручную: **Actions → Android APK → Run workflow**.
+Workflow `.github/workflows/android.yml` собирает APK при каждом push с изменениями в
+`server/public/**` или `mobile/**` (в любой ветке), а также вручную:
+**Actions → Android APK → Run workflow**.
 При ручном запуске можно указать адрес своего сервера.
 
 Готовый файл лежит в разделе **Artifacts** у запуска (`trade-monopoly-android`).
