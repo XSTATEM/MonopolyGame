@@ -847,3 +847,23 @@ body.overlay-open .game-menu-btn{display:none;}
   .overlay-panel[data-panel="market"] > section{max-width:1120px;}
   .kickvote-banner{left:auto;right:calc(24px + var(--safe-r));transform:none;max-width:340px;top:calc(16px + var(--safe-t));}
 }
+
+/* Сводка события: прокручивается содержимое, «Продолжить» всегда на экране. */
+.market-event-modal{display:flex;flex-direction:column;overflow:hidden;}
+.market-event-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;margin:0 -4px;padding:0 4px;}
+.market-event-close-btn{flex:none;margin-top:12px;}
+
+/* Телефон в портрете: уведомления не заходят на кнопку меню справа. */
+@media (max-width:1023px) and (orientation:portrait){
+  .toast-stack{left:calc(10px + var(--safe-l));right:calc(66px + var(--safe-r));width:auto;transform:none;}
+}
+/* Телефон в ландшафте: список игроков прокручивается и не уходит под кнопку
+   меню и панель вкладок; меню партии не вылезает за верх экрана. */
+@media (orientation:landscape) and (max-height:540px){
+  #cornerRating{min-height:0;overflow-y:auto;padding-bottom:52px;scrollbar-width:none;}
+  .game-menu-panel{max-height:calc(100vh - var(--tabbar-h) - 64px - var(--safe-t) - var(--safe-b));max-height:calc(100dvh - var(--tabbar-h) - 64px - var(--safe-t) - var(--safe-b));overflow-y:auto;}
+}
+/* Подвкладки портфеля на узком телефоне: «Недвижимость» помещается в ячейку. */
+@media (max-width:400px){
+  .cap-subtabs button{font-size:12px;letter-spacing:-.01em;padding:6px 0;}
+}

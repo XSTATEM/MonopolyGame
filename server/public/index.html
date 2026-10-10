@@ -497,13 +497,18 @@ let lastMeasureResult = null;
 let measureResultTimer = null;
 function recordMeasureResult(measure, result){
   if(!result || result.error) return;
-  lastMeasureResult = { measure, success: result.success !== false, ts: Date.now(), suspectName: result.suspectName || null };
+  lastMeasureResult = { measure, success: result.success !== false, ts: Date.now(), suspectName: result.suspectName || null, playerId: you };
   if(measureResultTimer) clearTimeout(measureResultTimer);
-  measureResultTimer = setTimeout(()=>{ lastMeasureResult = null; if(latest) renderControlPanel(latest); }, 7000);
-  if(latest) renderControlPanel(latest);
+  measureResultTimer = setTimeout(()=>{ lastMeasureResult = null; rerenderControlPanel(); }, 7000);
+  rerenderControlPanel();
+}
+// Перерисовка «Влияния» вне общего render(): сохраняем выбранные цели в списках.
+function rerenderControlPanel(){
+  if(latest) withPreservedInputs(["controlBody"], ()=> renderControlPanel(latest));
 }
 function measureResultBadgeHtml(measure){
-  if(!lastMeasureResult || lastMeasureResult.measure !== measure) return "";
+  // В хот-сите итог чужой меры не показываем следующему игроку за устройством.
+  if(!lastMeasureResult || lastMeasureResult.measure !== measure || lastMeasureResult.playerId !== you) return "";
   const r = lastMeasureResult;
   const labels = {
     espionage: r.success ? "Успех — активы цели раскрыты на 2 события." : "Провал — вас поймали, репутация снижена.",
@@ -646,7 +651,12 @@ function showOnly(id){
 let rulesReturnToGame = false;
 function openRulesFromGame(){
   rulesReturnToGame = true;
+  setRulesBackLabel("Назад в игру");
   showOnly("rulesScreen");
+}
+function setRulesBackLabel(text){
+  const btn = document.getElementById("btnBackFromRules");
+  btn.innerHTML = `${ico("arrow-left","ico-sm")} ${text}`;
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -1110,7 +1120,7 @@ try {
 
 // --- Правила ---
 document.getElementById("btnGoRules").onclick = ()=> showOnly("rulesScreen");
-document.getElementById("btnBackFromRules").onclick = ()=>{ const back = rulesReturnToGame ? "app" : "mainMenu"; rulesReturnToGame = false; showOnly(back); };
+document.getElementById("btnBackFromRules").onclick = ()=>{ const back = rulesReturnToGame ? "app" : "mainMenu"; rulesReturnToGame = false; setRulesBackLabel("Назад в меню"); showOnly(back); };
 
 document.getElementById("btnExitToMenu").onclick = ()=>{
   closeGameMenu();
@@ -1239,7 +1249,7 @@ function connectOnline(room, auth){
       }
     } else if(msg.type === "insiderCard"){
       pendingInsiderCard = msg.card;
-      if(latest) renderControlPanel(latest);
+      rerenderControlPanel();
     } else if(msg.type === "measureResult"){
       recordMeasureResult(msg.measure, msg);
     } else if(msg.type === "error"){
@@ -1380,6 +1390,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
 };
 
 let lastSyncedCurrentPlayerId = null;
+let lastHandoffKey = null;
 function refreshLocal(){
   if(mode !== "offline" || !localRoom) return;
   // Автоматически переключаем «Ход как» на нового текущего игрока только когда
@@ -1395,6 +1406,24 @@ function refreshLocal(){
       const cpPlayer = localRoom.players.find(p=>p.id===cp);
       if(!cpPlayer || !cpPlayer.isBot) viewAs = cp;
       lastSyncedCurrentPlayerId = cp;
+    }
+    // Цену выкупа назначает контролирующий акционер, а платит (или отказывается)
+    // ходящий. Передаём устройство тому, от кого сейчас ждут решения, если это
+    // человек, — иначе партия стояла бы, пока кто-то не догадается сменить
+    // «Смотреть как». Один раз на каждый шаг, чтобы не мешать ручному выбору.
+    const roll = localRoom.pendingRoll;
+    if(roll){
+      const meta = GameEngine.buildStatePayload(localRoom, roll.playerId).pendingRollMeta;
+      let waitFor = null;
+      if(meta && meta.kind === "stock" && meta.controllerId && meta.controllerId !== roll.playerId){
+        waitFor = localRoom.pendingForcedPrice ? roll.playerId : meta.controllerId;
+      }
+      const key = waitFor ? `${localRoom.turn}:${roll.playerId}:${waitFor}` : null;
+      if(key && key !== lastHandoffKey){
+        lastHandoffKey = key;
+        const w = localRoom.players.find(p=>p.id===waitFor);
+        if(w && !w.isBot) viewAs = waitFor;
+      }
     }
   }
   you = viewAs;
@@ -1524,8 +1553,9 @@ function localDispatch(obj){
     case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
     case "newGame": {
       localRoom = GameEngine.newGameKeepPlayers(localRoom);
-      viewAs = localRoom.players[0].id;
-      lastSyncedCurrentPlayerId = viewAs;
+      viewAs = (localRoom.players.find(p=>!p.isBot) || localRoom.players[0]).id;
+      lastSyncedCurrentPlayerId = GameEngine.currentPlayerId(localRoom);
+      lastSeenMarketEventCount = null;
       result = { ok:true };
       break;
     }
@@ -1807,11 +1837,13 @@ function openMarketEventModal(msg, prev){
     }
   }
   card.innerHTML = `
-    <div class="eyebrow">Раунд завершён</div>
-    <h2>${ico("bolt")} Биржевое событие №${msg.eventCount}</h2>
-    <div class="muted">Разыграна карта новостей, начислены проценты по кредитам и рента.</div>
-    ${moversHtml}
-    <div class="market-event-list">${rowsHtml}</div>
+    <div class="market-event-body">
+      <div class="eyebrow">Раунд завершён</div>
+      <h2>${ico("bolt")} Биржевое событие №${msg.eventCount}</h2>
+      <div class="muted">Разыграна карта новостей, начислены проценты по кредитам и рента.</div>
+      ${moversHtml}
+      <div class="market-event-list">${rowsHtml}</div>
+    </div>
     <button type="button" class="market-event-close-btn" onclick="closeMarketEventModal()">Продолжить</button>
   `;
   document.getElementById("marketEventOverlay").style.display = "flex";
@@ -2983,7 +3015,7 @@ function rollPopupHtml(s){
     let primary = "", secondary = "", note = "";
     const allowSkip = !meta.ownerId || meta.ownerId === you;
     if(!meta.ownerId){
-      primary = `<button type="button" class="grow" onclick="doBuyRealEstateFromRoll()">Купить · ${fmt(meta.price)}</button>`;
+      primary = `<button type="button" class="grow" onclick="doBuyRealEstateFromRoll()">Купить · ${fmt(meta.price * (1 + (s.bankFeePct||0)))}</button>`;
     } else if(meta.ownerId === you){
       if(meta.level < meta.maxLevel){
         primary = `<button type="button" class="grow" onclick="doUpgradeRealEstateFromRoll()">Улучшить до ${meta.level+1} · ${fmt(meta.upgradeCost)}</button>`;
@@ -3043,7 +3075,10 @@ function rollPopupHtml(s){
       if(s.pendingForcedPrice && s.pendingForcedPrice.targetId === you){
         secondary = `<button type="button" class="secondary has-sub" onclick="doPayForcedPrice()"><span>Оплатить выкуп</span><span class="btn-sub down">−${fmt(s.pendingForcedPrice.amount)}</span></button>`;
       } else {
-        note = `<div class="sheet-box sheet-note">${ico("crown","ico-sm")} <b>${escapeHtml(meta.controllerName||"")}</b> контролирует компанию и назначает цену выкупа за отказ — подождите или купите долю.</div>`;
+        const ctrlP = s.players.find(p=>p.id===meta.controllerId);
+        const handTo = mode==="offline" && ctrlP && !ctrlP.isBot
+          ? `<button type="button" class="secondary small" style="margin-top:10px;" onclick="viewAs=${ctrlP.id};refreshLocal();">Передать устройство: ${escapeHtml(ctrlP.name)}</button>` : "";
+        note = `<div class="sheet-box sheet-note">${ico("crown","ico-sm")} <b>${escapeHtml(meta.controllerName||"")}</b> контролирует компанию и назначает цену выкупа за отказ — подождите или купите долю.${handTo}</div>`;
       }
     } else {
       secondary = `<button type="button" class="secondary has-sub" onclick="send({type:'dividendFromRoll'})"><span>Отказаться</span><span class="btn-sub">${(meta.forcedPct*100).toFixed(0)}% цены держателям</span></button>`;
@@ -3307,7 +3342,7 @@ function refreshRealEstateModal(){
   let actionsHtml;
   if(canActNow){
     if(!re.ownerId){
-      actionsHtml = `<button type="button" class="block" style="min-height:52px;" onclick="doBuyRealEstateFromRoll();closeCompanyModal();">Купить · ${fmt(re.price)}</button>`;
+      actionsHtml = `<button type="button" class="block" style="min-height:52px;" onclick="doBuyRealEstateFromRoll();closeCompanyModal();">Купить · ${fmt(re.price * (1 + (s.bankFeePct||0)))}</button>`;
     } else if(isMine){
       actionsHtml = re.level < re.maxLevel
         ? `<button type="button" class="block" style="min-height:52px;" onclick="doUpgradeRealEstateFromRoll();closeCompanyModal();">Улучшить до ${re.level+1} · ${fmt(re.upgradeCost)}</button>`
