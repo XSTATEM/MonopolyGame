@@ -41,19 +41,20 @@ jobs:
       # Секреты нельзя проверять в if напрямую — пробрасываем в env задачи.
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - uses: actions/setup-java@v4
+      # Без cache: gradle — Android-проект генерируется позже, на шаге android:init,
+      # и в момент установки Java gradle-файлов ещё нет.
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
 
       - name: Установить зависимости
         run: npm ci

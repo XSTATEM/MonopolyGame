@@ -39,6 +39,11 @@
         <p class="brand-sub">Биржевая настольная игра: акции, недвижимость и интриги.</p>
       </div>
     </div>
+    <button type="button" class="menu-continue" id="btnContinueOffline" hidden>
+      <span class="menu-continue-icon"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></span>
+      <span class="menu-continue-text"><b>Продолжить партию</b><span id="continueOfflineInfo"></span></span>
+      <svg class="ico" aria-hidden="true"><use href="#i-chev-right"/></svg>
+    </button>
     <div class="menu-cards">
       <button type="button" class="menu-card online" id="btnGoOnline">
         <span class="menu-card-icon"><svg class="ico" aria-hidden="true"><use href="#i-globe"/></svg></span>
@@ -632,6 +637,7 @@ function showOnly(id){
   if(acc) acc.classList.toggle("show", id === "mainMenu");
   // Цвет системной строки браузера/приложения под текущую тему экрана.
   document.body.classList.toggle("in-game", id === "app");
+  if(id === "mainMenu") renderContinueOffline();
   const tc = document.querySelector('meta[name="theme-color"]');
   if(tc) tc.setAttribute("content", id === "app" ? "#140F0B" : "#EFE8DA");
   if(window.TMNative) window.TMNative.onScreen(id);
@@ -1108,7 +1114,7 @@ document.getElementById("btnBackFromRules").onclick = ()=>{ const back = rulesRe
 
 document.getElementById("btnExitToMenu").onclick = ()=>{
   closeGameMenu();
-  if(mode === "offline" && localRoom && localRoom.phase !== "ended" && !confirm("Выйти из партии? Офлайн-партия не сохраняется — продолжить её будет нельзя.")) return;
+  // Офлайн-партия уже сохранена (saveOfflineGame) — её можно продолжить из меню.
   if(mode === "online"){
     stopReconnect();
     if(ws){ ws.onclose = null; ws.close(); ws = null; }
@@ -1324,6 +1330,7 @@ document.getElementById("offlineNewName").addEventListener("keydown", e=>{ if(e.
 
 document.getElementById("btnStartOffline").onclick = ()=>{
   if(offlinePlayerNames.length < 2){ document.getElementById("offlineErr").textContent = "Нужно минимум 2 игрока."; return; }
+  if(loadOfflineSave() && !confirm("Начать новую партию? Сохранённая офлайн-партия будет заменена.")) return;
   document.getElementById("offlineErr").textContent = "";
   mode = "offline";
   localRoom = GameEngine.freshRoom("OFFLINE");
@@ -1379,8 +1386,56 @@ function refreshLocal(){
   detectNotifications(prevState, latest);
   detectMarketEventPopup(prevState, latest);
   render();
+  saveOfflineGame();
   scheduleBotPump();
 }
+
+// ---------------------------------------------------------------------
+// Автосохранение офлайн-партии: на телефоне система выгружает свёрнутое
+// приложение (или закрывается вкладка), и без этого партия терялась бы.
+// Комната движка — обычный JSON, поэтому сохраняем её целиком.
+// ---------------------------------------------------------------------
+const OFFLINE_SAVE_KEY = "tm_offline_save";
+function saveOfflineGame(){
+  if(mode !== "offline" || !localRoom) return;
+  try {
+    if(localRoom.phase === "ended") localStorage.removeItem(OFFLINE_SAVE_KEY);
+    else localStorage.setItem(OFFLINE_SAVE_KEY, JSON.stringify({ v:1, savedAt: Date.now(), viewAs, room: localRoom }));
+  } catch(e){}
+}
+function loadOfflineSave(){
+  try {
+    const raw = localStorage.getItem(OFFLINE_SAVE_KEY);
+    if(!raw) return null;
+    const save = JSON.parse(raw);
+    if(!save || save.v !== 1 || !save.room || !Array.isArray(save.room.players) || save.room.phase === "ended") return null;
+    return save;
+  } catch(e){ return null; }
+}
+function renderContinueOffline(){
+  const btn = document.getElementById("btnContinueOffline");
+  if(!btn) return;
+  const save = loadOfflineSave();
+  btn.hidden = !save;
+  if(!save) return;
+  const r = save.room;
+  const round = r.maxRounds ? `раунд ${Math.min(r.roundNumber||1, r.maxRounds)} из ${r.maxRounds}` : `раунд ${r.roundNumber||1}`;
+  const names = r.players.filter(p=>!p.isBot).map(p=>p.name).join(", ") || "боты";
+  document.getElementById("continueOfflineInfo").textContent = `${round} · ${names}${r.players.some(p=>p.isBot) ? " и боты" : ""}`;
+}
+function resumeOfflineGame(){
+  const save = loadOfflineSave();
+  if(!save){ renderContinueOffline(); return; }
+  mode = "offline";
+  localRoom = save.room;
+  latest = null;
+  viewAs = localRoom.players.some(p=>p.id===save.viewAs) ? save.viewAs : (localRoom.players.find(p=>!p.isBot) || localRoom.players[0]).id;
+  lastSyncedCurrentPlayerId = GameEngine.currentPlayerId(localRoom);
+  applyBoardSkin(accountUser ? (accountUser.equippedBoardSkin || "default") : "default");
+  showOnly("app");
+  refreshLocal();
+}
+document.getElementById("btnContinueOffline").onclick = resumeOfflineGame;
 
 // ---------------------------------------------------------------------
 // Боты в офлайн-режиме: botStep выполняет ровно одно действие движка за вызов
@@ -3477,6 +3532,7 @@ if("serviceWorker" in navigator && !TMNative.isNative && (location.protocol === 
 }
 initProfileUI();
 buildMarketFilters();
+renderContinueOffline();
 restoreSession().then(()=>{
   // Если пользователь уже успел открыть экран профиля/скинов/онлайна до того,
   // как сессия восстановилась — перерисуем его, чтобы гейт сменился на контент.
