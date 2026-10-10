@@ -822,3 +822,5 @@ body.debug .debug-only{display:flex !important;}
 .menu-continue-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
 .menu-continue-text b{font-size:15px;font-weight:800;}
 .menu-continue-text span{font-size:13px;font-weight:600;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+body.overlay-open .game-menu-btn{display:none;}

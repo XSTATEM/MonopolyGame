@@ -1932,6 +1932,7 @@ function switchTab(name){
     activeTab = "turn";
     document.querySelectorAll(".overlay-panel").forEach(p=> p.classList.remove("active"));
     document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab==="turn"));
+    document.body.classList.remove("overlay-open");
     return;
   }
   const panel = document.querySelector(`.overlay-panel[data-panel="${name}"]`);
@@ -1939,6 +1940,9 @@ function switchTab(name){
   document.querySelectorAll(".overlay-panel").forEach(p=> p.classList.toggle("active", p===panel && willOpen));
   activeTab = willOpen ? name : "turn";
   document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===activeTab));
+  // В открытых разделах кнопка меню партии не нужна и перекрывала бы прокручиваемое содержимое.
+  document.body.classList.toggle("overlay-open", activeTab !== "turn");
+  closeGameMenu();
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.onclick = ()=> switchTab(b.dataset.tab));
 
@@ -2764,7 +2768,7 @@ function stockActionsHtml(s, c, v){
     <input id="tradePrice_${c.ticker}" type="number" inputmode="numeric" placeholder="0" style="width:100%;">
     <label for="tradeWantTicker_${c.ticker}" style="display:block;font-size:12.5px;font-weight:700;margin:10px 0 6px;">И/или акции взамен</label>
     <select id="tradeWantTicker_${c.ticker}" style="width:100%;" onchange="onTradeWantTickerChange('${c.ticker}')">${wantOpts}</select>
-    ${pctSliderHtml("tradeWantPct_"+c.ticker, 25, 10, firstWant ? firstWant.price/100 : 0, "Доля взамен")}
+    <div id="tradeWantBox_${c.ticker}" hidden>${pctSliderHtml("tradeWantPct_"+c.ticker, 25, 10, firstWant ? firstWant.price/100 : 0, "Доля взамен")}</div>
     <button type="button" class="block" onclick="doProposeStockTrade('${c.ticker}')" ${otherPlayers.length===0?"disabled":""}>${ico("swap","ico-sm")} Предложить сделку</button>
   </div>`;
 }
@@ -2792,6 +2796,8 @@ function onPrTargetChange(){
 function onTradeWantTickerChange(ticker){
   const sel = document.getElementById(`tradeWantTicker_${ticker}`);
   const slider = document.getElementById(`tradeWantPct_${ticker}`);
+  const box = document.getElementById(`tradeWantBox_${ticker}`);
+  if(box && sel) box.hidden = !sel.value;
   if(!sel || !slider || !latest) return;
   const wc = latest.companies.find(x=>x.ticker===sel.value);
   slider.dataset.unit = wc ? (wc.price/100) : 0;
