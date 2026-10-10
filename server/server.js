@@ -172,7 +172,12 @@ function handleMessage(ws, raw) {
     case "updateRoomSettings": return run(conn, engine.updateRoomSettings(room, conn.playerId, msg.settings));
     case "deleteRoom": return handleDeleteRoom(conn);
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
-    case "forceEvent": return run(conn, engine.forceEvent(room));
+    case "forceEvent": {
+      // Отладочная кнопка: внеочередное событие даёт лидеру нечестное
+      // преимущество, поэтому на сервере она работает только при TM_DEBUG=1.
+      if (process.env.TM_DEBUG !== "1") return sendError(conn, "Внеочередное событие отключено на этом сервере.");
+      return run(conn, engine.forceEvent(room));
+    }
     case "ctrlNegativeInfo": return runWithResult(conn, ws, "negativeInfo", engine.ctrlNegativeInfo(room, conn.playerId, msg.ticker));
     case "ctrlPrCampaign": return runWithResult(conn, ws, "prCampaign", engine.ctrlPrCampaign(room, conn.playerId, msg.ticker));
     case "ctrlInsiderPeek": {
