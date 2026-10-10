@@ -29,8 +29,10 @@ Workflow `.github/workflows/android.yml` собирает APK при каждо�
 2. В **Settings → Secrets and variables → Actions** добавьте:
    - `ANDROID_KEYSTORE_BASE64` — вывод `base64 -w0 release.keystore`
    - `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`
-3. Следующий запуск workflow дополнительно соберёт подписанные `app-release.apk` и
-   `app-release.aab` (последний загружается в Play Console).
+3. Следующий запуск workflow из `master`, по тегу или вручную дополнительно соберёт
+   подписанные `app-release.apk` и `app-release.aab` (последний загружается в Play Console).
+   Сборки из других веток и pull request'ов остаются отладочными: ключ подписи
+   доступен только шагу подписи и не попадает в зависимости и gradle.
 
 Храните `release.keystore` в надёжном месте: без него нельзя выпускать обновления
 того же приложения в Google Play.
@@ -57,7 +59,8 @@ iOS (только на macOS с Xcode): `npm run ios:init && npm run ios:open`.
 
 Офлайн-режим (хот-сит с ботами) работает без сети. Для онлайн-игры приложение
 подключается к серверу из переменной `TM_SERVER_URL` во время сборки, а без неё — к
-`https://birzha-multiplayer.onrender.com`.
+`https://birzha-multiplayer.onrender.com`. Адрес должен быть `https://host[:port]`
+без пути и параметров; в готовом приложении он не меняется.
 
 ```bash
 TM_SERVER_URL=https://my-server.example npm run sync

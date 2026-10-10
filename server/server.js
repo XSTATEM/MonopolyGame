@@ -315,6 +315,8 @@ const server = http.createServer((req, res) => {
   // (URIError) вместе со всеми комнатами.
   try { reqPath = decodeURIComponent(req.url.split("?")[0]); }
   catch (e) { res.writeHead(400); return res.end("Bad request"); }
+  // %00 в пути: fs.readFile бросает исключение синхронно, и оно роняло процесс.
+  if (reqPath.includes("\0")) { res.writeHead(400); return res.end("Bad request"); }
   if (reqPath.startsWith("/api/")) {
     applyCors(req, res);
     if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }

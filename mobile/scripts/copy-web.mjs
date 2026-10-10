@@ -20,19 +20,28 @@ rmSync(dest, { recursive: true, force: true });
 // Service worker в нативной оболочке не нужен: файлы и так лежат в приложении.
 cpSync(src, dest, { recursive: true, filter: (p) => !p.endsWith("sw.js") });
 
-const serverUrl = (process.env.TM_SERVER_URL || "").trim().replace(/\/+$/, "");
-if (serverUrl) {
-  if (!/^https:\/\//.test(serverUrl)) {
-    console.error("TM_SERVER_URL должен начинаться с https:// (Android запрещает незащищённые запросы).");
+// Адрес сервера — только https-origin без пути, параметров и якоря: значение
+// попадает внутрь <script>, и всё лишнее (например, "</script>") недопустимо.
+let serverUrl = "";
+const rawUrl = (process.env.TM_SERVER_URL || "").trim();
+if (rawUrl) {
+  let parsed = null;
+  try { parsed = new URL(rawUrl); } catch (e) {}
+  if (!parsed || parsed.protocol !== "https:" || parsed.username || parsed.password
+      || !["", "/"].includes(parsed.pathname) || parsed.search || parsed.hash) {
+    console.error("TM_SERVER_URL должен быть адресом вида https://host[:port] без пути и параметров (Android запрещает незащищённые запросы).");
     process.exit(1);
   }
+  serverUrl = parsed.origin;
   const indexPath = join(dest, "index.html");
   const html = readFileSync(indexPath, "utf8");
-  const tag = `<script>window.TM_SERVER_URL=${JSON.stringify(serverUrl)};</script>\n<script src="/native.js"></script>`;
-  if (!html.includes('<script src="/native.js"></script>')) {
+  const needle = '<script src="/native.js"></script>';
+  const tag = `<script>window.TM_SERVER_URL=${JSON.stringify(serverUrl).replace(/</g, "\\u003c")};</script>\n${needle}`;
+  if (!html.includes(needle)) {
     console.error("В index.html не найдено подключение /native.js — некуда вставить адрес сервера.");
     process.exit(1);
   }
-  writeFileSync(indexPath, html.replace('<script src="/native.js"></script>', tag));
+  // Функция вместо строки: в строке замены `$'` и `$&` — спецшаблоны.
+  writeFileSync(indexPath, html.replace(needle, () => tag));
 }
 console.log(`Веб-клиент скопирован в ${dest}${serverUrl ? ` (сервер: ${serverUrl})` : ""}`);

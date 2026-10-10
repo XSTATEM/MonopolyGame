@@ -11,7 +11,9 @@ const Skins = require("./public/skins.js");
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
-const MAX_PHOTO_LEN = 400000; // ~300KB исходника после base64 — клиент обязан ужать фото перед отправкой
+// Клиент ужимает фото до 256px JPEG (обычно 20–40 КБ). Фото уходят в каждый
+// ответ /api/leaderboard, поэтому большие строки здесь не нужны.
+const MAX_PHOTO_LEN = 150000;
 
 function loadUsers() {
   try {
@@ -105,7 +107,8 @@ function register(username, password, gender, avatar) {
   const rec = {
     username, salt, hash,
     gender: String(gender || "").trim().slice(0, 24),
-    avatar: (() => { const a = String(avatar || "").trim().slice(0, 8); return a !== "PHOTO" && isAllowedAvatar(a) ? a : ""; })(),
+    // При регистрации доступен только бесплатный пак: платные покупаются за очки.
+    avatar: (() => { const a = String(avatar || "").trim().slice(0, 8); const base = Skins.avatarPackById("base"); return base && base.emojis.includes(a) ? a : ""; })(),
     avatarPhoto: null,
     points: 0,
     ownedAvatarPacks: ["base"],

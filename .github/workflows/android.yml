@@ -29,6 +29,10 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+# Токену сборки нужно только чтение кода.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,10 +42,13 @@ jobs:
         working-directory: mobile
     env:
       TM_SERVER_URL: ${{ github.event.inputs.server_url || 'https://birzha-multiplayer.onrender.com' }}
-      # Секреты нельзя проверять в if напрямую — пробрасываем в env задачи.
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      # Секреты нельзя проверять в if напрямую. В env задачи — только признак
+      # наличия ключа; сам ключ видит лишь шаг подписи, а не npm-зависимости и gradle.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v5
         with:
@@ -72,10 +79,13 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon
 
+      # Подписанный релиз — только из master, тегов или ручного запуска,
+      # а не из каждой ветки и не из pull request.
       - name: Собрать подписанный релиз (если заданы секреты)
-        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_KEYSTORE == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
         working-directory: mobile/android
         env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}

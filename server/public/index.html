@@ -528,6 +528,17 @@ function measureResultBadgeHtml(measure){
 let myName = "";
 let roomCode = "";
 let pendingInsiderCard = null;
+// Подсмотренная карта инсайда — только тому, кто её подсматривает. В офлайне
+// берём её из колоды комнаты: так она не видна следующему игроку за
+// устройством и переживает «Продолжить партию».
+function myInsiderCard(s){
+  if(!s || !s.pendingInsider || s.pendingInsider.playerId !== you) return null;
+  if(mode === "offline" && localRoom){
+    const idx = localRoom.deckOrder[localRoom.deckPos];
+    return idx != null ? (localRoom.deckData[idx] || null) : null;
+  }
+  return pendingInsiderCard;
+}
 let activeTab = "turn";
 let roomListPollTimer = null;
 
@@ -654,9 +665,19 @@ function openRulesFromGame(){
   setRulesBackLabel("Назад в игру");
   showOnly("rulesScreen");
 }
+function resetRulesReturn(){
+  rulesReturnToGame = false;
+  setRulesBackLabel("Назад в меню");
+}
 function setRulesBackLabel(text){
   const btn = document.getElementById("btnBackFromRules");
   btn.innerHTML = `${ico("arrow-left","ico-sm")} ${text}`;
+}
+function pluralRu(n, one, few, many){
+  const m10 = n % 10, m100 = n % 100;
+  if(m10 === 1 && m100 !== 11) return one;
+  if(m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -1119,8 +1140,13 @@ try {
 } catch(e){}
 
 // --- Правила ---
-document.getElementById("btnGoRules").onclick = ()=> showOnly("rulesScreen");
-document.getElementById("btnBackFromRules").onclick = ()=>{ const back = rulesReturnToGame ? "app" : "mainMenu"; rulesReturnToGame = false; setRulesBackLabel("Назад в меню"); showOnly(back); };
+document.getElementById("btnGoRules").onclick = ()=>{ resetRulesReturn(); showOnly("rulesScreen"); };
+document.getElementById("btnBackFromRules").onclick = ()=>{
+  const back = rulesReturnToGame && mode ? "app" : "mainMenu";
+  resetRulesReturn();
+  showOnly(back);
+  if(back === "app" && latest) render();
+};
 
 document.getElementById("btnExitToMenu").onclick = ()=>{
   closeGameMenu();
@@ -1130,6 +1156,7 @@ document.getElementById("btnExitToMenu").onclick = ()=>{
     if(ws){ ws.onclose = null; ws.close(); ws = null; }
   }
   mode = null; latest = null; you = null; localRoom = null; pendingInsiderCard = null;
+  resetRulesReturn();
   showOnly("mainMenu");
 };
 
@@ -1227,6 +1254,7 @@ function connectOnline(room, auth){
       // не переподключаемся, иначе две вкладки отбирали бы сессию друг у друга.
       stopReconnect();
       mode = null; latest = null;
+      resetRulesReturn();
       showOnly("onlineScreen");
       renderOnlineGate();
       document.getElementById("joinErr").textContent = "Партия открыта на другом устройстве или в другой вкладке.";
@@ -1243,6 +1271,8 @@ function connectOnline(room, auth){
       if(msg.phase === "lobby"){
         showOnly("lobbyScreen");
         renderLobby(msg);
+      } else if(rulesReturnToGame && document.getElementById("rulesScreen").style.display !== "none"){
+        // Игрок читает правила из партии — партию перерисуем, когда он вернётся.
       } else {
         showOnly("app");
         render();
@@ -1262,6 +1292,7 @@ function connectOnline(room, auth){
         accountUser = null;
         accountPassword = "";
         mode = null; latest = null; you = null;
+        resetRulesReturn();
         updateAccountCornerBtn();
         showOnly("onlineScreen");
         renderOnlineGate();
@@ -1340,6 +1371,7 @@ function addOfflinePlayer(){
   const el = document.getElementById("offlineNewName");
   const name = el.value.trim();
   if(!name) return;
+  if(!/^[a-zA-Zа-яА-ЯёЁ0-9_\- ]+$/.test(name)){ document.getElementById("offlineErr").textContent = "Имя может содержать только буквы, цифры, пробел, «-» и «_»."; return; }
   if(offlinePlayerNames.length >= 6){ document.getElementById("offlineErr").textContent = "Максимум 6 игроков."; return; }
   if(offlinePlayerNames.some(p=>p.name === name)){ document.getElementById("offlineErr").textContent = "Такое имя уже добавлено."; return; }
   document.getElementById("offlineErr").textContent = "";
@@ -1571,6 +1603,7 @@ function localDispatch(obj){
     case "ctrlSqueezeOut": result = GameEngine.ctrlSqueezeOut(localRoom, viewAs, obj.ticker); break;
     case "ctrlShort": result = GameEngine.ctrlShort(localRoom, viewAs, obj.ticker); break;
     case "ctrlMergeCompanies": result = GameEngine.ctrlMergeCompanies(localRoom, viewAs, obj.targetTicker, obj.absorbTickers); break;
+    case "ctrlPublicIPO": result = GameEngine.ctrlPublicIPO(localRoom, viewAs, obj.ticker); break;
     case "takeLoan": result = GameEngine.takeLoan(localRoom, viewAs, obj.amount); break;
     case "repayLoan": result = GameEngine.repayLoan(localRoom, viewAs, obj.amount); break;
     case "buyRealEstateFromRoll": result = GameEngine.buyRealEstateFromRoll(localRoom, viewAs); break;
@@ -1594,7 +1627,7 @@ function localDispatch(obj){
 const MEASURE_TYPE_MAP = {
   ctrlEspionage:"espionage", ctrlDiscredit:"discredit", ctrlInvestigate:"investigate",
   ctrlNegativeInfo:"negativeInfo", ctrlPrCampaign:"prCampaign", ctrlInsiderPeek:"insiderPeek",
-  ctrlSqueezeOut:"squeezeOut", ctrlShort:"short", personalPr:"personalPr",
+  ctrlSqueezeOut:"squeezeOut", ctrlShort:"short", personalPr:"personalPr", ctrlPublicIPO:"publicIPO",
 };
 
 // ---------------------------------------------------------------------
@@ -1632,9 +1665,9 @@ function feedEntryHtml(e, baseCls, extraCls){
   const meta = logEntryMeta(e.tag);
   e = Object.assign({}, e, { text: String(e.text||"").replace(LEADING_EMOJI_RE, "") });
   if(meta.cls === "feed-header"){
-    return `<div class="${baseCls} feed-header${extraCls||""}">${e.text.replace(/<[^>]+>/g,"")}</div>`;
+    return `<div class="${baseCls} feed-header${extraCls||""}">${escapeHtml(e.text)}</div>`;
   }
-  return `<div class="${baseCls} ${meta.cls}${extraCls||""}"><span class="feed-icon">${ico(meta.icon)}</span><div class="feed-body">${e.turnTag?`<div class="feed-meta">${escapeHtml(e.turnTag)}</div>`:""}${e.text}</div></div>`;
+  return `<div class="${baseCls} ${meta.cls}${extraCls||""}"><span class="feed-icon">${ico(meta.icon)}</span><div class="feed-body">${e.turnTag?`<div class="feed-meta">${escapeHtml(e.turnTag)}</div>`:""}${escapeHtml(e.text)}</div></div>`;
 }
 function logEntryMeta(tag){
   return LOG_TAG_META[tag] || { cls:"feed-system", icon:"info" };
@@ -1813,7 +1846,8 @@ function openMarketEventModal(msg, prev){
   });
   const rowsHtml = groups.map(g=>{
     if(g.count > 1){
-      const label = g.key === "rep" ? `Бонус к репутации за честную игру: ${g.count} игрока` : `Налог на недвижимость заплатили ${g.count} игрока`;
+      const players = `${g.count} ${pluralRu(g.count, "игрок", "игрока", "игроков")}`;
+      const label = g.key === "rep" ? `Бонус к репутации за честную игру: ${players}` : `Налог на недвижимость заплатили ${players}`;
       return feedEntryHtml({ tag: g.e.tag, text: label, turnTag: "" }, "log-entry");
     }
     return feedEntryHtml(Object.assign({}, g.e, {turnTag:""}), "log-entry");
@@ -2437,9 +2471,14 @@ let boardZoom = 1;
   const saved = parseFloat(localStorage.getItem("boardZoom"));
   if(!isNaN(saved)) boardZoom = Math.min(1.8, Math.max(0.6, saved));
 })();
+// Кнопки масштаба есть только в десктопной раскладке; на телефоне щипок
+// раньше увеличивал поле до 180% без возможности вернуть его кнопкой.
+const ZOOM_MQ = window.matchMedia("(min-width:1024px) and (min-height:600px)");
+function zoomAvailable(){ return ZOOM_MQ.matches; }
+ZOOM_MQ.addEventListener && ZOOM_MQ.addEventListener("change", ()=> applyBoardZoom());
 function applyBoardZoom(){
   const outer = document.querySelector("#tableBody .stage-board-outer");
-  if(outer) outer.style.transform = `scale(${boardZoom})`;
+  if(outer) outer.style.transform = zoomAvailable() && boardZoom !== 1 ? `scale(${boardZoom})` : "";
   const lbl = document.getElementById("zoomLabel");
   if(lbl) lbl.textContent = Math.round(boardZoom*100) + "%";
 }
@@ -2456,13 +2495,14 @@ function zoomBoardBy(delta){ setBoardZoom(boardZoom + delta); }
     const tableBody = document.getElementById("tableBody");
     if(!tableBody || !tableBody.contains(e.target)) return;
     if(!e.ctrlKey && !e.metaKey) return; // обычная прокрутка колесом не должна триггерить зум
+    if(!zoomAvailable()) return;
     e.preventDefault();
     zoomBoardBy(e.deltaY < 0 ? 0.1 : -0.1);
   }, { passive:false });
   let pinchStartDist = null, pinchStartZoom = 1;
   document.addEventListener("touchstart", (e)=>{
     const tableBody = document.getElementById("tableBody");
-    if(!tableBody || e.touches.length !== 2 || !tableBody.contains(e.target)) { pinchStartDist = null; return; }
+    if(!zoomAvailable() || !tableBody || e.touches.length !== 2 || !tableBody.contains(e.target)) { pinchStartDist = null; return; }
     pinchStartDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
     pinchStartZoom = boardZoom;
   }, { passive:true });
@@ -2637,8 +2677,22 @@ function renderControlPanel(s){
       ${body}
     </div>`;
 
-  if(pendingInsiderCard){
-    const c = pendingInsiderCard;
+  const insiderCard = myInsiderCard(s);
+  if(s.pendingInsider && s.pendingInsider.playerId === you && !insiderCard){
+    // Карта подсмотрена, но клиент её не знает (переподключение) — решение всё
+    // равно нужно, иначе инсайд заблокирован для всех до конца партии.
+    el.innerHTML = `<div class="insider-box">
+        <div class="eyebrow" style="margin-bottom:6px;">Инсайд · верхняя карта колоды</div>
+        <div style="font-weight:700;margin-bottom:12px;">Вы подсмотрели карту, но после переподключения она не сохранилась. Решите, где её оставить.</div>
+        <div class="sheet-actions" style="margin-top:0;">
+          <button type="button" class="secondary" onclick="doCtrlInsiderResolve('moveToBack')">Переложить в конец</button>
+          <button type="button" onclick="doCtrlInsiderResolve('keep')">Оставить наверху</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if(insiderCard){
+    const c = insiderCard;
     const pct = (c.percent>0?"+":"") + c.percent + "%";
     const desc = c.type==="global" ? `Глобальная: «${escapeHtml(c.title)}» — ${pct} всем компаниям`
       : c.type==="sector" ? `Отраслевая (${escapeHtml(c.sector)}): «${escapeHtml(c.title)}» — ${pct}`
@@ -2771,7 +2825,7 @@ function updateControlBadge(s){
   const me = s.players.find(p=>p.id===you);
   const btn = document.querySelector(".tab-btn-control");
   if(!btn) return;
-  const count = (!me || me.bankrupt) ? 0 : (s.mySpyIncidents||[]).length + (pendingInsiderCard ? 1 : 0);
+  const count = (!me || me.bankrupt) ? 0 : (s.mySpyIncidents||[]).length + (s.pendingInsider && s.pendingInsider.playerId === you ? 1 : 0);
   let badge = btn.querySelector(".tab-badge");
   if(count > 0){
     if(!badge){
@@ -3139,8 +3193,8 @@ function renderStage(s){
   const cornerRating = document.getElementById("cornerRating");
   const popup = document.getElementById("contextPopup");
   if(!cornerStatus) return;
-  const hidePopup = ()=>{ popup.style.display = "none"; popup.innerHTML = ""; };
-  const showPopup = (html)=>{ popup.style.display = "flex"; popup.innerHTML = html; };
+  const hidePopup = ()=>{ popup.style.display = "none"; popup.innerHTML = ""; popup.classList.remove("above-dock"); };
+  const showPopup = (html, aboveDock)=>{ popup.style.display = "flex"; popup.innerHTML = html; popup.classList.toggle("above-dock", !!aboveDock); };
 
   if(!me){
     cornerStatus.innerHTML = `<div class="g-top"><div class="g-round">Загрузка…</div></div>`;
@@ -3201,8 +3255,9 @@ function renderStage(s){
     cornerAction.innerHTML = `<div class="dock">${s.rolledThisTurn
       ? `<button type="button" class="dock-main end" onclick="send({type:'endTurn'})">${ico("check","ico-lg")} Завершить ход</button>`
       : `<button type="button" class="dock-main roll-btn" onclick="doRoll(this)">${ico("dice","ico-lg")} Бросить кубики</button>`}${side}</div>`;
+    // Предложение можно оставить «на потом»: лист не закрывает кнопку хода.
     const offers = incomingHtml();
-    if(offers) showPopup(offers); else hidePopup();
+    if(offers) showPopup(offers, true); else hidePopup();
     return;
   }
 }

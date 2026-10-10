@@ -3,8 +3,9 @@
 //
 // В нативном приложении страница открывается с https://localhost (Android)
 // или capacitor://localhost (iOS), а онлайн-сервер живёт отдельно — его адрес
-// берётся из localStorage("tm_server") или из window.TM_SERVER_URL, которое
-// пишет скрипт сборки mobile/scripts/copy-web.mjs (по умолчанию — продакшн на Render).
+// берётся из window.TM_SERVER_URL, которое пишет скрипт сборки
+// mobile/scripts/copy-web.mjs (по умолчанию — продакшн на Render). Переопределять
+// его из localStorage нельзя: туда уходят пароли и токены сессий.
 (function(){
   var cap = window.Capacitor;
   var isNative = !!(cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform());
@@ -13,8 +14,11 @@
 
   var serverOrigin = "";
   if(isNative){
-    try { serverOrigin = localStorage.getItem("tm_server") || ""; } catch(e){}
-    serverOrigin = (serverOrigin || window.TM_SERVER_URL || DEFAULT_SERVER).replace(/\/+$/, "");
+    serverOrigin = DEFAULT_SERVER;
+    try {
+      var u = new URL(String(window.TM_SERVER_URL || DEFAULT_SERVER));
+      if(u.protocol === "https:") serverOrigin = u.origin;
+    } catch(e){}
   }
 
   // Экран не гаснет, пока идёт партия (Screen Wake Lock API — есть и в

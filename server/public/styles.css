@@ -890,10 +890,6 @@ body.overlay-open .game-menu-btn{display:none;}
   #marketTable th:nth-child(2), #marketTable td:nth-child(2){display:none;}
 }
 /* Низкие экраны: кнопки листа броска всегда видны, пояснения прячем. */
-.popup-card .sheet-actions{position:sticky;bottom:-18px;z-index:1;background:var(--surface);padding:10px 0 18px;margin-bottom:-18px;}
-@media (orientation:landscape) and (max-height:540px){
-  .popup-card .sheet-actions{bottom:-12px;padding-bottom:12px;margin-bottom:-12px;}
-}
 @media (max-height:640px){
   .sheet-box .sheet-note{display:none;}
 }
@@ -922,4 +918,29 @@ body.overlay-open .game-menu-btn{display:none;}
   .g-viewas-label{display:none;}
   .g-viewas .pill{max-width:100%;}
   .g-viewas select{min-width:0;max-width:100%;}
+}
+
+/* Входящая сделка в свой ход: лист над панелью хода (кнопка броска доступна). */
+.context-popup.above-dock{bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--dock-h) + 20px);}
+.context-popup.above-dock .popup-card{border-radius:var(--r-2xl);border-bottom:1px solid var(--line-strong);max-height:min(46vh, 420px);max-height:min(46dvh, 420px);}
+@media (orientation:landscape) and (max-height:540px){
+  .context-popup.above-dock{bottom:calc(var(--tabbar-h) + var(--safe-b) + 2 * var(--dock-h) + 28px);}
+}
+@media (min-width:1024px) and (min-height:600px){
+  /* На десктопе панель хода под полем — лист с предложением поднимаем к верху поля. */
+  .context-popup.above-dock{bottom:var(--tabbar-h);align-items:flex-start;padding-top:24px;}
+}
+/* Липкие кнопки — только у самого листа, не у строк предложений внутри него. */
+.popup-card > .sheet-actions{position:sticky;bottom:-18px;z-index:1;background:var(--surface);padding:10px 0 18px;margin-bottom:-18px;}
+@media (orientation:landscape) and (max-height:540px){
+  .popup-card > .sheet-actions{bottom:-12px;padding-bottom:12px;margin-bottom:-12px;}
+}
+/* Баннер голосования на телефоне — одна строка. */
+@media (max-width:1023px), (max-height:599px){
+  .kickvote-banner{flex-wrap:nowrap;white-space:nowrap;}
+  .kickvote-banner > span, .kickvote-banner > div:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+}
+@media (max-width:1023px), (max-height:599px){
+  .kickvote-banner > span{flex:1 1 auto;}
+  .kickvote-banner > button{flex:none;}
 }
