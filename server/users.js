@@ -11,7 +11,9 @@ const Skins = require("./public/skins.js");
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
-const MAX_PHOTO_LEN = 400000; // ~300KB исходника после base64 — клиент обязан ужать фото перед отправкой
+// Клиент ужимает фото до 256px JPEG (обычно 20–40 КБ). Фото уходят в каждый
+// ответ /api/leaderboard, поэтому большие строки здесь не нужны.
+const MAX_PHOTO_LEN = 150000;
 
 function loadUsers() {
   try {
@@ -67,12 +69,24 @@ function hashPassword(password, salt) {
   return { salt, hash };
 }
 
+// Фото профиля — только data URL картинки с чистым base64: иначе строка вида
+// `data:image/png;base64,x" onerror="…` уходила бы в <img src> у всех, кто
+// открыл рейтинг (хранимый XSS → кража токена сессии).
+const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+function isAllowedAvatar(avatar) {
+  return avatar === "" || avatar === "PHOTO" || Skins.AVATAR_PACKS.some((p) => p.emojis.includes(avatar));
+}
+
 function publicProfile(rec) {
+  // Проверяем и при выдаче: в users.json могли остаться значения, сохранённые
+  // до появления строгих проверок.
+  const photo = rec.avatarPhoto && PHOTO_RE.test(rec.avatarPhoto) ? rec.avatarPhoto : null;
+  const avatar = rec.avatar && isAllowedAvatar(rec.avatar) && (rec.avatar !== "PHOTO" || photo) ? rec.avatar : "";
   return {
     username: rec.username,
     gender: rec.gender || "",
-    avatar: rec.avatar || "",
-    avatarPhoto: rec.avatarPhoto || null,
+    avatar,
+    avatarPhoto: photo,
     points: rec.points || 0,
     ownedAvatarPacks: rec.ownedAvatarPacks || ["base"],
     ownedBoardSkins: rec.ownedBoardSkins || ["default"],
@@ -93,7 +107,8 @@ function register(username, password, gender, avatar) {
   const rec = {
     username, salt, hash,
     gender: String(gender || "").trim().slice(0, 24),
-    avatar: String(avatar || "").trim().slice(0, 8),
+    // При регистрации доступен только бесплатный пак: платные покупаются за очки.
+    avatar: (() => { const a = String(avatar || "").trim().slice(0, 8); const base = Skins.avatarPackById("base"); return base && base.emojis.includes(a) ? a : ""; })(),
     avatarPhoto: null,
     points: 0,
     ownedAvatarPacks: ["base"],
@@ -184,7 +199,7 @@ function setPhoto(username, password, photoDataUrl, token) {
   const auth = authenticate(username, password, token);
   if (auth.error) return auth;
   photoDataUrl = String(photoDataUrl || "");
-  if (!/^data:image\/(png|jpeg|jpg|webp);base64,/.test(photoDataUrl)) return { error: "Неверный формат изображения." };
+  if (!PHOTO_RE.test(photoDataUrl)) return { error: "Неверный формат изображения." };
   if (photoDataUrl.length > MAX_PHOTO_LEN) return { error: "Фото слишком большое — уменьшите размер." };
   const rec = auth.rec;
   rec.avatarPhoto = photoDataUrl;

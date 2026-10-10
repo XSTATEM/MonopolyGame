@@ -1,13 +1,21 @@
 {
-  "name": "Trade Monopoly",
+  "id": "/",
+  "name": "Trade Monopoly — биржевая настольная игра",
   "short_name": "Trade Monopoly",
-  "start_url": "/",
+  "description": "Акции 31 компании, недвижимость, кредиты и интриги. Онлайн с друзьями или на одном устройстве с ботами.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#EFE8DA",
-  "theme_color": "#4C7A6B",
+  "theme_color": "#140F0B",
+  "categories": ["games", "board", "finance"],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
