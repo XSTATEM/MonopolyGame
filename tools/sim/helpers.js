@@ -50,13 +50,19 @@ function makeCtx(S, me) {
 
     // --- деньги ---
     feePct() { return E.bankFeePct(me.reputation); },
-    buyCost(t, pct) { return ctx.price(t) * (pct / 100) * (1 + ctx.feePct()); },
+    // Цена покупки по броску; с правилом «комиссия держателям» — вместе с комиссией.
+    buyCost(t, pct) {
+      const commission = typeof I.buyCommissionAmount === "function" ? I.buyCommissionAmount(room, t, me.id, pct) : 0;
+      return ctx.price(t) * (pct / 100) * (1 + ctx.feePct()) + commission;
+    },
     // Сколько % можно купить на budget (с учётом комиссии, лимита 25% за бросок и свободных акций).
+    // Наибольшая доля, которая укладывается в бюджет. Перебором: с комиссией
+    // держателям цена покупки не пропорциональна доле.
     affordablePct(t, budget) {
-      const per = ctx.buyCost(t, 1);
-      if (!(per > 0) || !(budget > 0)) return 0;
-      const pct = Math.floor((budget - 1e-6) / per);
-      return clamp(pct, 0, Math.min(25, ctx.free(t)));
+      if (!(budget > 0)) return 0;
+      const max = Math.floor(Math.min(25, ctx.free(t)));
+      for (let pct = max; pct >= 1; pct--) if (ctx.buyCost(t, pct) <= budget - 1e-6) return pct;
+      return 0;
     },
     nw(p) { return E.netWorth(room, p || me); },
     stockValue(p) {

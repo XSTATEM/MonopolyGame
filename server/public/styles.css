@@ -1348,3 +1348,13 @@ body.reduce-motion .coach-ring.pulse{animation:none;}
   .coach-dim, .coach-dim-fill, .coach-hole, .coach-ring, .coach-card, .coach-mini{transition:none;}
   .coach-ring.pulse{animation:none;}
 }
+
+/* --- Темп партии: комиссия держателям, финал, место и отрыв ------------- */
+.slider-comm{margin-top:6px;font-size:12.5px;font-weight:600;color:var(--text-2);}
+.slider-comm b{font-family:var(--font-mono);color:var(--down);font-weight:700;}
+.rep-badge.final{background:color-mix(in srgb, var(--stage-accent) 18%, transparent);color:var(--stage-accent);border-color:color-mix(in srgb, var(--stage-accent) 45%, transparent);}
+.rep-badge.place{font-family:var(--font-ui);}
+.rep-badge.place.lead{color:var(--up);}
+.end-rank-row{flex-wrap:wrap;}
+.end-rank-detail{flex-basis:100%;text-align:left;font-size:12px;font-weight:600;color:var(--text-2);padding-left:34px;margin-top:2px;}
+.end-rank-detail .up{color:var(--up);} .end-rank-detail .down{color:var(--down);}
