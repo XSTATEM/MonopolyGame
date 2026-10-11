@@ -1,0 +1,46 @@
+# systemd-юнит игрового сервера «Биржи».
+# install.sh подставляет __NODE_BIN__, __APP_DIR__, __DATA_DIR__ и кладёт файл
+# в /etc/systemd/system/birzha.service. Настройки — в /etc/birzha.env.
+
+[Unit]
+Description=Birzha (Trade Monopoly) game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=birzha
+Group=birzha
+WorkingDirectory=__APP_DIR__/app
+EnvironmentFile=/etc/birzha.env
+ExecStart=__NODE_BIN__ __APP_DIR__/app/server.js
+Restart=always
+RestartSec=2
+# По SIGTERM сервер сохраняет идущие партии на диск и закрывает сокеты.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Изоляция: писать процесс может только в каталог данных.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=__DATA_DIR__
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+UMask=0027
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

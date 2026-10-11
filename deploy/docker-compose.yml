@@ -1,0 +1,19 @@
+# Запуск в Docker вместо systemd:  docker compose -f deploy/docker-compose.yml up -d --build
+# Порт открыт только на localhost — снаружи ставьте nginx (deploy/nginx-birzha.conf)
+# или замените на "80:8792", если прокси не нужен.
+services:
+  birzha:
+    build: ../server
+    restart: unless-stopped
+    environment:
+      TRUST_PROXY: "1"
+      ROOM_TTL_HOURS: "12"
+    ports:
+      - "127.0.0.1:8792:8792"
+    volumes:
+      - birzha-data:/data
+    # Время на сохранение партий перед остановкой.
+    stop_grace_period: 20s
+
+volumes:
+  birzha-data:

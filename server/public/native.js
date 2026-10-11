@@ -65,7 +65,9 @@
     haptic: function(kind){
       if(plugins.Haptics && plugins.Haptics.impact){
         plugins.Haptics.impact({ style: kind === "heavy" ? "HEAVY" : kind === "light" ? "LIGHT" : "MEDIUM" }).catch(function(){});
-      } else if(navigator.vibrate){
+      } else if(navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)){
+        // До первого касания страницы браузер вибрацию всё равно блокирует
+        // и пишет ошибку в консоль (анимации зовут haptic и на чужих ходах).
         try { navigator.vibrate(kind === "heavy" ? 30 : 12); } catch(e){}
       }
     },

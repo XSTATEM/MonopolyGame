@@ -8,7 +8,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/run-all.js",
+    "test:fast": "node test/run-all.js --fast"
   },
   "dependencies": {
     "ws": "^8.18.0"
