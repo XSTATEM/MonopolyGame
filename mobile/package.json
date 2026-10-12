@@ -4,6 +4,7 @@
   "private": true,
   "description": "Нативное приложение Trade Monopoly (Android/iOS) на Capacitor — оболочка вокруг веб-клиента из server/public",
   "scripts": {
+    "test": "node scripts/build-flavor.test.mjs",
     "copy-web": "node scripts/copy-web.mjs",
     "icons": "python3 scripts/make-icons.py",
     "assets": "capacitor-assets generate --iconBackgroundColor \"#EFE8DA\" --iconBackgroundColorDark \"#140F0B\" --splashBackgroundColor \"#EFE8DA\" --splashBackgroundColorDark \"#140F0B\"",

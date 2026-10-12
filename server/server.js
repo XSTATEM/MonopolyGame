@@ -4,6 +4,22 @@ const path = require("path");
 const { WebSocketServer } = require("ws");
 const engine = require("./public/engine.js");
 const users = require("./users.js");
+// Магазин и видео с наградой. Без настроек в окружении всё выключено:
+// каталог отвечает {enabled:false}, остальные маршруты — 404.
+const Payments = require("./payments.js");
+const Ads = require("./ads.js");
+
+// Настройки из окружения. На своём сервере они лежат в /etc/birzha.env
+// (см. deploy/README.md); без них сервер работает как раньше — на всех
+// интерфейсах, порт 8792, данные в server/data.
+const PORT = Number(process.env.PORT) || 8792;
+const HOST = process.env.HOST || "";
+// За nginx реальный IP игрока и протокол приходят в X-Forwarded-*/X-Real-IP.
+// Без TRUST_PROXY эти заголовки игнорируются: их может подделать кто угодно.
+const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+const ROOM_TTL_MS = (Number(process.env.ROOM_TTL_HOURS) || 12) * 3600 * 1000;
+const ROOMS_FILE = path.join(users.DATA_DIR, "rooms.json");
+const startedAt = Date.now();
 
 function fmt(n) { return "$" + Math.round(n).toLocaleString("ru-RU"); }
 
@@ -12,6 +28,8 @@ function fmt(n) { return "$" + Math.round(n).toLocaleString("ru-RU"); }
 // ---------------------------------------------------------------------
 const rooms = new Map(); // code -> room
 const connections = new Map(); // ws -> {roomCode, playerId, name}
+const roomLastActive = new Map(); // code -> время последнего события в комнате
+let roomsDirty = false; // есть изменения, ещё не сброшенные в rooms.json
 
 function getOrCreateRoom(code) {
   if (!rooms.has(code)) rooms.set(code, engine.freshRoom(code));
@@ -26,6 +44,10 @@ function sendTo(ws, obj) { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify
 function sendError(conn, message) { sendTo(conn.ws, { type: "error", message }); }
 
 function broadcast(room) {
+  // Любое изменение комнаты проходит через рассылку — здесь же отмечаем его
+  // для сохранения на диск и для таймера удаления заброшенных комнат.
+  roomsDirty = true;
+  roomLastActive.set(room.code, Date.now());
   for (const [ws, conn] of connections) {
     if (conn.roomCode === room.code && ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(engine.buildStatePayload(room, conn.playerId)));
@@ -81,21 +103,112 @@ function syncAccountPoints(room) {
   const award = room.lastGamePointsAward;
   if (!award) return;
   room.lastGamePointsAward = null;
-  for (const [, c] of connections) {
-    if (c.roomCode === room.code && c.playerId === award.playerId && c.accountUsername) {
-      const total = users.addPoints(c.accountUsername, award.amount);
-      const p = room.players.find((x) => x.id === award.playerId);
-      if (p && total != null) p.points = total;
-      break;
-    }
-  }
+  // Имя игрока в онлайн-комнате — это ник его аккаунта (см. handleJoin).
+  // Раньше очки искались по открытому сокету и терялись, если победитель
+  // в момент окончания партии был не в сети, хотя экран писал «Начислено +N».
+  const p = room.players.find((x) => x.id === award.playerId);
+  if (!p || p.isBot) return;
+  const total = users.addPoints(p.name, award.amount);
+  if (total != null) p.points = total;
+  // users.json уже записан — сразу сохраняем и комнату в финальном виде. Иначе
+  // при падении процесса в ближайшие 30 с поднялся бы снимок до конца партии,
+  // и ту же партию можно было бы доиграть и получить очки второй раз.
+  persistRooms();
 }
+
+// ---------------------------------------------------------------------
+// Защита от подбора паролей: не больше AUTH_MAX_FAILS неудачных входов с
+// одного IP за AUTH_WINDOW_MS. Лимит в nginx закрывает только /api/login,
+// а пароль можно проверять и через вход в комнату по WebSocket — поэтому
+// считаем здесь, для обоих путей.
+// ---------------------------------------------------------------------
+const AUTH_WINDOW_MS = 10 * 60 * 1000;
+const AUTH_MAX_FAILS = 20;
+const TOO_MANY_FAILS = "Слишком много неудачных попыток входа. Подождите 10 минут.";
+const authFails = new Map(); // ip -> {count, resetAt}
+
+// Заголовки прокси принимаем, только если соединение пришло от него самого —
+// с локального или внутреннего адреса (nginx на этой машине, Docker, балансировщик
+// хостинга). Если порт по ошибке открыт наружу при TRUST_PROXY=1, клиент не
+// подставит себе X-Real-IP и не обойдёт лимиты и проверку адресов ЮKassa.
+function isLocalPeer(addr) {
+  let a = String(addr || "").toLowerCase();
+  if (a.startsWith("::ffff:")) a = a.slice(7);
+  if (a === "::1" || /^127\./.test(a) || /^10\./.test(a) || /^192\.168\./.test(a)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(a) || /^169\.254\./.test(a) || /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a)) return true;
+  return /^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a);
+}
+function clientIp(req) {
+  if (TRUST_PROXY && isLocalPeer(req.socket && req.socket.remoteAddress)) {
+    const real = String(req.headers["x-real-ip"] || "").trim();
+    if (real) return real;
+    // nginx дописывает адрес клиента В КОНЕЦ X-Forwarded-For; начало списка
+    // присылает сам клиент и может его подделать.
+    const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (xff.length) return xff[xff.length - 1];
+  }
+  return (req.socket && req.socket.remoteAddress) || "";
+}
+function authBlocked(ip) {
+  const rec = authFails.get(ip);
+  if (!rec) return false;
+  if (Date.now() > rec.resetAt) { authFails.delete(ip); return false; }
+  return rec.count >= AUTH_MAX_FAILS;
+}
+function noteAuthFail(ip) {
+  const now = Date.now();
+  const rec = authFails.get(ip);
+  if (!rec || now > rec.resetAt) authFails.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
+  else rec.count++;
+}
+
+// Счётчик событий с одного IP за окно — для регистраций и новых комнат.
+function ipLimiter(windowMs, max) {
+  const hits = new Map(); // ip -> {count, resetAt}
+  return {
+    blocked(ip) {
+      const rec = hits.get(ip);
+      if (!rec) return false;
+      if (Date.now() > rec.resetAt) { hits.delete(ip); return false; }
+      return rec.count >= max;
+    },
+    note(ip) {
+      const now = Date.now();
+      const rec = hits.get(ip);
+      if (!rec || now > rec.resetAt) hits.set(ip, { count: 1, resetAt: now + windowMs });
+      else rec.count++;
+    },
+    sweep(now) { for (const [ip, rec] of hits) if (now > rec.resetAt) hits.delete(ip); },
+  };
+}
+// Регистрации: лимит nginx закрывает только /api/register, а аккаунт создаёт
+// и вход в комнату по WebSocket. Каждая регистрация — scrypt и полная
+// перезапись users.json, поэтому поток регистраций тормозил бы все партии и
+// раздувал файл. Считаем созданные аккаунты (неудачная попытка дешёвая).
+const regLimit = ipLimiter(60 * 60 * 1000, 10);
+const TOO_MANY_REGS = "Слишком много регистраций с вашего адреса — попробуйте через час.";
+// Новые комнаты: иначе один скрипт с десятком сокетов занимал все MAX_ROOMS.
+const roomLimit = ipLimiter(10 * 60 * 1000, 20);
+// Магазин и реклама: заказы, проверка покупок, билеты на видео. Каждый такой
+// запрос может уйти к провайдеру — ограничиваем поток с одного IP.
+const shopLimit = ipLimiter(10 * 60 * 1000, 120);
+// Вебхук ЮKassa — без входа, и каждое уведомление проверяется запросом к API
+// ЮKassa с ключом магазина. Настоящих уведомлений единицы — поток выдуманных режем.
+const hookLimit = ipLimiter(10 * 60 * 1000, 300);
 
 // Вход в комнату теперь требует аккаунт: ник — это логин, доступ к нему
 // закрыт паролем (scrypt-хэш в users.js), чтобы прогресс/очки нельзя было
 // присвоить или потерять, просто зная чужой ник.
+const MAX_ROOMS = Number(process.env.MAX_ROOMS) || 500;
+// Код комнаты показывается в списке комнат и в интерфейсе — без управляющих
+// символов и разметки.
+const ROOM_CODE_RE = /^[^\u0000-\u001f\u007f<>"'&\\`]{1,20}$/;
+
 function handleJoin(ws, msg) {
   const code = String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
+  if (!ROOM_CODE_RE.test(code)) return sendTo(ws, { type: "error", message: "Код комнаты не должен содержать кавычек, угловых скобок и служебных символов." });
+  if (!rooms.has(code) && rooms.size >= MAX_ROOMS) return sendTo(ws, { type: "error", message: "На сервере слишком много комнат. Войдите в существующую или попробуйте позже." });
+  if (!rooms.has(code) && roomLimit.blocked(ws.clientIp)) return sendTo(ws, { type: "error", message: "Слишком много новых комнат с вашего адреса — войдите в существующую или подождите несколько минут." });
 
   // Три способа подтвердить личность: свежий логин, регистрация, либо (новое)
   // токен сессии из куки — так игрока не выкидывает из аккаунта при обновлении
@@ -110,15 +223,37 @@ function handleJoin(ws, msg) {
     const password = String(msg.password || "");
     if (!username) return sendTo(ws, { type: "error", message: "Введите ник." });
     if (!password) return sendTo(ws, { type: "error", message: "Введите пароль." });
+    if (authBlocked(ws.clientIp)) return sendTo(ws, { type: "error", message: TOO_MANY_FAILS });
+    if (authMode === "register" && regLimit.blocked(ws.clientIp)) return sendTo(ws, { type: "error", message: TOO_MANY_REGS });
     authResult = authMode === "register"
       ? users.register(username, password, msg.gender, msg.avatar)
       : users.login(username, password);
+    if (authResult.authFailed) noteAuthFail(ws.clientIp);
+    if (authMode === "register" && !authResult.error) regLimit.note(ws.clientIp);
   }
   if (authResult.error) return sendTo(ws, { type: "error", message: authResult.error, sessionExpired: !!sessionToken });
   const profile = authResult.user;
   const effectiveToken = authResult.sessionToken || sessionToken;
 
+  // Этот же сокет уже сидел в другой комнате (повторный join без
+  // переподключения): там игрок иначе навсегда остался бы «в сети».
+  const prevConn = connections.get(ws);
+  if (prevConn && prevConn.roomCode !== code) {
+    connections.delete(ws);
+    const prevRoom = rooms.get(prevConn.roomCode);
+    if (prevRoom) {
+      // Из комнаты ожидания игрок ушёл сам — убираем его сразу, а опустевшую
+      // комнату удаляем: прыжками по кодам иначе можно было держать сотни
+      // комнат с «призраками» и упереться в MAX_ROOMS.
+      if (prevRoom.phase === "lobby") engine.leaveLobby(prevRoom, prevConn.playerId);
+      else markOffline(prevRoom, prevConn.playerId);
+      if (!dropIfEmpty(prevRoom)) broadcast(prevRoom);
+    }
+  }
+
+  const isNewRoom = !rooms.has(code);
   const room = getOrCreateRoom(code);
+  if (isNewRoom) roomLimit.note(ws.clientIp);
 
   // Тот же аккаунт уже сидит в этой комнате через другой сокет. Чаще всего это
   // «полуоткрытое» соединение после смены сети на телефоне (Wi-Fi → LTE):
@@ -137,21 +272,40 @@ function handleJoin(ws, msg) {
     }
   }
 
-  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points, profile.equippedBoardSkin);
-  if (result.error) return sendTo(ws, { type: "error", message: result.error });
+  // За столом показывается рейтинг (только победы), а не баланс очков.
+  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.rating, profile.equippedBoardSkin);
+  if (result.error) { dropIfEmpty(room); return sendTo(ws, { type: "error", message: result.error }); }
+  // Фото профиля — ссылкой на /api/avatar, а не самой картинкой (см. users.photoUrl).
+  result.player.avatarPhoto = users.photoUrl(profile);
 
   connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name: profile.username, accountUsername: profile.username });
   sendTo(ws, { type: "joined", playerId: result.player.id, room: code, sessionToken: effectiveToken, username: profile.username });
   broadcast(room);
 }
 
+// Тикеры приходят от клиента как есть. Ключ вроде "__proto__" или
+// "constructor" находил «компанию» в прототипе объекта room.companies, и
+// движок успевал испортить комнату до исключения: наличные игрока → NaN,
+// капитал всех игроков → null. Пропускаем только настоящие тикеры.
+function tickersValid(room, msg) {
+  const isTicker = (t) => typeof t === "string" && Object.prototype.hasOwnProperty.call(room.companies, t);
+  if (msg.ticker !== undefined && !isTicker(msg.ticker)) return false;
+  if (msg.wantTicker != null && msg.wantTicker !== "" && !isTicker(msg.wantTicker)) return false;
+  if (msg.targetTicker !== undefined && !isTicker(msg.targetTicker)) return false;
+  if (msg.absorbTickers !== undefined && !(Array.isArray(msg.absorbTickers) && msg.absorbTickers.every(isTicker))) return false;
+  return true;
+}
+
 function handleMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch (e) { return; }
+  if (!msg || typeof msg !== "object") return;
   if (msg.type === "join") return handleJoin(ws, msg);
   const conn = connections.get(ws);
   if (!conn) return sendTo(ws, { type: "error", message: "Сначала присоединитесь к комнате." });
   const room = requireRoom(conn);
+  if (!room) return sendTo(ws, { type: "error", message: "Комната больше не существует — войдите заново." });
+  if (!tickersValid(room, msg)) return sendError(conn, "Неизвестная компания.");
 
   switch (msg.type) {
     case "roll": return run(conn, engine.rollDice(room, conn.playerId));
@@ -205,16 +359,89 @@ function handleMessage(ws, raw) {
     case "voteKick": return runKick(conn, engine.voteKick(room, conn.playerId, msg.target, !!msg.yes));
     case "cancelKickVote": return run(conn, engine.cancelKickVote(room, conn.playerId));
     case "reaction": return run(conn, engine.sendReaction(room, conn.playerId, msg.emoji));
+    case "leaveLobby": return handleLeaveLobby(ws, conn);
   }
+}
+
+// «Покинуть комнату» в лобби: игрок уходит из комнаты сразу, а не через
+// LOBBY_LEAVE_GRACE_MS после закрытия сокета (см. scheduleLobbyLeave).
+function handleLeaveLobby(ws, conn) {
+  const room = requireRoom(conn);
+  if (!room) return;
+  connections.delete(ws); // закрытие сокета после этого уже ничего не меняет
+  const result = engine.leaveLobby(room, conn.playerId);
+  // Партия уже идёт — просто «не в сети», как при обычном закрытии вкладки.
+  if (result.error) markOffline(room, conn.playerId);
+  if (!dropIfEmpty(room)) broadcast(room);
+}
+
+// Комната ожидания, из которой ушёл последний игрок, никому не нужна —
+// удаляем сразу, не дожидаясь прохода sweepRooms. Возвращает true, если удалили
+// (тогда рассылать её состояние уже некому).
+function dropIfEmpty(room) {
+  if (room.players.length || rooms.get(room.code) !== room) return false;
+  rooms.delete(room.code);
+  roomLastActive.delete(room.code);
+  roomsDirty = true;
+  return true;
+}
+
+// Игрок отключился посреди партии. Через OFFLINE_KICK_GRACE_MS его можно
+// исключить одним голосом, а если это хост — новую партию может начать любой
+// (engine.kickVotesNeeded / hostAway). Само время состояние комнаты не меняет,
+// поэтому по истечении паузы рассылаем его заново: карточка игрока и меню
+// партии у остальных показывают это без нового хода.
+function scheduleGraceBroadcast(room, playerId) {
+  const t = setTimeout(() => {
+    if (rooms.get(room.code) !== room) return;
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.connected || p.kicked) return;
+    // Голосование против него уже идёт — теперь хватает одного голоса «за»
+    // (голос инициатора уже есть): итог подводим сразу, а не по чьему-то
+    // следующему нажатию (баннер показывал бы 1/1 без исключения).
+    if (room.kickVote && room.kickVote.targetId === playerId) {
+      engine.resolveKickVote(room);
+      syncAccountPoints(room);
+      roomsDirty = true;
+    }
+    for (const c of connections.values()) if (c.roomCode === room.code) return broadcast(room);
+  }, engine.OFFLINE_KICK_GRACE_MS + 250);
+  if (t.unref) t.unref();
+}
+function markOffline(room, playerId) {
+  engine.setConnected(room, playerId, false);
+  scheduleGraceBroadcast(room, playerId);
+}
+
+// Лобби: игрок, закрывший вкладку без «Покинуть комнату», убирается из
+// комнаты, если не вернулся за LOBBY_LEAVE_GRACE_MS, — иначе висел бы
+// «призраком»: с ним хост мог начать партию, и та вставала на его ходу.
+// Пауза нужна, чтобы обновление страницы или смена сети (Wi-Fi → LTE) не
+// стоили места в комнате.
+const LOBBY_LEAVE_GRACE_MS = 20000;
+function scheduleLobbyLeave(room, playerId, delayMs) {
+  if (room.phase !== "lobby") return;
+  const t = setTimeout(() => {
+    if (rooms.get(room.code) !== room || room.phase !== "lobby") return;
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.connected) return;
+    if (engine.leaveLobby(room, playerId).ok && !dropIfEmpty(room)) broadcast(room);
+  }, delayMs || LOBBY_LEAVE_GRACE_MS);
+  if (t.unref) t.unref();
 }
 
 function handleNewGame(conn) {
   const room = requireRoom(conn);
   if (!room) return;
   // Сбросить идущую партию может только хост; после конца партии реванш
-  // доступен любому. Иначе любой игрок мог перезапустить чужую игру.
+  // доступен любому. Иначе любой игрок мог перезапустить чужую игру. Хост
+  // пропал надолго (не в сети дольше минуты, исключён) — сбросить может любой,
+  // кто ещё в игре: роль хоста посреди партии больше не переходит.
   if (room.phase !== "ended" && room.hostPlayerId !== conn.playerId) {
-    return sendError(conn, "Начать новую партию до её окончания может только хост комнаты.");
+    const p = room.players.find((x) => x.id === conn.playerId);
+    if (!engine.hostAway(room) || !p || p.bankrupt) {
+      return sendError(conn, "Начать новую партию до её окончания может только хост комнаты (или любой игрок, если хост не в сети дольше минуты).");
+    }
   }
   const fresh = engine.newGameKeepPlayers(room);
   rooms.set(room.code, fresh);
@@ -242,7 +469,87 @@ function handleDeleteRoom(conn) {
     }
     // Удалить комнату из реестра
     rooms.delete(room.code);
+    roomLastActive.delete(room.code);
+    roomsDirty = true;
   }
+}
+
+// ---------------------------------------------------------------------
+// Сохранение партий на диск. Комнаты живут в памяти; чтобы перезапуск или
+// обновление сервера не обрывали игру, они сбрасываются в rooms.json (раз в
+// 30 с, если что-то менялось, и при остановке) и поднимаются при старте —
+// клиенты переподключаются сами (сессия по токену, см. handleJoin).
+// Запись через временный файл и rename: оборванная запись не портит файл.
+// ---------------------------------------------------------------------
+function persistRooms() {
+  try {
+    const list = [...rooms.values()].filter((r) => r.players.length > 0);
+    fs.mkdirSync(users.DATA_DIR, { recursive: true });
+    const tmp = ROOMS_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify({ v: 1, savedAt: Date.now(), rooms: list }), "utf8");
+    fs.renameSync(tmp, ROOMS_FILE);
+    roomsDirty = false;
+  } catch (e) {
+    console.error("Не удалось сохранить комнаты:", e.message);
+  }
+}
+
+function restoreRooms() {
+  let saved;
+  try { saved = JSON.parse(fs.readFileSync(ROOMS_FILE, "utf8")); } catch (e) { return; }
+  if (!saved || saved.v !== 1 || !Array.isArray(saved.rooms)) return;
+  const now = Date.now();
+  for (const room of saved.rooms) {
+    if (!room || typeof room.code !== "string" || !Array.isArray(room.players) || !room.companies) continue;
+    // Сокеты перезапуск не пережили: люди «не в сети», пока не переподключатся.
+    // Пауза перед исключением одним голосом отсчитывается заново — иначе
+    // первый вернувшийся мог бы сразу исключить всех, кто ещё переподключается.
+    room.players.forEach((p) => { if (!p.isBot) { p.connected = false; p.offlineSince = now; } });
+    // Срок решения контролёра о цене выкупа (engine CONTROLLER_DECISION_MS)
+    // по той же причине начинается заново: метка из rooms.json пережила
+    // перезапуск, но контролёр ещё переподключается — иначе после простоя
+    // бросающий сразу оплатил бы по тарифу, не дав ему назначить цену.
+    if (room.pendingRoll && room.pendingRoll.controllerWaitSince) room.pendingRoll.controllerWaitSince = now;
+    rooms.set(room.code, room);
+    roomLastActive.set(room.code, now);
+    // В лобби не вернувшиеся после перезапуска уходят из комнаты (с запасом
+    // времени на автопереподключение клиентов), а не висят «призраками».
+    room.players.forEach((p) => {
+      if (p.isBot) return;
+      scheduleLobbyLeave(room, p.id, 3 * LOBBY_LEAVE_GRACE_MS);
+      if (room.phase === "roll") scheduleGraceBroadcast(room, p.id);
+    });
+  }
+  if (rooms.size) console.log(`Восстановлено комнат: ${rooms.size}`);
+}
+
+// Комнаты, в которых никого нет дольше ROOM_TTL_HOURS, удаляются — иначе
+// реестр (и rooms.json) рос бы бесконечно из брошенных партий. Пустая комната
+// ожидания или законченная партия никому не нужна — её убираем уже через
+// EMPTY_ROOM_GRACE_MS (запас на перезагрузку страницы), иначе список комнат
+// часами показывал бы мёртвые комнаты. Идущую партию ждём весь ROOM_TTL_HOURS.
+const EMPTY_ROOM_GRACE_MS = 5 * 60 * 1000;
+function sweepRooms() {
+  const now = Date.now();
+  const live = new Set();
+  for (const c of connections.values()) live.add(c.roomCode);
+  for (const [code, room] of rooms) {
+    if (live.has(code)) continue;
+    const last = roomLastActive.get(code);
+    if (last == null) { roomLastActive.set(code, now); continue; }
+    const ttl = room.phase === "roll" ? ROOM_TTL_MS : EMPTY_ROOM_GRACE_MS;
+    if (room.players.length === 0 || now - last > ttl) {
+      rooms.delete(code);
+      roomLastActive.delete(code);
+      roomsDirty = true;
+    }
+  }
+  for (const [ip, rec] of authFails) if (now > rec.resetAt) authFails.delete(ip);
+  regLimit.sweep(now);
+  roomLimit.sweep(now);
+  shopLimit.sweep(now);
+  hookLimit.sweep(now);
+  Ads.sweep(now);
 }
 
 // ---------------------------------------------------------------------
@@ -268,7 +575,8 @@ function applyCors(req, res) {
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Authorization — GET-маршруты магазина (токен сессии в заголовке, не в адресе).
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
@@ -293,19 +601,63 @@ function sendJson(res, status, obj, headers) {
   res.writeHead(status, Object.assign({ "Content-Type": "application/json; charset=utf-8" }, headers || {}));
   res.end(JSON.stringify(obj));
 }
+// За HTTPS (напрямую или через nginx) кука получает флаг Secure — иначе
+// браузер мог бы отправить токен сессии по открытому http.
+function isHttps(req) {
+  if (req.socket && req.socket.encrypted) return true;
+  return TRUST_PROXY && isLocalPeer(req.socket && req.socket.remoteAddress)
+    && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+}
 // При успешном логине/регистрации сервер, помимо токена в теле ответа,
 // проставляет и обычную куку — так браузер сам пришлёт её при следующем
 // заходе, даже если клиентский JS почему-то не сохранит токен сам.
-function sessionCookieHeader(token) {
-  return { "Set-Cookie": `tm_session=${encodeURIComponent(token)}; Max-Age=2592000; Path=/; SameSite=Lax` };
+function sessionCookieHeader(token, secure) {
+  return { "Set-Cookie": `tm_session=${encodeURIComponent(token)}; Max-Age=2592000; Path=/; SameSite=Lax${secure ? "; Secure" : ""}` };
 }
-function handleApiPost(req, res, fn) {
+// opts.auth — запрос проверяет пароль: неудачи считаются в лимит подбора.
+// Считаются только неудачи самой проверки (authFailed из users.js) — иначе
+// два десятка нажатий «Купить» без очков блокировали вход всему IP (NAT
+// мобильного оператора, общий Wi-Fi).
+function handleApiPost(req, res, fn, opts) {
+  const ip = clientIp(req);
+  const guarded = !!(opts && opts.auth);
+  if (guarded && authBlocked(ip)) return sendJson(res, 429, { error: TOO_MANY_FAILS });
   readJsonBody(req, 800000)
     .then((body) => {
-      const result = fn(body) || {};
-      const headers = result.sessionToken ? sessionCookieHeader(result.sessionToken) : null;
+      const result = fn(body || {}) || {};
+      if (guarded && result.authFailed) noteAuthFail(ip);
+      delete result.authFailed; // служебный флаг, клиенту не нужен
+      const headers = result.sessionToken ? sessionCookieHeader(result.sessionToken, isHttps(req)) : null;
       sendJson(res, result.error ? 400 : 200, result, headers);
     })
+    .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
+}
+const AUTH = { auth: true };
+
+// Как handleApiPost, но fn может вернуть промис: платёжным маршрутам нужны
+// запросы к провайдерам. Исключение внутри fn — это ошибка сервера (500 и лог),
+// а не «ошибка действия»: ожидаемые отказы fn возвращает как {error, code}
+// (httpStatus — код ответа, если не 400). opts.limiter — лимит запросов с IP.
+function handleApiPostAsync(req, res, fn, opts) {
+  const ip = clientIp(req);
+  const guarded = !!(opts && opts.auth);
+  if (guarded && authBlocked(ip)) return sendJson(res, 429, { error: TOO_MANY_FAILS });
+  if (opts && opts.limiter) {
+    if (opts.limiter.blocked(ip)) return sendJson(res, 429, { error: "Слишком много запросов — подождите немного.", code: "rate_limited" });
+    opts.limiter.note(ip);
+  }
+  readJsonBody(req, 64 * 1024)
+    .then((body) => Promise.resolve().then(() => fn(body || {}, ip)).then((result) => {
+      result = result || {};
+      if (guarded && result.authFailed) noteAuthFail(ip);
+      delete result.authFailed;
+      const status = result.httpStatus || (result.error ? 400 : 200);
+      delete result.httpStatus;
+      sendJson(res, status, result, { "Cache-Control": "no-store" });
+    }, (e) => {
+      console.error("shop:", e && e.message);
+      sendJson(res, 500, { error: "Внутренняя ошибка сервера." });
+    }))
     .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
 }
 
@@ -317,6 +669,17 @@ const server = http.createServer((req, res) => {
   catch (e) { res.writeHead(400); return res.end("Bad request"); }
   // %00 в пути: fs.readFile бросает исключение синхронно, и оно роняло процесс.
   if (reqPath.includes("\0")) { res.writeHead(400); return res.end("Bad request"); }
+
+  // Проверка живости для systemd/update.sh/Docker и внешнего мониторинга.
+  if (reqPath === "/healthz") {
+    return sendJson(res, 200, {
+      ok: true,
+      uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+      rooms: rooms.size,
+      connections: connections.size,
+    }, { "Cache-Control": "no-store" });
+  }
+
   if (reqPath.startsWith("/api/")) {
     applyCors(req, res);
     if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
@@ -343,11 +706,25 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, users.getLeaderboard(50));
   }
 
+  if (reqPath.startsWith("/api/avatar/") && req.method === "GET") {
+    const photo = users.getPhoto(reqPath.slice("/api/avatar/".length));
+    if (!photo) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("Not found"); }
+    // Адрес содержит версию фото (?v=…), поэтому кешировать можно надолго.
+    res.writeHead(200, { "Content-Type": photo.mime, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
+    return res.end(photo.buf);
+  }
+
   if (reqPath === "/api/login" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.login(b.username, b.password));
+    return handleApiPost(req, res, (b) => users.login(b.username, b.password), AUTH);
   }
   if (reqPath === "/api/register" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.register(b.username, b.password, b.gender, b.avatar));
+    const ip = clientIp(req);
+    if (regLimit.blocked(ip)) return sendJson(res, 429, { error: TOO_MANY_REGS });
+    return handleApiPost(req, res, (b) => {
+      const result = users.register(b.username, b.password, b.gender, b.avatar);
+      if (!result.error) regLimit.note(ip);
+      return result;
+    });
   }
   // Проверка куки/токена сессии при загрузке страницы — без пароля, только
   // чтобы молча восстановить "вы вошли как X" (или тихо промолчать, если
@@ -359,20 +736,38 @@ const server = http.createServer((req, res) => {
     return handleApiPost(req, res, (b) => users.invalidateSession(b.username, b.token));
   }
   if (reqPath === "/api/profile/update" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.updateProfile(b.username, b.password, b.gender, b.avatar, b.token));
+    return handleApiPost(req, res, (b) => users.updateProfile(b.username, b.password, b.gender, b.avatar, b.token), AUTH);
   }
   if (reqPath === "/api/profile/password" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.changePassword(b.username, b.password, b.newPassword, b.token));
+    return handleApiPost(req, res, (b) => users.changePassword(b.username, b.password, b.newPassword, b.token), AUTH);
   }
   if (reqPath === "/api/profile/photo" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl, b.token));
+    return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl, b.token), AUTH);
   }
   if (reqPath === "/api/skins/buy" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind, b.token));
+    return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind, b.token), AUTH);
   }
   if (reqPath === "/api/skins/equip" && req.method === "POST") {
-    return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind, b.token));
+    return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind, b.token), AUTH);
   }
+
+  // Магазин и реклама (payments.js, ads.js). Без настроек в окружении
+  // маршруты отвечают «выключено», а каталог — {enabled:false}.
+  const SHOP = { auth: true, limiter: shopLimit };
+  if (reqPath === "/api/shop/catalog" && req.method === "GET") return Payments.handleCatalog(req, res);
+  if (reqPath === "/api/shop/order" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Payments.createOrder(b), SHOP);
+  if (reqPath.startsWith("/api/shop/order/") && req.method === "GET") return Payments.handleOrderStatus(req, res, reqPath.slice("/api/shop/order/".length));
+  if (reqPath === "/api/shop/yookassa/webhook" && req.method === "POST") {
+    const ip = clientIp(req);
+    if (hookLimit.blocked(ip)) return sendJson(res, 429, { error: "Слишком много запросов." }, { "Cache-Control": "no-store" });
+    hookLimit.note(ip);
+    return Payments.handleYookassaWebhook(req, res, ip);
+  }
+  if (reqPath === "/api/shop/verify" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Payments.verify(b), SHOP);
+  if (reqPath === "/api/shop/entitlements" && req.method === "GET") return Payments.handleEntitlements(req, res);
+  if (reqPath === "/api/ads/start" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Ads.start(b), SHOP);
+  if (reqPath === "/api/ads/reward" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Ads.reward(b), SHOP);
+  if (reqPath === "/api/ads/admob-ssv" && req.method === "GET") return Ads.handleAdmobSsv(req, res);
 
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";
   const filePath = path.join(PUBLIC_DIR, reqPath);
@@ -398,13 +793,31 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ server });
-wss.on("connection", (ws) => {
+// Самое большое сообщение клиента — чат или настройки комнаты, это сотни байт.
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });
+// Не больше MSG_MAX сообщений за MSG_WINDOW_MS с одного сокета: человеку
+// хватает с запасом, а залить комнату реакциями или чатом уже не выйдет.
+const MSG_WINDOW_MS = 5000;
+const MSG_MAX = 60;
+wss.on("connection", (ws, req) => {
   ws.isAlive = true;
+  ws.clientIp = clientIp(req);
+  ws.msgWindowStart = Date.now();
+  ws.msgCount = 0;
   ws.on("pong", () => { ws.isAlive = true; });
+  // Битый кадр или превышение maxPayload: ws сообщает об этом событием error
+  // и сам закрывает сокет. Без обработчика событие стало бы исключением и
+  // уронило бы весь процесс со всеми комнатами.
+  ws.on("error", (e) => { console.warn("ws error:", e.message); });
   ws.on("message", (raw) => {
-    // Ошибка в обработке одного сообщения (например, тикер "__proto__")
-    // не должна останавливать сервер со всеми комнатами.
+    const now = Date.now();
+    if (now - ws.msgWindowStart > MSG_WINDOW_MS) { ws.msgWindowStart = now; ws.msgCount = 0; }
+    if (++ws.msgCount > MSG_MAX) {
+      if (ws.msgCount === MSG_MAX + 1) sendTo(ws, { type: "error", message: "Слишком много действий подряд — подождите пару секунд." });
+      return;
+    }
+    // Ошибка в обработке одного сообщения не должна останавливать сервер
+    // со всеми комнатами.
     try { handleMessage(ws, raw); }
     catch (e) { console.error("handleMessage:", e); }
   });
@@ -413,7 +826,8 @@ wss.on("connection", (ws) => {
     if (conn) {
       const room = rooms.get(conn.roomCode);
       if (room) {
-        engine.setConnected(room, conn.playerId, false);
+        markOffline(room, conn.playerId);
+        scheduleLobbyLeave(room, conn.playerId);
         broadcast(room);
       }
       connections.delete(ws);
@@ -430,5 +844,42 @@ const pingInterval = setInterval(() => {
 }, 30000);
 wss.on("close", () => clearInterval(pingInterval));
 
-const PORT = process.env.PORT || 8792;
-server.listen(PORT, () => { console.log(`Trade Monopoly сервер запущен: http://localhost:${PORT}`); });
+const maintenanceInterval = setInterval(() => {
+  sweepRooms();
+  if (roomsDirty) persistRooms();
+}, 30000);
+
+// ---------------------------------------------------------------------
+// Остановка (systemctl stop/restart, docker stop, Ctrl+C): сохраняем партии
+// и закрываем сокеты кодом 1012 «перезапуск сервиса» — клиент сам
+// переподключится, как только сервер поднимется.
+// ---------------------------------------------------------------------
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal}: сохраняю партии и останавливаюсь…`);
+  clearInterval(pingInterval);
+  clearInterval(maintenanceInterval);
+  persistRooms();
+  for (const ws of wss.clients) { try { ws.close(1012, "restart"); } catch (e) {} }
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+// Непойманная ошибка всё равно завершит процесс (systemd его перезапустит),
+// но сначала сохраняем партии, чтобы игроки вернулись в ту же игру.
+process.on("uncaughtException", (e) => {
+  console.error("uncaughtException:", e);
+  persistRooms();
+  process.exit(1);
+});
+
+restoreRooms();
+// Магазин: помощники HTTP передаём в модули (без дублей), там же — сверка
+// заказов при старте и фоновые задачи (таймеры с unref).
+Payments.init({ sendJson, readJsonBody });
+Ads.init({ sendJson });
+const onListen = () => { console.log(`Trade Monopoly сервер запущен: http://${HOST || "localhost"}:${PORT}`); };
+if (HOST) server.listen(PORT, HOST, onListen); else server.listen(PORT, onListen);

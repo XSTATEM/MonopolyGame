@@ -94,6 +94,10 @@
 body.theme-emerald{ --stage-c1:#1E4536; --stage-c2:#0F2219; --stage-c3:#08130E; --stage-accent:#4FE3A8; --frame:#2B4A3B; }
 body.theme-midnight{ --stage-c1:#283063; --stage-c2:#141733; --stage-c3:#0A0B1C; --stage-accent:#8FA8FF; --frame:#2E3566; }
 body.theme-royal{ --stage-c1:#5A2338; --stage-c2:#2B0F1B; --stage-c3:#170810; --stage-accent:#E3B34F; --frame:#5E2A3B; }
+/* Премиум («Золото биржи», «Неон») и набор «Уолл-стрит» — см. skins.js. */
+body.theme-gold{ --stage-c1:#5C4A1E; --stage-c2:#2B200B; --stage-c3:#171006; --stage-accent:#F2C94C; --frame:#5E4A1F; }
+body.theme-neon{ --stage-c1:#1B2A4A; --stage-c2:#0C1222; --stage-c3:#05080F; --stage-accent:#39E6FF; --frame:#24335A; }
+body.theme-wallstreet{ --stage-c1:#1F3B2C; --stage-c2:#0F1E16; --stage-c3:#08110C; --stage-accent:#C9A45C; --frame:#2A4A38; }
 
 /* ---------------------------------------------------------------------
    База
@@ -107,8 +111,22 @@ body{margin:0;font-family:var(--font-ui);font-size:15px;line-height:1.45;color:v
     radial-gradient(circle at 88% 78%, var(--bg-patch2) 0%, transparent 42%),
     var(--bg);
 }
-body.reduce-motion *{animation-duration:.001s !important;transition-duration:.001s !important;}
-@media (prefers-reduced-motion:reduce){ *{animation-duration:.001s !important;transition-duration:.001s !important;} }
+/* «Сократить анимации» (настройка) и системная настройка: одна итерация без
+   задержки — бесконечные анимации (пульсация клетки, спиннер) не превращаются в
+   мерцание 1 мс, а элементы с задержкой появления не остаются невидимыми.
+   Псевдоэлементы перечислены явно: «*» их не задевает. */
+body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after{animation-duration:.001s !important;animation-iteration-count:1 !important;animation-delay:0s !important;transition-duration:.001s !important;scroll-behavior:auto !important;}
+@media (prefers-reduced-motion:reduce){ *, *::before, *::after{animation-duration:.001s !important;animation-iteration-count:1 !important;animation-delay:0s !important;transition-duration:.001s !important;scroll-behavior:auto !important;} }
+/* Реакция над аватаром кончается кадром opacity:0 — без анимации она просто
+   видна (гасит её JS через REACTION_MS); сдвиг повторяет основной кадр всплытия. */
+body.reduce-motion .pchip .av-reaction{animation:none !important;opacity:1;transform:translate(-50%,-10px);}
+@media (prefers-reduced-motion:reduce){ .pchip .av-reaction{animation:none !important;opacity:1;transform:translate(-50%,-10px);} }
+@media (max-width:1023px), (max-height:599px){
+  body.reduce-motion .pchip .av-reaction{transform:translate(-50%,0);}
+}
+@media (max-width:1023px) and (prefers-reduced-motion:reduce), (max-height:599px) and (prefers-reduced-motion:reduce){
+  .pchip .av-reaction{transform:translate(-50%,0);}
+}
 img{max-width:100%;}
 a{color:var(--accent);}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
@@ -157,6 +175,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);box-shadow:0 0
 input[type="checkbox"]{min-height:0;width:22px;height:22px;accent-color:var(--primary);}
 input[type="number"]{font-family:var(--font-mono);}
 select{cursor:pointer;}
+/* iOS (Safari и WKWebView) увеличивает страницу при фокусе на поле мельче 16px
+   и не возвращает масштаб — фиксированные слои уезжают за экран. На тач-экранах
+   и узких окнах поля 16px, на десктопе с мышью остаются 15px. */
+@media (pointer:coarse), (max-width:480px){
+  input,select,textarea{font-size:16px;}
+}
 label{color:var(--text-2);}
 
 .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
@@ -186,12 +210,21 @@ button.chip{min-height:36px;}
 .delta.flat{color:var(--text-2);background:var(--line);}
 .eyebrow{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);}
 
-/* Логотип компании: токен цвета сектора с аббревиатурой (одинаково на поле и в списках). */
+/* Логотип компании: токен цвета сектора (одинаково на поле и в списках). С картинкой
+   (.has-img) на нём светлая плашка с логотипом, по краю видна рамка цвета сектора;
+   без картинки (файла нет, не загрузился) — аббревиатура. */
 .co-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--r-xs);flex:none;vertical-align:middle;margin-right:8px;
   color:#fff;font-family:var(--font-mono);font-weight:700;font-size:9.5px;letter-spacing:-.02em;background:var(--surface-3);overflow:hidden;box-shadow:inset 0 -2px 0 rgba(0,0,0,.16);}
 .co-logo.sec-tech{background:var(--sec-tech);} .co-logo.sec-media{background:var(--sec-media);} .co-logo.sec-consumer{background:var(--sec-consumer);}
 .co-logo.sec-industrial{background:var(--sec-industrial);} .co-logo.sec-finance{background:var(--sec-finance);} .co-logo.sec-re{background:var(--sec-re);}
 .cell-logo-name{display:inline-flex;align-items:center;}
+.has-img > .co-abbr{display:none;}
+/* Размеры в % от токена/клетки — картинка не сдвигает раскладку ни до, ни после
+   загрузки. Не позиционирована: заливки анимаций (::before/::after клетки поля,
+   anim.js) остаются поверх неё. pointer-events:none — клик и долгое нажатие
+   достаются кнопке, а не картинке (без меню «сохранить изображение» на телефоне). */
+.logo-img{display:block;flex:none;box-sizing:border-box;width:84%;height:84%;min-width:0;min-height:0;padding:9%;
+  object-fit:contain;background:#FBF8F1;border-radius:22%;pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;}
 
 /* ---------------------------------------------------------------------
    Экраны меню (светлая тема)
@@ -209,37 +242,173 @@ button.chip{min-height:36px;}
 .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
 .screen-head h1{margin:0;}
 
-.brand{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:22px;}
-.brand-mark{width:64px;height:64px;border-radius:20px;background:linear-gradient(160deg,#FFFFFF,#DCEBE3);box-shadow:0 10px 24px rgba(76,122,107,.25), inset 0 1px 0 #fff;
-  display:flex;align-items:flex-end;justify-content:center;gap:5px;padding:0 0 15px;}
-.brand-mark i{display:block;width:7px;border-radius:4px;background:#4C7A6B;}
-.brand-mark i:nth-child(1){height:16px;opacity:.75;} .brand-mark i:nth-child(2){height:28px;} .brand-mark i:nth-child(3){height:12px;opacity:.6;} .brand-mark i:nth-child(4){height:22px;}
-.brand-title{font-size:30px;line-height:1.05;font-weight:800;letter-spacing:-.02em;margin:0;}
-.brand-sub{font-size:14px;color:var(--text-2);margin:2px 0 0;}
+/* ---------------------------------------------------------------------
+   Главное меню (#mainMenu, docs/MONETIZATION-SPEC.md §12). Телефон: одна
+   колонка — шапка (знак, название, чип аккаунта), тёмный «герой» с главным
+   действием и режимами (цвета — от экипированной темы стола), ниже светлые
+   пункты как раньше. Компьютер (≥1024×600): герой слева, остальное справа.
+   --------------------------------------------------------------------- */
+/* Невидимый текст только для чтения с экрана (подпись поля кода комнаты; общая утилита). */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
-.menu-cards{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
-.menu-card{display:flex;align-items:center;gap:14px;width:100%;min-height:76px;padding:16px 18px;border-radius:var(--r-xl);border:none;color:#fff;text-align:left;font-size:16px;font-weight:800;justify-content:flex-start;}
-.menu-card .menu-card-icon{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex:none;}
-.menu-card .menu-card-icon .ico{width:24px;height:24px;}
-.menu-card .menu-card-sub{display:block;font-size:13px;font-weight:600;margin-top:2px;}
-.menu-card .menu-card-go{margin-left:auto;opacity:.85;}
-.menu-card.online{background:#4C7A6B;}
-.menu-card.offline{background:var(--clay);}
-.menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px;}
+.menu-screen{align-items:flex-start;}
+.menu-shell{width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px;}
+.menu-shell > .menu-continue{margin:0;}
+.menu-shell .tutorial-offer > button{min-height:44px;} /* цели нажатия не меньше 44 px */
+
+.menu-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;}
+.brand{display:flex;align-items:center;gap:10px;flex:none;}
+.brand-mark{width:40px;height:40px;border-radius:13px;flex:none;background:linear-gradient(160deg,#FFFFFF,#DCEBE3);box-shadow:0 6px 16px rgba(76,122,107,.25), inset 0 1px 0 #fff;
+  display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:0 0 9px;}
+.brand-mark i{display:block;width:5px;border-radius:3px;background:#4C7A6B;}
+.brand-mark i:nth-child(1){height:10px;opacity:.75;} .brand-mark i:nth-child(2){height:17px;} .brand-mark i:nth-child(3){height:7px;opacity:.6;} .brand-mark i:nth-child(4){height:13px;}
+.brand-title{font-size:20px;line-height:1.1;font-weight:800;letter-spacing:-.02em;margin:0;white-space:nowrap;}
+
+/* Чип аккаунта: гость — «Войти», вошёл — аватар, ник, баланс, корона Премиума. */
+.account-chip{flex:0 1 auto;min-width:0;min-height:44px;padding:7px 14px 7px 7px;gap:8px;border-radius:var(--r-pill);justify-content:flex-start;
+  background:rgba(255,255,255,.78);color:var(--text);border:1px solid rgba(255,255,255,.95);box-shadow:var(--shadow-1);font-size:13px;font-weight:700;}
+.account-chip .acc-dot{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:var(--accent);color:var(--on-accent);font-size:16px;line-height:1;}
+.account-chip.signed-in .acc-dot{background:var(--surface-3);color:var(--text);}
+.account-chip .acc-dot img{width:100%;height:100%;object-fit:cover;}
+.account-chip .acc-name{min-width:0;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.account-chip .acc-points{display:inline-flex;align-items:center;gap:4px;flex:none;padding-left:8px;border-left:1px solid var(--line-strong);
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.account-chip .acc-points .ico{color:var(--warn);}
+.account-chip .acc-crown{flex:none;fill:var(--amber);color:var(--warn);margin-left:-2px;}
+.acc-modal-hint{font-size:13px;margin:10px 0 0;}
+
+/* «Играть»: тёмные токены внутри (.theme-dark), фон — сцена темы стола. */
+.menu-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;margin:0;padding:0 16px 12px;color:var(--text);
+  background:radial-gradient(120% 140% at 10% 0%, var(--stage-c1), var(--stage-c2) 55%, var(--stage-c3));
+  border:1px solid var(--line-strong);border-radius:var(--r-2xl);box-shadow:var(--shadow-1);}
+/* Фоновый график цветом акцента темы стола — за текстом и кнопками (isolation выше). */
+.menu-hero::before{content:"";position:absolute;z-index:-1;top:30px;right:0;width:62%;height:96px;pointer-events:none;opacity:.28;background:var(--stage-accent);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 120' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-opacity='.5'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14V120H0z' fill='url(%23g)'/%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 120' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-opacity='.5'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14V120H0z' fill='url(%23g)'/%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat;}
+.menu-ticker{height:30px;margin:0 -16px 14px;display:flex;align-items:center;overflow:hidden;background:rgba(0,0,0,.2);border-bottom:1px solid var(--line);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);}
+.menu-ticker-track{display:flex;flex:none;width:max-content;animation:menuTicker 40s linear infinite;}
+.menu-ticker.paused .menu-ticker-track{animation-play-state:paused;}
+.menu-tick{flex:none;padding-right:22px;font-family:var(--font-mono);font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.menu-tick b{color:var(--text-2);font-weight:700;}
+@keyframes menuTicker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+/* Без анимаций — неподвижная лента (общее правило оставило бы один проезд). */
+body.reduce-motion .menu-ticker-track{animation:none !important;}
+@media (prefers-reduced-motion:reduce){ .menu-ticker-track{animation:none !important;} }
+.menu-hero .menu-hero-title{font-size:24px;line-height:1.15;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--text);margin:0;}
+.menu-hero-sub{font-size:13.5px;line-height:1.4;color:var(--text);opacity:.82;margin:4px 0 14px;}
+
+.menu-quick{width:100%;min-height:64px;padding:10px 14px 10px 10px;gap:12px;justify-content:flex-start;text-align:left;border-radius:var(--r-xl);
+  background:var(--primary);color:var(--on-primary);box-shadow:0 8px 22px rgba(224,177,104,.22);}
+.menu-quick-icon{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(26,20,15,.14);}
+.menu-quick-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.menu-quick-text b{font-size:17px;font-weight:800;}
+.menu-quick-text span{font-size:13px;font-weight:600;opacity:.8;}
+/* Есть сохранённая партия: главная — «Продолжить», «Играть с ботами» — вторая. */
+/* Карточки в герое чуть прозрачные — сквозь них проступает цвет темы стола.
+   rgba — запасной фон для WebView старше Chrome 111 без color-mix(): иначе там
+   остался бы янтарный фон кнопки по умолчанию под светлым текстом. */
+.menu-quick.is-secondary{background:rgba(46,37,30,.8);background:color-mix(in srgb, var(--surface-2) 80%, transparent);color:var(--text);border-color:var(--line-strong);box-shadow:none;}
+.menu-quick.is-secondary .menu-quick-icon{background:var(--primary);color:var(--on-primary);}
+
+.menu-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;}
+.menu-mode{min-height:0;padding:12px;gap:2px;flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:left;border-radius:var(--r-lg);
+  background:rgba(46,37,30,.8);background:color-mix(in srgb, var(--surface-2) 80%, transparent);color:var(--text);border-color:var(--line);font-size:15px;}
+.menu-mode-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.menu-mode.online .menu-mode-icon{background:var(--accent);color:var(--on-accent);}
+.menu-mode.offline .menu-mode-icon{background:var(--clay);color:var(--on-clay);}
+.menu-mode b{font-weight:800;}
+.menu-mode-sub{font-size:12.5px;font-weight:600;color:var(--text-2);}
+@media (max-width:359px){ .menu-modes{grid-template-columns:minmax(0,1fr);} }
+
+.menu-code-toggle{align-self:center;min-height:44px;margin-top:2px;padding:8px 12px;background:transparent;border:none;color:var(--accent);font-size:13.5px;
+  text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;}
+.menu-code-toggle[aria-expanded="true"]{color:var(--text-2);}
+.menu-code-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;margin-bottom:4px;}
+.menu-code-row input{width:100%;text-transform:uppercase;font-family:var(--font-mono);letter-spacing:.06em;}
+.menu-code-row input::placeholder{text-transform:none;font-family:var(--font-ui);letter-spacing:0;}
+.menu-code-row .err{grid-column:1 / -1;margin:0;min-height:0;}
+
+/* Светлые пункты: «Магазин», «Обучение» (как карточка «Продолжить»). */
+.menu-row{width:100%;min-height:64px;padding:10px 16px 10px 12px;gap:14px;justify-content:flex-start;text-align:left;border-radius:var(--r-xl);
+  background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);}
+.menu-row-icon{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--on-accent);}
+.menu-row.shop .menu-row-icon{background:var(--amber);color:var(--on-amber);}
+.menu-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.menu-row-text b{font-size:15px;font-weight:800;}
+.menu-row-text span{font-size:13px;font-weight:600;color:var(--text-2);}
+.menu-row > .ico{color:var(--text-3);}
+.menu-row .chip{flex:none;min-height:32px;padding:4px 12px;color:var(--text);font-variant-numeric:tabular-nums;}
+
+/* «Продолжить партию» — главная кнопка меню, пока есть сохранение. */
+.menu-continue.is-primary{background:var(--amber);color:var(--on-amber);border-color:transparent;box-shadow:0 10px 24px rgba(168,120,40,.25);}
+.menu-continue.is-primary .menu-continue-icon{background:rgba(26,20,15,.14);color:var(--on-amber);}
+.menu-continue.is-primary .menu-continue-text span{color:rgba(26,20,15,.78);}
+
+.menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
 .menu-tile{background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-lg);min-height:76px;padding:12px 4px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;}
 .menu-tile .ico{width:22px;height:22px;color:var(--accent);}
 .menu-tile span{white-space:nowrap;}
-@media (max-width:380px){ .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
-.menu-links{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:18px;font-size:13px;}
-.menu-links a{color:var(--text-2);display:inline-flex;align-items:center;gap:6px;text-decoration:none;min-height:36px;}
+/* На телефонах 340–400 px четыре плитки остаются в один ряд (чуть ниже и мельче):
+   иначе «Настройки» и «Правила» уходили за нижний край экрана 360×640. */
+@media (max-width:399px){ .menu-tile{min-height:64px;padding:10px 2px;gap:4px;font-size:12px;} }
+@media (max-width:339px){ .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+.menu-links{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px;}
+.menu-links a{color:var(--text-2);display:inline-flex;align-items:center;gap:6px;text-decoration:none;min-height:44px;}
 .menu-links a:hover{color:var(--text);}
 
-.account-corner-btn{position:fixed;top:calc(12px + var(--safe-t));right:calc(12px + var(--safe-r));z-index:40;min-height:40px;
-  background:rgba(255,255,255,.75);color:var(--text);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-pill);
-  padding:6px 14px 6px 6px;font-size:13px;font-weight:700;display:none;align-items:center;gap:8px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-.account-corner-btn.show{display:inline-flex;}
-.account-corner-btn .acc-dot{width:28px;height:28px;border-radius:14px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;}
+/* Наведение на компьютере: лёгкий подъём; нажатие — общее scale(.98). */
+.menu-quick, .menu-mode, .menu-row, .menu-tile, .menu-shell > .menu-continue{transition:filter .15s, transform .15s, box-shadow .15s, background-color .15s;}
+@media (hover:hover){
+  .menu-row:hover:not(:active), .menu-tile:hover:not(:active), .menu-shell > .menu-continue:hover:not(:active){transform:translateY(-1px);box-shadow:0 10px 26px rgba(36,31,26,.12);}
+  .menu-mode:hover:not(:active){transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.35);}
+  .menu-quick:hover:not(:active){transform:translateY(-1px);box-shadow:0 12px 28px rgba(224,177,104,.32);}
+  .menu-quick.is-secondary:hover:not(:active){box-shadow:0 10px 24px rgba(0,0,0,.35);}
+}
+
+/* Первый показ меню за сессию: пункты проявляются по очереди (не больше 8 шагов). */
+.menu-shell.menu-enter > *{animation:menuEnter .22s ease-out both;}
+.menu-shell.menu-enter > :nth-child(2){animation-delay:30ms;} .menu-shell.menu-enter > :nth-child(3){animation-delay:60ms;}
+.menu-shell.menu-enter > :nth-child(4){animation-delay:90ms;} .menu-shell.menu-enter > :nth-child(5){animation-delay:120ms;}
+.menu-shell.menu-enter > :nth-child(6){animation-delay:150ms;} .menu-shell.menu-enter > :nth-child(7){animation-delay:180ms;}
+.menu-shell.menu-enter > :nth-child(n+8){animation-delay:210ms;}
+@keyframes menuEnter{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
+@media (prefers-reduced-motion:reduce){ .menu-shell.menu-enter > *{animation:none !important;} }
+
+/* Узкий телефон: название в две строки, ник в чипе короче; совсем узкий — без ника. */
+@media (max-width:479px){
+  .brand-title{width:min-content;white-space:normal;font-size:17px;line-height:1.05;}
+  .account-chip .acc-name{max-width:9ch;}
+}
+@media (max-width:359px){
+  .account-chip.signed-in .acc-name{display:none;}
+}
+/* Планшет: колонка шире и по центру экрана. */
+@media (min-width:640px){
+  .menu-screen{align-items:center;}
+  .menu-shell{max-width:520px;}
+}
+/* Компьютер: две колонки — герой слева на всю высоту правой колонки, пункты
+   справа. Последняя строка 1fr забирает лишнюю высоту героя, поэтому пункты
+   справа не растягиваются и не расходятся; скрытые (hidden) места не занимают. */
+@media (min-width:1024px) and (min-height:600px){
+  .menu-shell{max-width:920px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);grid-template-rows:auto repeat(6,auto) 1fr;
+    column-gap:20px;row-gap:0;align-content:start;}
+  .menu-top{grid-column:1 / -1;margin-bottom:16px;}
+  .menu-hero{grid-column:1;grid-row:2 / span 7;padding:0 24px 20px;}
+  .menu-hero::before{top:40px;bottom:300px;width:72%;height:auto;min-height:110px;} /* график — над кнопками «Играть» */
+  .menu-shell > :not(.menu-top):not(.menu-hero){grid-column:2;margin:0 0 12px;}
+  .menu-ticker{height:34px;margin:0 -24px 22px;}
+  .menu-tick{font-size:12.5px;}
+  .menu-hero .menu-hero-title{font-size:30px;}
+  .menu-hero-sub{font-size:14.5px;margin-bottom:auto;padding-bottom:20px;}
+  .menu-quick{min-height:72px;}
+  .menu-mode{padding:16px;}
+  .menu-links{justify-content:flex-start;}
+}
 .account-modal-tabs{display:flex;gap:4px;margin:14px 0 6px;border-radius:var(--r-pill);background:var(--surface-3);padding:4px;}
 .account-modal-tabs button{flex:1;border-radius:var(--r-pill);background:transparent;color:var(--text-2);font-size:14px;min-height:38px;padding:6px 0;}
 .account-modal-tabs button.active{background:var(--surface-2);color:var(--text);box-shadow:var(--shadow-1);}
@@ -287,6 +456,77 @@ button.chip{min-height:36px;}
 .skin-swatch{width:20px;height:20px;border-radius:6px;border:1px solid rgba(0,0,0,.15);}
 .skin-emoji-row{font-size:16px;letter-spacing:2px;}
 .skin-card button{width:100%;min-height:38px;font-size:13px;}
+/* Скины из Премиума и наборов (открываются покупкой в магазине) */
+.skin-card.exclusive{border-color:color-mix(in srgb, var(--amber) 50%, var(--line));}
+.skin-tag{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding:1px 8px;border-radius:var(--r-pill);background:var(--warn-bg);color:var(--warn);
+  font-size:11px;font-weight:800;vertical-align:1px;}
+.skin-tag.premium{padding:2px 6px;}
+.skin-tag.premium .ico{width:13px;height:13px;vertical-align:0;}
+.skins-balance{margin:0;}
+
+/* Премиум: корона в рейтинге, модалке аккаунта, профиле и магазине — всегда
+   вместе с текстом (видимым или .sr-only), не только цветом. */
+.rating-crown{display:inline-flex;align-items:center;flex:none;color:var(--warn);}
+.rating-name.has-crown{display:flex;align-items:center;gap:5px;min-width:0;}
+.rating-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rating-crown .ico, .shop-premium-chip .ico, .skin-tag.premium .ico{fill:var(--amber);}
+.shop-premium-chip{background:var(--warn-bg);color:var(--warn);border-color:transparent;min-height:28px;padding:3px 10px;font-size:12px;vertical-align:1px;}
+.acc-modal-stats{display:inline-block;margin-top:4px;font-size:13px;font-weight:600;color:var(--text-2);}
+
+/* ---------------------------------------------------------------------
+   Магазин (shop.js): светлая карточка экрана, Премиум — тёмная плашка с
+   градиентом экипированной темы стола (как «герой» главного меню).
+   --------------------------------------------------------------------- */
+.shop-box section{background:transparent;border:none;border-radius:0;padding:0;margin:18px 0 0;box-shadow:none;}
+.shop-box section > h2{margin:0 0 8px;}
+.shop-balance{margin:6px 0 0;}
+.shop-note{font-size:13px;line-height:1.45;padding:10px 12px;border-radius:var(--r-md);background:var(--surface-3);color:var(--text);margin:10px 0;}
+.shop-note.warn{background:var(--warn-bg);color:var(--warn);font-weight:700;}
+.shop-notice{font-size:14px;margin:14px 0 0;}
+.shop-providers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 0;}
+.shop-providers-label{font-size:13px;font-weight:700;color:var(--text-2);margin-right:2px;}
+.shop-providers .chip{min-height:44px;} /* кнопки оплаты — не меньше 44 px */
+.shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+@media (max-width:460px){ .shop-grid{grid-template-columns:1fr;} }
+.shop-card{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px;display:flex;flex-direction:column;gap:6px;
+  transition:border-color .2s, box-shadow .2s;}
+.shop-card-title{display:flex;align-items:center;gap:6px;font-weight:800;font-size:15px;}
+.shop-card-title .ico{color:var(--warn);}
+.shop-card-sub{flex:1;font-size:12.5px;line-height:1.35;color:var(--text-2);}
+.shop-card-preview{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.shop-card-preview .skin-preview{display:flex;gap:4px;}
+.shop-card button{width:100%;min-height:44px;font-size:13px;margin-top:2px;}
+#skinsTopUpBtn{min-height:44px;} /* «Пополнить» ведёт к оплате — полноразмерная цель нажатия */
+.shop-card.owned{opacity:.8;}
+/* Подсветка товара, к которому привели («Премиум» на скине, «Пополнить») */
+.shop-focus{border-color:var(--amber) !important;box-shadow:0 0 0 3px color-mix(in srgb, var(--amber) 35%, transparent) !important;}
+
+.shop-box section.shop-premium{margin-top:14px;padding:16px;border-radius:var(--r-xl);color:var(--text);
+  background:radial-gradient(120% 140% at 10% 0%, var(--stage-c1), var(--stage-c2) 55%, var(--stage-c3));
+  border:1px solid var(--line-strong);box-shadow:var(--shadow-1);transition:border-color .2s, box-shadow .2s;}
+.shop-premium-head{display:flex;align-items:center;gap:12px;}
+.shop-premium-icon{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--amber);color:var(--on-amber);}
+.shop-premium-icon .ico{width:24px;height:24px;}
+.shop-box .shop-premium h2{margin:0;font-size:20px;letter-spacing:-.01em;text-transform:none;color:var(--text);}
+.shop-premium-sub{font-size:13px;font-weight:600;color:var(--text-2);}
+.shop-premium-text{font-size:14px;color:var(--text-2);margin:12px 0 14px;}
+.shop-premium-list{list-style:none;margin:12px 0 14px;padding:0;display:flex;flex-direction:column;gap:7px;}
+.shop-premium-list li{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.4;}
+.shop-premium-list .ico{color:var(--up);margin-top:2px;}
+.shop-premium button{width:100%;min-height:48px;font-size:15px;}
+.shop-premium-active{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:var(--r-md);background:var(--up-bg);color:var(--up);font-weight:800;}
+
+#btnRewardedAd{width:100%;min-height:48px;background:var(--accent);color:var(--on-accent);}
+#shopAdStatus{font-size:13px;margin-top:6px;text-align:center;min-height:1em;}
+.shop-email{margin-top:14px;}
+.shop-status{font-size:13px;margin-top:6px;min-height:1em;}
+.shop-box details.tips{margin-top:12px;}
+.shop-history-row{display:flex;justify-content:space-between;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13.5px;}
+.shop-history-row:last-child{border-bottom:none;}
+.shop-history-row > .muted{text-align:right;}
+.shop-history-row.refunded > span:first-child{text-decoration:line-through;color:var(--text-3);}
+.shop-legal{font-size:12px;line-height:1.5;margin:14px 0 0;}
+.shop-legal a{color:var(--text-2);}
 
 details.tips{border-bottom:1px solid var(--line);}
 details.tips summary{cursor:pointer;font-weight:800;color:var(--text);list-style:none;padding:12px 2px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;}
@@ -427,13 +667,18 @@ main{margin:0;padding:0;}
 .stage-cell.sec-industrial{background:var(--sec-industrial);} .stage-cell.sec-finance{background:var(--sec-finance);}
 .stage-cell.re-cell{background:var(--sec-re);}
 .stage-cell .ico{width:58%;height:58%;max-width:15px;max-height:15px;stroke-width:2.2;}
+/* На поле рамка цвета сектора чуть шире, чем у токена в списках: по ней и читается сектор. */
+.stage-cell .logo-img{width:78%;height:78%;padding:6%;}
 .cell-owner{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:4px;background:var(--owner,#fff);box-shadow:0 0 0 1.5px var(--board);pointer-events:none;}
 .re-stars{position:absolute;bottom:1px;left:0;right:0;font-size:7px;line-height:1;text-align:center;color:#FFD76B;letter-spacing:-1px;pointer-events:none;}
 /* Перекрестие броска: строка и столбец подсвечены, остальное приглушено. */
 .stage-cells.has-roll .stage-cell{opacity:.32;}
 .stage-cells.has-roll .stage-cell.on-line{opacity:1;box-shadow:0 0 0 1.5px var(--stage-accent);}
 .stage-cells.has-roll .stage-cell.active-cell{opacity:1;z-index:2;transform:scale(1.28);
-  box-shadow:0 0 0 2px var(--board), 0 0 0 4.5px var(--stage-accent), 0 8px 18px rgba(0,0,0,.35);animation:cellPulse 1.6s ease-in-out infinite;}
+  box-shadow:0 0 0 2px var(--board), 0 0 0 4.5px var(--stage-accent), 0 8px 18px rgba(0,0,0,.35);animation:cellPulse 1.6s ease-in-out infinite;
+  /* Поле пересобирается на каждом состоянии: anim.js задаёт фазу пульсации,
+     чтобы клетка не дёргалась с начала цикла при каждой перерисовке. */
+  animation-delay:var(--pulse-delay,0ms);}
 @keyframes cellPulse{0%,100%{transform:scale(1.28);}50%{transform:scale(1.18);}}
 
 .zoom-controls{display:none;position:absolute;right:10px;bottom:10px;z-index:5;flex-direction:column;align-items:center;gap:6px;}
@@ -502,11 +747,15 @@ input[type="range"].pct-slider::-moz-range-track{height:8px;border-radius:4px;ba
    --------------------------------------------------------------------- */
 .stage-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:23;background:#1A140F;border-top:1px solid var(--line);
   padding:6px calc(10px + var(--safe-r)) calc(6px + var(--safe-b)) calc(10px + var(--safe-l));}
-.tab-bar{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;height:calc(var(--tabbar-h) - 12px);}
+/* Столбцы по числу видимых вкладок: у банкрота «Влияние» скрыто, и пустого слота нет. */
+.tab-bar{max-width:640px;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;height:calc(var(--tabbar-h) - 12px);}
 .tab-btn{position:relative;flex-direction:column;gap:3px;min-height:0;height:100%;padding:4px 2px;border-radius:var(--r-md);background:transparent;color:#9C9081;border:none;font-size:11px;font-weight:700;white-space:nowrap;}
 .tab-btn .ico{width:22px;height:22px;}
 .tab-btn.active{color:var(--stage-accent);background:color-mix(in srgb, var(--stage-accent) 13%, transparent);}
-.tab-btn:hover{filter:none;color:var(--text);}
+.tab-btn:hover{filter:none;}
+/* Подсветка при наведении — только у мыши и только у неактивных вкладок: на
+   тач-экране :hover залипает на последней нажатой вкладке и перекрывал акцент. */
+@media (hover:hover){ .tab-btn:not(.active):hover{color:var(--text);} }
 .tab-badge{position:absolute;top:2px;left:50%;margin-left:6px;min-width:17px;height:17px;padding:0 5px;background:var(--down);color:#1A140F;border-radius:9px;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
 
 .overlay-panel.active{position:fixed;inset:0;z-index:22;display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
@@ -537,16 +786,24 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .co-name{display:flex;flex-direction:column;gap:1px;min-width:0;}
 .co-name b{font-size:14.5px;white-space:nowrap;}
 .co-name span{font-size:12px;color:var(--text-3);white-space:nowrap;}
+/* Название и бейдж контролёра одной строкой: многоточием обрезается название,
+   бейдж виден всегда (длинное имя контролёра обрезается внутри бейджа). */
+.co-title{display:flex;align-items:center;gap:6px;min-width:0;}
+.co-title b{min-width:0;}
+.co-title .badge{flex:none;max-width:55%;margin-left:0;}
+.co-title .badge > span{min-width:0;color:inherit;font-size:inherit;}
 .owned-bar{height:6px;background:var(--track);border-radius:3px;overflow:hidden;width:72px;display:inline-flex;vertical-align:middle;}
 .owned-fill{height:100%;background:var(--accent);}
 .spark{display:block;}
 .col-spark{white-space:nowrap;}
-@media (max-width:1023px), (orientation:landscape) and (max-height:540px){
+@media (max-width:1023px), (orientation:landscape) and (max-height:599px){
   #marketTable thead{display:none;}
   #marketTable, #marketTable tbody{display:block;}
   #marketTable tr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"co spark price" "co spark delta" "own own own";column-gap:12px;row-gap:2px;padding:12px 14px;border-bottom:1px solid var(--line);}
   #marketTable tr:last-child{border-bottom:none;}
   #marketTable td{display:block;padding:0;border:none;background:none !important;}
+  /* Фон ячеек сброшен, поэтому выпавшую компанию подсвечиваем всей строкой. */
+  #marketTable tr.active-row{background:color-mix(in srgb, var(--stage-accent) 10%, transparent);box-shadow:inset 3px 0 0 var(--stage-accent);}
   #marketTable td:nth-child(1){grid-area:co;align-self:center;}
   #marketTable td:nth-child(2){display:none;}
   #marketTable td:nth-child(3){grid-area:price;text-align:right;font-size:15px;}
@@ -643,6 +900,7 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .full-chart-wrap svg{display:block;width:100%;height:150px;}
 .full-chart-minmax{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);}
 .fc-tooltip{position:absolute;display:none;top:4px;left:0;z-index:5;background:#0D0A07;color:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;box-shadow:0 6px 16px rgba(0,0,0,.4);}
+.fc-tooltip{max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;} /* страховка на очень узком экране */
 .fc-tooltip b{font-weight:800;}
 .fc-tooltip .up{color:#7FD1A3;} .fc-tooltip .down{color:#EE8A6E;} .fc-tooltip .muted{color:rgba(255,255,255,.6);}
 .reaction-picker{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px;}
@@ -677,6 +935,18 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 @keyframes toastIn{from{opacity:0;transform:translateY(-14px) scale(.97);}to{opacity:1;transform:none;}}
 @keyframes toastOut{from{opacity:1;}to{opacity:0;transform:translateY(-10px) scale(.97);}}
 
+/* Индикатор обрыва связи (#connBanner): в отличие от тостов висит, пока
+   соединение не восстановится; тосты появляются поверх него. */
+.conn-banner{position:fixed;top:calc(10px + var(--safe-t));left:50%;transform:translateX(-50%);z-index:59;display:flex;align-items:center;gap:8px;
+  max-width:min(92vw,420px);background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);border-radius:var(--r-pill);padding:8px 14px;box-shadow:var(--shadow-2);font-size:13px;font-weight:700;pointer-events:none;}
+.conn-banner .ico{color:var(--warn);}
+@media (max-width:1023px) and (orientation:portrait){
+  .conn-banner{left:calc(10px + var(--safe-l));right:calc(66px + var(--safe-r));transform:none;max-width:none;width:fit-content;margin:0 auto;}
+}
+/* «Подключение к комнате…» с отменой на экране «Играть онлайн». */
+.join-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:13px;color:var(--text-2);}
+.room-list-box.connecting{opacity:.55;pointer-events:none;}
+
 /* Экран конца партии (внутри нижнего листа) */
 .end-screen-icon{width:64px;height:64px;border-radius:20px;margin:4px auto 0;display:flex;align-items:center;justify-content:center;background:var(--warn-bg);color:var(--stage-accent);animation:endIconPop .5s ease-out;}
 .end-screen-icon .ico{width:34px;height:34px;}
@@ -694,12 +964,39 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .end-rank-row:nth-child(3) .end-rank-pos{background:#C08A5B;color:#1A140F;}
 .end-reward-card{margin-bottom:14px;text-align:left;}
 
+/* Читаемый финал партии с лимитом раундов (BALANCE-REPORT.md, В4): состав
+   капитала в итогах, место и отрыв у капитала, места на чипах, метка финала. */
+.end-rank-row{flex-wrap:wrap;}
+.end-rank-parts{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:2px 12px;padding-left:34px;font-size:12px;font-weight:600;color:var(--text-2);font-variant-numeric:tabular-nums;}
+.end-rank-ev{font-weight:700;}
+.end-finish-note{margin:-6px 0 14px;font-size:13px;line-height:1.45;color:var(--text-2);}
+.end-finish-note b{color:var(--text);font-family:var(--font-mono);}
+.cap-standing{display:flex;align-items:center;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;margin-top:8px;padding:7px 12px;border-radius:var(--r-lg);
+  background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--text-2);}
+.cap-standing-place{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.cap-standing-place b{color:var(--text);}
+.cap-standing-gap{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.cap-standing.final{border-color:color-mix(in srgb, var(--warn) 55%, transparent);background:color-mix(in srgb, var(--warn-bg) 60%, var(--surface));}
+.pchip-place{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
+  background:var(--surface-3);color:var(--text-2);font:700 10.5px/1 var(--font-mono);flex:none;}
+.pchip-place.p1{background:#E0B168;color:#1A140F;}
+.pchip-place.p2{background:#C9C2B6;color:#1A140F;}
+.pchip-place.p3{background:#C08A5B;color:#1A140F;}
+.rep-badge.g-final{text-wrap:balance;}
+.event-finale-note{display:flex;align-items:flex-start;gap:8px;margin:10px 0 4px;padding:10px 12px;border-radius:var(--r-md);background:var(--warn-bg);
+  border:1px solid color-mix(in srgb, var(--warn) 45%, transparent);color:var(--text);font-size:13.5px;font-weight:600;line-height:1.4;}
+.event-finale-note .ico{flex:none;margin-top:2px;color:var(--warn);}
+
 /* =====================================================================
    Адаптив
    ===================================================================== */
 
-/* Телефон в горизонтальной ориентации: мало высоты — три колонки. */
-@media (orientation:landscape) and (max-height:540px){
+/* Горизонтальная ориентация вне десктопной раскладки — три колонки: телефон
+   (мало высоты), а также любая высота до 599px (ноутбук с масштабом 150%) и
+   ландшафт уже 1024px (планшет 960×600). В ландшафте запрос — точное дополнение
+   десктопного (min-width:1024px) and (min-height:600px); во всех блоках ниже он
+   одинаковый. */
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   :root{ --tabbar-h:52px; --dock-h:48px; }
   .stage{grid-template-columns:minmax(180px,1fr) auto minmax(200px,1fr);
     grid-template-areas:"top board capital" "players board capital" "players board feed";
@@ -758,7 +1055,6 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
   .company-modal-overlay, .market-event-overlay{align-items:center;padding:24px;}
   .company-modal, .market-event-modal{border-radius:var(--r-2xl);border-bottom:1px solid var(--line-strong);padding:24px;max-height:88vh;}
   .stage-tabbar{left:50%;right:auto;bottom:12px;transform:translateX(-50%);width:min(640px, calc(100vw - 48px));border:1px solid var(--line-strong);border-radius:var(--r-xl);padding:6px;box-shadow:var(--shadow-2);background:rgba(26,20,15,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-  .tab-bar{grid-template-columns:repeat(5,minmax(0,1fr));}
   .tab-btn{flex-direction:row;gap:8px;font-size:13px;}
   .overlay-panel.active{background:color-mix(in srgb, var(--stage-c3) 92%, transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:32px 24px calc(var(--tabbar-h) + 40px);}
   .stage-ticker{display:none;}
@@ -794,7 +1090,7 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 @media (min-width:1360px) and (min-height:600px){
   .game-menu-btn{right:auto;left:calc(24px + 320px - 44px);}
 }
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   .context-popup{left:auto;right:0;top:0;bottom:calc(var(--tabbar-h) + var(--safe-b));width:min(440px, 56vw);align-items:flex-end;padding:8px calc(8px + var(--safe-r)) 8px 0;}
   .popup-card{border-radius:var(--r-xl);border-bottom:1px solid var(--line-strong);padding:12px 14px;max-height:100%;}
   .popup-card::before{display:none;}
@@ -852,6 +1148,8 @@ body.overlay-open .game-menu-btn{display:none;}
 .market-event-modal{display:flex;flex-direction:column;overflow:hidden;}
 .market-event-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;margin:0 -4px;padding:0 4px;}
 .market-event-close-btn{flex:none;margin-top:12px;}
+/* Фокус переносится на саму карточку при открытии — обводка всей карточки не нужна. */
+.company-modal:focus, .market-event-modal:focus{outline:none;}
 
 /* Телефон в портрете: уведомления не заходят на кнопку меню справа. */
 @media (max-width:1023px) and (orientation:portrait){
@@ -859,7 +1157,7 @@ body.overlay-open .game-menu-btn{display:none;}
 }
 /* Телефон в ландшафте: список игроков прокручивается и не уходит под кнопку
    меню и панель вкладок; меню партии не вылезает за верх экрана. */
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   #cornerRating{min-height:0;overflow-y:auto;padding-bottom:52px;scrollbar-width:none;}
   .game-menu-panel{max-height:calc(100vh - var(--tabbar-h) - 64px - var(--safe-t) - var(--safe-b));max-height:calc(100dvh - var(--tabbar-h) - 64px - var(--safe-t) - var(--safe-b));overflow-y:auto;}
 }
@@ -870,7 +1168,7 @@ body.overlay-open .game-menu-btn{display:none;}
 
 /* --- Уточнения после визуального QA на 9 размерах экрана ---------------- */
 /* Узкий ландшафт (667×375): поле не шире своей колонки, боковые колонки уже. */
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   .stage{grid-template-columns:minmax(150px,1fr) auto minmax(170px,1fr);}
   .stage-board-outer{max-width:min(440px, calc(100vw - 368px - var(--safe-l) - var(--safe-r)));}
   /* Кнопка меню — в левом верхнем углу, рядом с шапкой, а не на списке игроков. */
@@ -899,8 +1197,6 @@ body.overlay-open .game-menu-btn{display:none;}
 }
 /* Настройки партии: поля в одной строке сетки — на одной высоте. */
 .settings-grid > div{display:flex;flex-direction:column;justify-content:flex-end;}
-/* Главное меню: кнопка аккаунта не заходит на карточки. */
-#mainMenu{padding-top:calc(64px + var(--safe-t));}
 .co-name .co-mine{display:inline;font-weight:700;color:var(--stage-accent);}
 /* Десктоп: справа от поля — место под кнопки зума. Поле по центру колонки,
    если места хватает, иначе сдвигается влево ровно на ширину кнопок. */
@@ -914,7 +1210,7 @@ body.overlay-open .game-menu-btn{display:none;}
   .cap-strip > div{flex-direction:row;justify-content:space-between;align-items:baseline;padding:8px 12px;}
 }
 /* Узкий ландшафт: в «Смотреть как» остаётся только выбор игрока. */
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   .g-viewas-label{display:none;}
   .g-viewas .pill{max-width:100%;}
   .g-viewas select{min-width:0;max-width:100%;}
@@ -923,7 +1219,7 @@ body.overlay-open .game-menu-btn{display:none;}
 /* Входящая сделка в свой ход: лист над панелью хода (кнопка броска доступна). */
 .context-popup.above-dock{bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--dock-h) + 20px);}
 .context-popup.above-dock .popup-card{border-radius:var(--r-2xl);border-bottom:1px solid var(--line-strong);max-height:min(46vh, 420px);max-height:min(46dvh, 420px);}
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   .context-popup.above-dock{bottom:calc(var(--tabbar-h) + var(--safe-b) + 2 * var(--dock-h) + 28px);}
 }
 @media (min-width:1024px) and (min-height:600px){
@@ -932,15 +1228,372 @@ body.overlay-open .game-menu-btn{display:none;}
 }
 /* Липкие кнопки — только у самого листа, не у строк предложений внутри него. */
 .popup-card > .sheet-actions{position:sticky;bottom:-18px;z-index:1;background:var(--surface);padding:10px 0 18px;margin-bottom:-18px;}
-@media (orientation:landscape) and (max-height:540px){
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
   .popup-card > .sheet-actions{bottom:-12px;padding-bottom:12px;margin-bottom:-12px;}
 }
-/* Баннер голосования на телефоне — одна строка. */
+/* Телефон в портрете: нижний лист накрывает низ поля. JS (syncSheetCover) пишет
+   в --sheet-cover, сколько пикселей снизу экрана занято листом вместе с вкладками, —
+   нижнего отступа сцены хватает, чтобы прокрутить выпавшую клетку выше листа. */
+@media (max-width:1023px) and (orientation:portrait){
+  .stage{padding-bottom:max(calc(var(--tabbar-h) + var(--dock-h) + 36px + var(--safe-b)), calc(var(--sheet-cover, 0px) + 12px));
+    scroll-padding-bottom:calc(var(--sheet-cover, 0px) + 12px);}
+}
+/* Низкий портрет (375×667): лист броска не выше половины экрана, иначе над ним
+   почти не остаётся поля; слайдер прокручивается внутри листа, кнопки липкие. */
+@media (max-width:1023px) and (orientation:portrait) and (max-height:700px){
+  .context-popup:not(.above-dock) .popup-card:has(.dice-pair){max-height:52vh;max-height:52dvh;}
+}
+/* Баннер голосования: имя цели и счёт — отдельные элементы (.kv-name/.kv-count),
+   у кнопок полная (.kv-long) и короткая (.kv-short) подписи. */
+.kv-info{display:inline-flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;min-width:0;}
+.kv-name{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kv-count{flex:none;white-space:nowrap;}
+.kickvote-banner .kv-short{display:none;}
+/* Телефон — одна строка: имя и счёт двумя строчками слева (не выше кнопок),
+   кнопки короткие — цель и счёт видны и у инициатора с двумя кнопками. */
 @media (max-width:1023px), (max-height:599px){
   .kickvote-banner{flex-wrap:nowrap;white-space:nowrap;}
-  .kickvote-banner > span, .kickvote-banner > div:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;}
-}
-@media (max-width:1023px), (max-height:599px){
-  .kickvote-banner > span{flex:1 1 auto;}
+  .kickvote-banner > .kv-info{flex:1 1 auto;flex-direction:column;align-items:flex-start;flex-wrap:nowrap;gap:1px;line-height:1.25;overflow:hidden;}
   .kickvote-banner > button{flex:none;}
+  .kickvote-banner .kv-long{display:none;}
+  .kickvote-banner .kv-short{display:inline-flex;}
+}
+/* Телефон в ландшафте: слева вверху кнопка меню, посередине поле — баннер
+   уходит в правую колонку (над капиталом), кнопки второй строкой. */
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
+  .kickvote-banner{left:auto;right:calc(12px + var(--safe-r));max-width:26vw;flex-wrap:wrap;gap:6px 8px;padding:8px 10px;}
+  .kickvote-banner > .kv-info{flex:1 1 100%;}
+  .kickvote-banner > button{flex:1 1 auto;min-height:32px;padding:5px 10px;}
+}
+/* 1024–1279: колонки ленты нет — баннер внизу левой колонки, не на поле
+   и не на кнопке меню партии, над плавающей панелью вкладок. */
+@media (min-width:1024px) and (max-width:1279px) and (min-height:600px){
+  .kickvote-banner{left:calc(24px + var(--safe-l));right:auto;top:auto;bottom:calc(var(--tabbar-h) + 28px + var(--safe-b));max-width:280px;justify-content:flex-start;}
+}
+
+/* =====================================================================
+   Анимации партии (anim.js)
+   ---------------------------------------------------------------------
+   Классы anim-* вешает anim.js через реестр эффектов: после каждой
+   перерисовки (innerHTML) класс снова добавляется к новым узлам с
+   отрицательной задержкой --d-<класс>, и анимация продолжается с того же
+   места. Правило: последний кадр совпадает с обычным видом элемента, поэтому
+   снятие класса незаметно. Анимируются только transform / opacity / filter /
+   цвет и псевдоэлементы. На .stage-cell ::before — заливка цены/волны,
+   ::after — кольцо владельца; .stage-board-outer не трогаем (там масштаб поля).
+   ===================================================================== */
+
+/* Слой наложений над столом: всплывающие суммы, кости соперника, баннер хода.
+   Живёт внутри .stage (anim.js layer()): выше поля, ниже панели хода (z20) и листа (z21). */
+#animLayer{position:fixed;inset:0;z-index:19;pointer-events:none;overflow:hidden;contain:strict;}
+.anim-confetti{position:fixed;left:0;top:0;z-index:40;pointer-events:none;}
+
+/* Нижний лист: въезд один раз на событие (бросок, конец партии, цена выкупа). */
+.roll-reveal{animation-delay:var(--d-roll-reveal,0ms);}
+
+/* --- Бросок 2×d12: цифры крутятся и ложатся (строка, затем столбец) ----- */
+.die.anim-die-spin, .anim-mini-die.anim-die-spin{animation:dieWobble .12s linear infinite alternate;}
+.die.anim-die-spin b, .anim-mini-die.anim-die-spin b{opacity:.8;filter:blur(.4px);}
+.die.anim-die-land b, .anim-mini-die.anim-die-land b{animation:dieLand .26s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d-anim-die-land,0ms);}
+@keyframes dieWobble{from{transform:rotate(-5deg);}to{transform:rotate(5deg);}}
+@keyframes dieLand{0%{transform:scale(1.25) rotate(-10deg);}100%{transform:none;}}
+/* Название выпавшего проявляется, когда легли обе кости; кнопки видны сразу. */
+.popup-card.anim-gated .sheet-head{animation:headReveal .22s ease-out both;animation-delay:calc(var(--d-anim-gated,0ms) + 470ms);}
+@keyframes headReveal{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.roll-reveal .own-bar i{transform-origin:left center;animation:barGrow .5s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--d-roll-reveal,0ms) + 350ms);}
+@keyframes barGrow{from{transform:scaleX(0);}to{transform:none;}}
+
+/* Кости чужого броска / бота — фишка над полем (нижний край — на рамке поля). */
+.anim-dice-chip{position:absolute;display:flex;align-items:center;gap:8px;padding:4px 5px 4px 10px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--line-strong);box-shadow:0 14px 34px rgba(0,0,0,.5);color:var(--text);
+  font-size:13px;font-weight:700;white-space:nowrap;transform:translate(-50%,-100%);animation:chipInOut 1.6s ease-out both;}
+.anim-chip-dot{width:10px;height:10px;border-radius:5px;flex:none;}
+.anim-chip-name{max-width:132px;overflow:hidden;text-overflow:ellipsis;}
+.anim-mini-die{width:24px;height:24px;border-radius:7px;background:#F3EEE4;color:#1A140F;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 3px 8px rgba(0,0,0,.4);}
+.anim-mini-die b{font-family:var(--font-mono);font-size:13px;line-height:1;}
+@keyframes chipInOut{
+  0%{opacity:0;transform:translate(-50%,calc(-100% - 6px));}
+  12%{opacity:1;transform:translate(-50%,-100%);}
+  80%{opacity:1;transform:translate(-50%,-100%);}
+  100%{opacity:0;transform:translate(-50%,calc(-100% - 4px));}
+}
+
+/* --- Перекрестие: метки, бегущая подсветка линий, прилёт клетки ---------- */
+.stage-label.anim-hot{animation:labelPop .32s cubic-bezier(.2,1.5,.4,1) both;animation-delay:var(--d-anim-hot,0ms);}
+@keyframes labelPop{from{transform:scale(.6);background-color:transparent;color:var(--board-label);}}
+/* Пустые клетки (компания поглощена слиянием, disabled) и так приглушены —
+   без :not(:disabled) они вспыхивали бы золотом на старте и в конце броска. */
+.stage-cells.has-roll.anim-dim .stage-cell:not(.on-line):not(:disabled){animation:dimIn .3s ease-out both;animation-delay:var(--d-anim-dim,0ms);}
+@keyframes dimIn{from{opacity:1;}to{opacity:.32;}}
+.stage-cells.has-roll .stage-cell.on-line.anim-sweep{animation:lineSweep .42s ease-out both;animation-delay:var(--d-anim-sweep,0ms);}
+@keyframes lineSweep{
+  0%{opacity:1;box-shadow:0 0 0 0 transparent;filter:none;}
+  35%{opacity:1;box-shadow:0 0 0 2.5px var(--stage-accent);filter:brightness(1.45);}
+  100%{opacity:1;box-shadow:0 0 0 1.5px var(--stage-accent);filter:none;}
+}
+.stage-cells.has-roll .stage-cell.active-cell.anim-land{animation:cellLand .5s cubic-bezier(.2,1.5,.4,1) both, cellPulse 1.6s ease-in-out infinite;
+  animation-delay:var(--d-anim-land,0ms), calc(var(--d-anim-land,0ms) + .5s);}
+@keyframes cellLand{0%{transform:scale(1);box-shadow:0 0 0 0 transparent;}55%{transform:scale(1.55);}100%{transform:scale(1.28);}}
+/* Бросок решён: поле плавно возвращает яркость, клетка — размер. */
+.stage-cell.anim-undim:not(:disabled){animation:undimIn .35s ease-out both;animation-delay:var(--d-anim-undim,0ms);}
+@keyframes undimIn{from{opacity:.32;}to{opacity:1;}}
+.stage-cell.anim-settle{animation:cellSettle .3s ease-out both;animation-delay:var(--d-anim-settle,0ms);}
+@keyframes cellSettle{from{transform:scale(1.28);}to{transform:none;}}
+
+/* --- Владельцы и цены на поле -------------------------------------------- */
+.cell-owner.anim-pop, .re-stars.anim-pop{animation:ownerPop .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d-anim-pop,0ms);}
+@keyframes ownerPop{0%{transform:scale(0);}60%{transform:scale(1.8);}100%{transform:none;}}
+/* Клетки рисуются по порядку, и соседи справа и снизу закрывали бы кольцо,
+   «прыжок» точки владельца и сжатие клетки — на время эффекта поднимаем её
+   (ниже выпавшей клетки, у той z-index:2). :has — отдельным правилом: где его
+   не знают, он не должен ронять всё правило. */
+.stage-cell.anim-owned, .stage-cell.anim-settle{z-index:1;}
+.stage-cell:has(> .anim-pop){z-index:1;}
+.stage-cell.anim-owned::after{content:"";position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--flash,var(--stage-accent));pointer-events:none;
+  animation:ownRing .8s ease-out both;animation-delay:var(--d-anim-owned,0ms);}
+@keyframes ownRing{0%{opacity:1;transform:scale(.85);}100%{opacity:0;transform:scale(1.4);}}
+.stage-cell.anim-px-up::before, .stage-cell.anim-px-down::before,
+.stage-cell.anim-wave-up::before, .stage-cell.anim-wave-down::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;}
+.stage-cell.anim-px-up::before{background:rgba(127,209,163,.55);animation:pxFlash .8s ease-out both;animation-delay:var(--d-anim-px-up,0ms);}
+.stage-cell.anim-px-down::before{background:rgba(238,138,110,.6);animation:pxFlash .8s ease-out both;animation-delay:var(--d-anim-px-down,0ms);}
+@keyframes pxFlash{0%{opacity:0;}25%{opacity:1;}100%{opacity:0;}}
+/* Волна после биржевого события: сила заливки — по величине изменения (--wave-a). */
+.stage-cell.anim-wave-up::before{background:#7FD1A3;animation:waveFlash .65s ease-out both;animation-delay:var(--d-anim-wave-up,0ms);}
+.stage-cell.anim-wave-down::before{background:#EE8A6E;animation:waveFlash .65s ease-out both;animation-delay:var(--d-anim-wave-down,0ms);}
+@keyframes waveFlash{0%{opacity:0;}30%{opacity:var(--wave-a,.5);}100%{opacity:0;}}
+/* Таблица «Биржи»: только цвет цифры, без фона строки (фон рынок двигает постоянно). */
+#marketBody td.price.anim-px-up{--px:var(--up);animation:pxText .9s ease-out both;animation-delay:var(--d-anim-px-up,0ms);}
+#marketBody td.price.anim-px-down{--px:var(--down);animation:pxText .9s ease-out both;animation-delay:var(--d-anim-px-down,0ms);}
+@keyframes pxText{0%{color:var(--px);text-shadow:0 0 10px color-mix(in srgb, var(--px) 55%, transparent);}100%{}}
+#marketBody .delta.anim-pop{animation:deltaPop .35s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d-anim-pop,0ms);}
+@keyframes deltaPop{0%{transform:scale(.85);}60%{transform:scale(1.08);}100%{transform:none;}}
+
+/* --- Деньги: всплывающие суммы и подсветка счётчиков --------------------- */
+.anim-float{position:absolute;font:700 13px/1 var(--font-mono);font-variant-numeric:tabular-nums;padding:3px 8px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:1px solid color-mix(in srgb, currentColor 40%, transparent);box-shadow:0 6px 16px rgba(0,0,0,.35);
+  white-space:nowrap;transform:translate(-50%,0);animation:floatUp 1.1s cubic-bezier(.2,.7,.3,1) both;}
+.anim-float.up{color:var(--up);}
+.anim-float.down{color:var(--down);}
+.anim-float.bk{color:var(--on-danger);background:var(--danger);border-color:transparent;font-family:var(--font-ui);font-weight:800;}
+@keyframes floatUp{
+  0%{opacity:0;transform:translate(-50%,6px) scale(.8);}
+  15%{opacity:1;transform:translate(-50%,-4px) scale(1.05);}
+  70%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,-30px);}
+}
+.anim-gain{animation:numGain .8s ease-out both;animation-delay:var(--d-anim-gain,0ms);}
+.anim-loss{animation:numLoss .8s ease-out both;animation-delay:var(--d-anim-loss,0ms);}
+@keyframes numGain{0%{color:var(--up);text-shadow:0 0 12px color-mix(in srgb, var(--up) 50%, transparent);}100%{}}
+@keyframes numLoss{0%{color:var(--down);text-shadow:0 0 12px color-mix(in srgb, var(--down) 50%, transparent);}100%{}}
+
+/* --- Смена хода: кольцо на чипе, подсказка на кнопке, баннер ------------- */
+.pchip.anim-turn::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid var(--ring,var(--seat));pointer-events:none;
+  animation:turnRing .55s ease-out 2 both;animation-delay:var(--d-anim-turn,0ms);}
+@keyframes turnRing{0%{opacity:1;transform:scale(.97);}100%{opacity:0;transform:scale(1.08);}}
+.pchip.anim-turn .pchip-av{animation:avBounce .4s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d-anim-turn,0ms);}
+@keyframes avBounce{0%{transform:none;}45%{transform:scale(1.15);}100%{transform:none;}}
+/* button:active сжимает саму кнопку — анимируем только иконку и блик. */
+.dock .dock-main.anim-nudge{position:relative;overflow:hidden;}
+.dock .dock-main.anim-nudge .ico{animation:avBounce .45s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d-anim-nudge,0ms);}
+.dock .dock-main.anim-nudge::after{content:"";position:absolute;inset:0;pointer-events:none;transform:translateX(-120%);
+  background:linear-gradient(105deg, transparent 35%, rgba(255,255,255,.42) 50%, transparent 65%);
+  animation:nudgeSweep .7s ease-out both;animation-delay:var(--d-anim-nudge,0ms);}
+@keyframes nudgeSweep{from{transform:translateX(-120%);}to{transform:translateX(120%);}}
+.anim-banner{position:absolute;padding:10px 20px;border-radius:var(--r-pill);background:var(--surface);color:var(--text);
+  border:1.5px solid var(--stage-accent);font:800 17px/1.2 var(--font-ui);letter-spacing:-.01em;white-space:nowrap;
+  box-shadow:0 14px 34px rgba(0,0,0,.5), 0 0 0 4px color-mix(in srgb, var(--stage-accent) 18%, transparent);
+  transform:translate(-50%,-50%);animation:bannerInOut 1.4s ease-out both;}
+@keyframes bannerInOut{
+  0%{opacity:0;transform:translate(-50%,calc(-50% - 8px)) scale(.96);}
+  12%{opacity:1;transform:translate(-50%,-50%);}
+  80%{opacity:1;transform:translate(-50%,-50%);}
+  100%{opacity:0;transform:translate(-50%,calc(-50% - 6px));}
+}
+
+/* --- Входящая сделка ------------------------------------------------------ */
+.trade-offer.anim-offer-in{animation:offerIn .65s cubic-bezier(.2,1.4,.4,1) both;animation-delay:var(--d-anim-offer-in,0ms);}
+@keyframes offerIn{
+  0%{opacity:0;transform:translateY(16px) scale(.94);}
+  60%{opacity:1;transform:scale(1.02);box-shadow:0 0 0 6px color-mix(in srgb, var(--primary) 30%, transparent);}
+  100%{transform:none;box-shadow:0 0 0 0 transparent;}
+}
+.tab-btn.anim-bump .ico{animation:tabBump .5s cubic-bezier(.2,1.6,.4,1);}
+@keyframes tabBump{0%{transform:none;}45%{transform:scale(1.3) rotate(-8deg);}100%{transform:none;}}
+
+/* --- Банкротство ---------------------------------------------------------- */
+.pchip.bankrupt .pchip-av{filter:grayscale(1);}
+.pchip.anim-bankrupt{animation:bkShake .42s ease-in-out, bkFade .6s ease-out both;
+  animation-delay:var(--d-anim-bankrupt,0ms), calc(var(--d-anim-bankrupt,0ms) + .42s);}
+.pchip.anim-bankrupt .pchip-av{animation:avGray .6s ease-out both;animation-delay:calc(var(--d-anim-bankrupt,0ms) + .42s);}
+@keyframes bkShake{0%,100%{transform:none;}20%{transform:translateX(-5px);}40%{transform:translateX(5px);}60%{transform:translateX(-4px);}80%{transform:translateX(3px);}}
+@keyframes bkFade{from{opacity:1;}to{opacity:.45;}}
+@keyframes avGray{from{filter:none;}to{filter:grayscale(1);}}
+.stage-board.anim-quake{animation:boardQuake .45s ease-in-out both;animation-delay:var(--d-anim-quake,0ms);}
+@keyframes boardQuake{
+  0%,100%{transform:none;}
+  20%{transform:translate(-3px,1px) rotate(-.4deg);}
+  40%{transform:translate(3px,-1px) rotate(.4deg);}
+  60%{transform:translate(-2px,0) rotate(-.2deg);}
+  80%{transform:translate(2px,0) rotate(.1deg);}
+}
+
+/* --- Биржевое событие: переворот карточки, строки по очереди ------------- */
+.market-event-modal.anim-flip{transform-origin:50% 100%;animation:eventCardIn .55s cubic-bezier(.2,.9,.3,1.05) both;}
+@keyframes eventCardIn{
+  0%{opacity:0;transform:perspective(1000px) rotateX(-70deg) translateY(40px);}
+  65%{opacity:1;transform:perspective(1000px) rotateX(6deg);}
+  100%{opacity:1;transform:none;}
+}
+.market-event-modal.anim-flip .cap-row, .market-event-modal.anim-flip .log-entry{animation:rowIn .32s ease-out both;animation-delay:calc(200ms + var(--i,0) * 45ms);}
+.market-event-modal.anim-flip h2 .ico{animation:boltZap .5s .15s cubic-bezier(.2,1.6,.4,1) both;}
+@keyframes rowIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes boltZap{0%{opacity:0;transform:scale(.5) rotate(-20deg);}100%{opacity:1;transform:none;}}
+
+/* --- Конец партии: кубок и места по очереди — только при появлении листа -- */
+.end-screen-icon{animation:none;}
+.roll-reveal .end-screen-icon{animation:endIconPop .5s ease-out both;animation-delay:var(--d-roll-reveal,0ms);}
+.roll-reveal .end-rank-row{animation:rowIn .35s ease-out both;animation-delay:calc(var(--d-roll-reveal,0ms) + 250ms + var(--i,0) * 70ms);}
+
+/* --- Живая лента у стола: новые записи въезжают по очереди --------------- */
+.feed-entry-in{animation-fill-mode:both;animation-delay:calc(var(--i,0) * 60ms);}
+
+/* --- Кнопка броска: кувырок кубика укладывается в задержку отправки (280 мс),
+   дальше — ровное вращение, пока ждём ответ сервера; без приглушения disabled. */
+.dock .roll-btn.rolling .ico{animation:diceTumble .28s ease-out, diceWait .9s linear .28s infinite;}
+.dock .roll-btn.rolling:disabled{opacity:1;}
+@keyframes diceWait{from{transform:rotate(0);}to{transform:rotate(360deg);}}
+
+/* --- Вкладки: раздел мягко поднимается над столом (закрытие — мгновенно) --- */
+.overlay-panel.active{animation:panelIn .22s cubic-bezier(.2,.8,.3,1);}
+@keyframes panelIn{from{opacity:0;transform:translateY(12px);}}
+.tab-btn.active .ico{animation:tabPop .3s cubic-bezier(.2,1.6,.4,1);}
+@keyframes tabPop{0%{transform:scale(.8);}60%{transform:scale(1.12);}100%{transform:none;}}
+.anim-fade{animation:rowIn .22s ease-out both;animation-delay:var(--d-anim-fade,0ms);}
+
+/* --- Финал партии с лимитом: метка в шапке вспыхивает при входе в финал -- */
+.rep-badge.g-final.anim-final{animation:finalGlow .7s ease-out 2 both;animation-delay:var(--d-anim-final,0ms);}
+@keyframes finalGlow{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);transform:none;}
+  35%{transform:scale(1.06);}
+  100%{box-shadow:0 0 0 10px transparent;transform:none;}
+}
+
+/* --- Отклик на нажатие ---------------------------------------------------- */
+.dock > button:active{transform:scale(.96);}
+.sheet-actions > button:active{transform:scale(.97);}
+.stage-cell:not(.active-cell):active{transform:scale(.9);filter:brightness(1.2);}
+.chip:active, .reaction-btn:active, .zoom-btn:active{transform:scale(.94);}
+.pchip .pchip-av{transition:transform .1s;}
+.pchip:active .pchip-av{transform:scale(.92);}
+
+/* =====================================================================
+   Обучение (tutorial.js): карточка «Обучение» в меню, разовое предложение
+   новичку и тренер поверх стола. Тренер лежит вне #app — у него светлые
+   токены меню, и светлая карточка видна на тёмном столе. Слои: затемнение
+   и кольца — 56 (над карточкой компании 50, баннером голосования 45 и
+   меню партии 31, под сводкой события 58, баннером связи 59 и тостами 60),
+   карточка и плашка — 62 (над сводкой события). Сам корень .coach не
+   позиционирован: fixed создал бы общий контекст наложения, и карточка
+   оказалась бы под сводкой. Нажатия принимают только карточка и плашка —
+   у затемнения и колец pointer-events:none.
+   ===================================================================== */
+/* Пункт «Обучение» в меню — .menu-row.tutorial (блок «Главное меню»). */
+.tutorial-offer{cursor:pointer;gap:10px;} /* тап по тексту тоже начинает обучение (tutorial.js) */
+.tutorial-offer .menu-continue-text span{white-space:normal;}
+.tutorial-offer > button{flex:none;}
+.tutorial-offer .tutorial-offer-close{width:44px;min-height:44px;padding:0;}
+
+.coach{position:static;}
+.coach-dim{position:fixed;left:0;top:0;width:100%;height:100%;z-index:56;pointer-events:none;opacity:0;transition:opacity .22s ease;}
+.coach-dim.on{opacity:1;}
+.coach-dim-fill{fill:rgba(12,8,5,.58);transition:fill .22s ease;}
+.coach-dim.soft .coach-dim-fill{fill:rgba(12,8,5,.32);}
+.coach-hole{transition:x .22s ease, y .22s ease, width .22s ease, height .22s ease;}
+.coach-dim.coach-instant .coach-hole{transition:none;} /* отверстие появляется сразу на месте */
+.coach-rings{position:fixed;inset:0;z-index:56;pointer-events:none;overflow:hidden;}
+.coach-ring{position:absolute;box-sizing:border-box;border:2px solid #E0B168;border-radius:14px;pointer-events:none;
+  box-shadow:0 0 0 3px rgba(224,177,104,.22), 0 0 22px rgba(224,177,104,.45);
+  transition:left .22s ease, top .22s ease, width .22s ease, height .22s ease;}
+.coach-ring.also{box-shadow:0 0 12px rgba(224,177,104,.55);}
+.coach-ring.off{display:none;}
+.coach-ring.pulse{animation:coachPulse 1.4s ease-in-out infinite;}
+@keyframes coachPulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(224,177,104,.22), 0 0 22px rgba(224,177,104,.45);}
+  50%{box-shadow:0 0 0 9px rgba(224,177,104,.10), 0 0 30px rgba(224,177,104,.75);}
+}
+
+.coach-card{position:fixed;left:0;top:0;z-index:62;box-sizing:border-box;width:360px;max-width:calc(100vw - 24px);
+  background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);border-radius:var(--r-xl);
+  box-shadow:0 24px 60px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.25);font-family:var(--font-ui);font-size:.9375rem;line-height:1.45;
+  visibility:hidden;opacity:0;transition:opacity .2s ease, left .22s ease, top .22s ease, visibility 0s linear .2s;}
+.coach-card.on{visibility:visible;opacity:1;transition:opacity .2s ease, left .22s ease, top .22s ease, visibility 0s;}
+.coach-card:focus{outline:none;}
+.coach-card:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+.coach-inner{padding:14px 16px 16px;overflow-y:auto;overscroll-behavior:contain;border-radius:inherit;}
+.coach-caret{position:absolute;width:14px;height:14px;background:var(--surface-2);border:1px solid var(--line-strong);transform:rotate(45deg);display:none;pointer-events:none;}
+.coach-card[data-side="below"] .coach-caret{display:block;top:-8px;border-right-color:transparent;border-bottom-color:transparent;}
+.coach-card[data-side="above"] .coach-caret{display:block;bottom:-8px;border-left-color:transparent;border-top-color:transparent;}
+.coach-card[data-side="right"] .coach-caret{display:block;left:-8px;border-top-color:transparent;border-right-color:transparent;}
+.coach-card[data-side="left"] .coach-caret{display:block;right:-8px;border-bottom-color:transparent;border-left-color:transparent;}
+.coach-progress{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.coach-eyebrow{font-size:.6875rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);}
+.coach-bar{display:flex;gap:3px;}
+.coach-bar i{flex:1;height:3px;border-radius:2px;background:var(--track);}
+.coach-bar i.on{background:var(--clay);}
+.coach-card .coach-title{font-size:1.0625rem;line-height:1.25;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--text);margin:0 0 6px;}
+.coach-text{font-size:.875rem;line-height:1.5;color:var(--text-2);margin:0 0 10px;}
+.coach-do{font-size:.875rem;line-height:1.45;color:var(--text);margin:0;padding:8px 10px;border-radius:var(--r-sm);background:var(--warn-bg);}
+.coach-do b{font-weight:800;}
+.coach-more{display:none;background:none;border:none;color:var(--accent);padding:0;min-height:40px;font-size:.875rem;font-weight:800;}
+.coach-card.compact .coach-text, .coach-card.compact .coach-bar{display:none;}
+.coach-card.compact .coach-more{display:inline-flex;}
+.coach-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.coach-card .coach-actions button{min-height:44px;}
+.coach-next{min-width:120px;margin-left:auto;}
+.coach-next[aria-disabled="true"]{opacity:.45;cursor:not-allowed;filter:none;transform:none;}
+.coach-finish{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.coach-finish button{min-height:48px;}
+.coach-finish-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.coach-note{font-size:.75rem;color:var(--text-3);margin:2px 0 0;text-align:center;}
+.coach-confirm .coach-actions{justify-content:flex-end;}
+
+.coach-mini{position:fixed;left:0;top:0;z-index:62;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;
+  border-radius:var(--r-pill);background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);
+  box-shadow:0 12px 30px rgba(0,0,0,.45);font-family:var(--font-ui);font-size:.875rem;font-weight:700;line-height:1.3;
+  visibility:hidden;opacity:0;transition:opacity .2s ease, visibility 0s linear .2s;}
+.coach-mini.on{visibility:visible;opacity:1;transition:opacity .2s ease, visibility 0s;}
+.coach-mini .spinner{margin-left:0;width:16px;height:16px;border-top-color:var(--clay);}
+.coach-mini-text{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.coach-mini-btns{display:flex;align-items:center;gap:6px;flex:none;}
+.coach-mini button{min-height:44px;border-radius:var(--r-pill);flex:none;}
+/* Узкий экран: не помещается в строку — кнопки переносятся под текст, вправо
+   (иначе «Обучение ждёт за столом» сжималось до многоточия). Короткая плашка
+   («Ходят боты…» и «Пропустить») остаётся в одну строку. */
+@media (max-width:480px){
+  .coach-mini{flex-wrap:wrap;row-gap:4px;border-radius:var(--r-xl);}
+  .coach-mini-text{flex:1 1 auto;max-width:100%;}
+  .coach-mini-spin:not([hidden]) + .coach-mini-text{max-width:calc(100% - 26px);} /* рядом со спиннером */
+  .coach-mini-btns{margin-left:auto;}
+}
+
+.coach-probe{position:fixed;left:0;top:0;width:0;height:0;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);visibility:hidden;pointer-events:none;}
+.coach-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;}
+
+/* Шаг «Биржевое событие»: сводке оставляем место под карточку тренера —
+   на телефоне в портрете сверху, в ландшафте слева. */
+@media (max-width:1023px) and (orientation:portrait){
+  body.coach-event .market-event-modal{max-height:calc(100vh - 290px - var(--safe-t));max-height:calc(100dvh - 290px - var(--safe-t));}
+}
+@media (orientation:landscape) and (max-height:599px), (orientation:landscape) and (max-width:1023px){
+  body.coach-event .market-event-overlay{justify-content:flex-end;padding-right:calc(12px + var(--safe-r));}
+  body.coach-event .market-event-modal{max-width:min(560px, calc(100vw - 264px - var(--safe-l) - var(--safe-r)));}
+}
+
+/* Сокращённые анимации: без проездов, пульсации и проявления. */
+body.reduce-motion .coach-dim, body.reduce-motion .coach-dim-fill, body.reduce-motion .coach-hole, body.reduce-motion .coach-ring,
+body.reduce-motion .coach-card, body.reduce-motion .coach-mini{transition:none;}
+body.reduce-motion .coach-ring.pulse{animation:none;}
+@media (prefers-reduced-motion:reduce){
+  .coach-dim, .coach-dim-fill, .coach-hole, .coach-ring, .coach-card, .coach-mini{transition:none;}
+  .coach-ring.pulse{animation:none;}
 }

@@ -1,0 +1,12 @@
+{
+  "name": "tm-rustore-pay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Локальный Capacitor-плагин RuStore Pay SDK (ставится в CI только для store=rustore)",
+  "license": "UNLICENSED",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}

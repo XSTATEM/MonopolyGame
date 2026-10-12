@@ -1,0 +1,9 @@
+[Unit]
+Description=Birzha data backup
+
+[Service]
+Type=oneshot
+User=birzha
+Group=birzha
+EnvironmentFile=/etc/birzha.env
+ExecStart=/usr/local/bin/birzha-backup

@@ -1,0 +1,12 @@
+{
+  "name": "tm-yandex-rewarded",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Локальный Capacitor-плагин: реклама с вознаграждением Яндекса (ставится в CI только при TM_YANDEX_REWARDED_ID)",
+  "license": "UNLICENSED",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}
