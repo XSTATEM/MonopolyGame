@@ -337,6 +337,7 @@
       room: s.room, gameId: s.gameId || 0, you: String(s.you), phase: s.phase,
       cur: s.phase === "roll" && s.currentPlayerId != null ? String(s.currentPlayerId) : null,
       eventCount: s.eventCount || 0, turn: s.turn || 0,
+      round: s.roundNumber || 1, maxRounds: s.maxRounds || 0,
       rollKey, roll: r ? { pid: String(r.playerId), row: r.row, col: r.col } : null,
       players, prices, ctrl, re, cap, fpKey,
       inTrades: new Set((s.pendingTrades || []).filter((t)=> t.toId === s.you).map((t)=> String(t.id))),
@@ -636,6 +637,19 @@
     if(prev.fpKey && prev.fpKey !== next.fpKey) drop("fp:" + prev.fpKey);
     if(next.fpKey && next.fpKey !== prev.fpKey) add("fp:" + next.fpKey, "#contextPopup .popup-card", "roll-reveal", { dur: 400 });
   }
+  // Партия с лимитом раундов: метка финала в шапке (index.html, statusRowHtml,
+  // класс g-final) вспыхивает на каждом новом раунде финала. Метка есть только
+  // в последних раундах — раньше селектор просто ничего не находит. Пока
+  // открыта сводка события, ждём её закрытия, как «Ваш ход».
+  function diffFinal(prev, next){
+    if(!next.maxRounds || next.phase !== "roll" || next.round <= prev.round) return;
+    const round = next.round, key = `final:${next.room}:${next.gameId}:${round}`;
+    const play = ()=>{
+      if(!snap || snap.round !== round || snap.phase !== "roll") return;
+      add(key, "#cornerStatus .g-final", "anim-final", { dur: 1400 });
+    };
+    if(eventOpen()) deferred.push(play); else play();
+  }
 
   // --- Конфетти победы -------------------------------------------------
   function killConfetti(){
@@ -771,6 +785,7 @@
       diffTrades(prev, next);
       diffEnd(prev, next, s, bankrupt);
       diffFpWait(prev, next);
+      diffFinal(prev, next);
       flushIO();
       syncPulse();
       reapply();

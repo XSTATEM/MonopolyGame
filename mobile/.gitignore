@@ -4,3 +4,5 @@ www/
 # (и в CI) из capacitor.config.json и resources/ — в репозитории не храним.
 android/
 ios/
+# Какие плагины покупок/рекламы включил scripts/enable-native.mjs (пишется при сборке).
+.native-build.json

@@ -1,6 +1,8 @@
 # Запуск в Docker вместо systemd:  docker compose -f deploy/docker-compose.yml up -d --build
 # Порт открыт только на localhost — снаружи ставьте nginx (deploy/nginx-birzha.conf)
-# или замените на "80:8792", если прокси не нужен.
+# или замените на "80:8792", если прокси не нужен. Без прокси уберите и строку
+# TRUST_PROXY: иначе сервер верил бы заголовкам X-Real-IP/X-Forwarded-*, которые
+# может подставить любой клиент (лимиты, проверка адресов вебхука ЮKassa).
 services:
   birzha:
     build: ../server

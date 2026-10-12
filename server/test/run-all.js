@@ -2,7 +2,7 @@
 // Запуск всех проверок подряд с итоговой сводкой (npm test).
 //   node test/run-all.js            — всё, смоук ждёт периодическое сохранение (~35 с)
 //   node test/run-all.js --fast     — то же без ожидания (SMOKE_FAST=1, npm run test:fast)
-//   node test/run-all.js engine     — только выбранные: check, engine, smoke
+//   node test/run-all.js engine     — только выбранные: check, engine, smoke, shop
 // Каждый набор — отдельный процесс node: падение одного не мешает остальным,
 // а код выхода ненулевой, если не прошёл хоть один.
 // ---------------------------------------------------------------------
@@ -13,6 +13,7 @@ const SUITES = [
   { name: "check", file: "check.js", title: "синтаксис, повторы функций, партии ботов" },
   { name: "engine", file: "engine.test.js", title: "правила движка" },
   { name: "smoke", file: "smoke.js", title: "сервер: HTTP + WebSocket" },
+  { name: "shop", file: "shop.test.js", title: "магазин, заказы, реклама" },
 ];
 
 const args = process.argv.slice(2);

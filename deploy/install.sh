@@ -135,8 +135,50 @@ EOF
 elif [ "$PORT_SET" -eq 1 ]; then
   sed -i "s/^PORT=.*/PORT=$PORT/" "$ENV_FILE"
 fi
+# Магазин и реклама: только закомментированные заготовки — без ключей всё выключено.
+# Дописываются один раз, в том числе в файл от прежней установки.
+if ! grep -q 'YOOKASSA_SHOP_ID' "$ENV_FILE"; then
+  cat >> "$ENV_FILE" <<'EOF'
+
+# --- Магазин и реклама (необязательно; см. deploy/README.md и MONETIZATION.md) ---
+# Пока строки закомментированы, магазина и рекламы нет. Секреты храните только здесь,
+# файлы ключей — в /etc/birzha/ (права 640, владелец root:birzha).
+# ЮKassa — карты и СБП на сайте и в APK:
+#YOOKASSA_SHOP_ID=
+#YOOKASSA_SECRET_KEY=
+#YOOKASSA_RETURN_URL=https://game.example.ru
+#YOOKASSA_RECEIPTS=off
+#YOOKASSA_VAT_CODE=1
+#YOOKASSA_TAX_SYSTEM=
+#YOOKASSA_PAYMENT_SUBJECT=service
+#YOOKASSA_IN_RUSTORE=off
+# RuStore Pay — сборка для RuStore:
+#RUSTORE_KEY_ID=
+#RUSTORE_PRIVATE_KEY=
+#RUSTORE_PRIVATE_KEY_FILE=/etc/birzha/rustore.key
+#RUSTORE_APP_ID=
+#RUSTORE_ALLOW_SANDBOX=off
+# Google Play — международная сборка:
+#GOOGLE_PLAY_PACKAGE=com.xstatem.trademonopoly
+#GOOGLE_PLAY_SERVICE_ACCOUNT=/etc/birzha/google-play.json
+#GOOGLE_PLAY_ALLOW_TEST=off
+# Видео с наградой (0 — выключено):
+#ADS_REWARD_POINTS=10
+#ADS_DAILY_CAP=5
+#ADS_COOLDOWN_SEC=180
+#ADS_MIN_WATCH_SEC=10
+#ADMOB_SSV=off
+#ADMOB_AD_UNITS=
+# Подвал магазина (продавец, оферта, политика конфиденциальности):
+#SHOP_SELLER=ИП Иванов И. И., ИНН 000000000000, support@example.ru
+#SHOP_OFFER_URL=https://game.example.ru/offer.html
+#SHOP_PRIVACY_URL=https://game.example.ru/privacy.html
+EOF
+fi
 chown root:"$APP_USER" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
+# Каталог для файлов ключей магазинов (RuStore, Google Play): служба его только читает.
+install -d -m 750 -o root -g "$APP_USER" /etc/birzha
 PORT="$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -n1)"
 PORT="${PORT:-8792}"
 

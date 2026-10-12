@@ -39,7 +39,8 @@ const HELP = `Симулятор баланса «Биржи» (tools/sim)
   --settings JSON      то же пачкой: '{"turnSalary":450}' или @файл.json
   --sweep NAME=v1|v2   прогнать один и тот же набор партий для каждого значения и сравнить;
                        NAME заглавными — константа (--override), иначе — настройка комнаты или maxRounds
-  --engine PATH        другой файл движка (по умолчанию server/public/engine.js)
+  --engine PATH        другой файл движка (по умолчанию server/public/engine.js), например копия
+                       до правки — для сравнения до/после на тех же --seed и --profiles
 
 Вывод и проверки
   --out FILE           записать сводку (и аномалии) в JSON

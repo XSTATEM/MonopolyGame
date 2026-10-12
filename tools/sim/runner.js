@@ -12,7 +12,8 @@
 // Если все игроки — профиль "engine", каждый шаг — просто engine.botStep (эталон).
 // Обязательства движковых ботов всегда решает сам botStep; где решение зависит
 // от игрока-профиля, драйвер спрашивает профиль, а за движкового бота повторяет
-// формулу botStep (цена выкупа fair×(1.5..2.5), намерение — botChoosePct движка).
+// формулу botStep (цена выкупа fair×(1.5..2.5), намерение — botBuyPct движка,
+// у старых движков — botChoosePct; порог сделки — тот, что записан в botStep).
 // ---------------------------------------------------------------------
 const { makeRng } = require("./engine-loader");
 const { PROFILES } = require("./profiles");
@@ -131,6 +132,10 @@ function runGame(env, cfg, gameIndex) {
     phase: { key: "", actions: 0, tried: new Set() },
     insiderCard: null,
     allEngine: seats.every((n) => PROFILES[n].pure),
+    // Порог сделки движкового бота: got >= paid × k. k — из botStep загруженного
+    // движка (engine-loader); не нашли — по наличию botBuyPct: он пришёл в том же
+    // пакете А5, что и k = 1, а раньше было 0.9.
+    tradeAcceptMult: Number.isFinite(env.tradeAcceptMult) ? env.tradeAcceptMult : typeof I.botBuyPct === "function" ? 1 : 0.9,
   };
 
   // --- метрики партии ---
@@ -464,11 +469,14 @@ function engineStep(S) {
 }
 
 // Хочет ли движковый бот купить по броску (та же проверка, что в botStep, шаг 2).
+// Движок с пакетом А5 решает через botBuyPct (5%, а не плата за отказ, если у
+// компании есть другие держатели); старые — botChoosePct или копия его формулы.
 function engineWantsBuy(S, roller, ticker) {
   const { E, I, room } = S;
   const free = 100 - E.totalOwnedPct(room, ticker);
   if (free < 1) return false;
   const price = room.companies[ticker].price;
+  if (typeof I.botBuyPct === "function") return I.botBuyPct(room, roller, ticker, roller.cash) >= 1;
   if (typeof I.botChoosePct === "function") return I.botChoosePct(roller.cash, price, free) >= 1;
   const spendable = Math.max(0, (roller.cash - 15000) * 0.35);
   return Math.min(25, free, Math.floor(spendable / (price / 100))) >= 1;
@@ -477,6 +485,7 @@ function engineBuyPct(S, roller, ticker) {
   const { E, I, room } = S;
   const free = 100 - E.totalOwnedPct(room, ticker);
   const price = room.companies[ticker].price;
+  if (typeof I.botBuyPct === "function") return I.botBuyPct(room, roller, ticker, roller.cash);
   if (typeof I.botChoosePct === "function") return I.botChoosePct(roller.cash, price, free);
   const spendable = Math.max(0, (roller.cash - 15000) * 0.35);
   const pct = Math.min(25, free, Math.floor(spendable / (price / 100)));
@@ -492,7 +501,7 @@ function engineAcceptTrade(S, to, trade) {
   const got = room.companies[trade.ticker].price * (trade.pct / 100);
   const paid = trade.price + (trade.wantTicker ? room.companies[trade.wantTicker].price * (trade.wantPct / 100) : 0);
   const canPay = (trade.price === 0 || to.cash >= trade.price) && (!trade.wantTicker || (to.holdings[trade.wantTicker] || 0) >= trade.wantPct);
-  return canPay && got >= paid * 0.9;
+  return canPay && got >= paid * S.tradeAcceptMult;
 }
 
 function callHook(S, p, name, ...args) {
