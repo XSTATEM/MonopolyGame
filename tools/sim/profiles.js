@@ -301,20 +301,6 @@ const PROFILES = {
     },
   },
 
-  dodgerMin: {
-    desc: "Проверка лазейки при комиссии держателям: вместо отказа покупает долю 1–5% с наименьшей комиссией (обычно 3–4%), недвижимость — как движок.",
-    stock(ctx, roll) {
-      const t = roll.ticker;
-      const comm = (pct) => (typeof ctx.I.buyCommissionAmount === "function" ? ctx.I.buyCommissionAmount(ctx.room, t, ctx.me.id, pct) : 0);
-      let best = 0;
-      for (let pct = 1; pct <= Math.min(5, Math.floor(ctx.free(t))); pct++) {
-        if (ctx.me.cash < ctx.buyCost(t, pct)) break;
-        if (!best || comm(pct) < comm(best)) best = pct;
-      }
-      return best ? buy(best) : refuse();
-    },
-  },
-
   // Хаос-обезьяна: случайные (в том числе бессмысленные) действия из всего набора
   // движка — для поиска зависаний, падений и нарушений инвариантов, а не для баланса.
   chaos: {

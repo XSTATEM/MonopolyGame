@@ -198,28 +198,17 @@ ownedBoardSkins, equippedAvatarPack, equippedBoardSkin}`.
    или realEstateId}` — дальше игрок выбирает действие.
 
 **Действия после броска на клетку с акциями:**
-- `buyFromRoll(pct)` — купить 1–25% компании по текущей цене + комиссия
+- `buyFromRoll(pct)` — купить 10% или 25% компании по текущей цене + комиссия
   банка (зависит от репутации, см. §7). Возможно, только если у банка ещё
   есть свободный объём (суммарно у всех игроков ≤ 100%). Покупка двигает
-  цену вверх: `applyPriceDelta(ticker, BUY_PRICE_IMPACT * (pct/10))`
-  (`BUY_PRICE_IMPACT = 2`, т.е. +2% за каждые 10% пакета, до множителя
-  волатильности тира). **Комиссия держателям** (`buyCommission`, флаг
-  `settings.buyCommission`): если у компании уже есть другие держатели,
-  покупатель платит им `refuseRollAmount × max((fullPct − pct)/fullPct,
-  flat + perPct × pct)` с `BUY_COMMISSION = {flat: 0, perPct: 0.1, fullPct: 5}`
-  — 10% доли стоят одну плату за отказ, 25% — две с половиной, 1% — 0,8.
-  Делится по долям держателей, как плата за отказ; не берётся, пока карта
-  новостей отменила выплаты по компании. Денег на цену + комиссию нет —
-  покупка отклоняется. В ленте — запись «💼 … комиссию держателям».
+  цену вверх: `applyPriceDelta(ticker, +2 * (pct/10))` (т.е. +2% за каждые
+  10% купленного пакета, до множителя волатильности тира).
 - `dividendFromRoll()` — отказ от покупки, если пакет уже частично выкуплен
   другими игроками: **обязательная** плата в пользу текущих держателей,
   пропорционально их долям (не «дивиденды», а штраф за отказ). Формула:
-  `amount = price * getForcedPaymentPct(tier) * (totalOwnedPct/100) *
-  dividendMultiplier * squeezeMult * TIER_DIVIDEND_MULT[tier]`
-  (`refuseRollAmount`), где `getForcedPaymentPct` = ставка класса из
-  `settings.tierForcedPaymentPct` (по умолчанию `DEFAULT_FORCED_PAYMENT_PCT =
-  [60, 45, 30]` % для A/B/C) × множитель инфляции выплат (`feeInflationMult`,
-  см. «Темп партии» ниже). Если пакет
+  `amount = price * TIER_FORCED_PAYMENT_PCT[tier] * (totalOwnedPct/100) *
+  dividendMultiplier * (2 если компания под сквиз-аутом иначе 1)`, где
+  `TIER_FORCED_PAYMENT_PCT = {A:0.03, B:0.05, C:0.08}`. Если пакет
   полностью под контролем одного игрока (>50%, других держателей нет) —
   этот путь недоступен, вместо него применяется `setForcedPrice`.
   **Срок решения контролёра** (`CONTROLLER_DECISION_MS = 45000`): отсчёт
@@ -253,28 +242,6 @@ ownedBoardSkins, equippedAvatarPack, equippedBoardSkin}`.
 
 **Действия на клетке недвижимости** (см. §6): `buyRealEstateFromRoll`,
 `upgradeRealEstateFromRoll`, `payRealEstateRentFromRoll`.
-
-**Темп партии** (BALANCE-REPORT.md, раздел 7; флаги в `room.settings`,
-`freshRoom` включает их новым комнатам, у комнат из `rooms.json` и офлайн-
-сохранений без флагов действуют прежние правила):
-- `maxRounds` новой комнаты — 30 (лобби и офлайн по-прежнему позволяют 15/50
-  и «без лимита»).
-- Плата за отказ по умолчанию 60/45/30% (была 20/15/10).
-- **Инфляция выплат** (`settings.feeInflation`, `FEE_INFLATION = {fromRound:
-  10, stepPct: 10, maxMult: 3}`): с 11-го раунда ставка платы за отказ (а с
-  ней справедливая цена выкупа и комиссия держателям) растёт на 10% за раунд,
-  максимум ×3. В состоянии — `feeInflationMult`, `feeInflationNext`,
-  `feeInflationFromRound`; шапка партии показывает «Плата за отказ ×1,3 ↑».
-- **Финальный отсчёт** (`settings.finalCountdown`, только без лимита): первое
-  банкротство (не исключение голосованием) ставит `room.finalRound =
-  roundNumber + FINAL_COUNTDOWN_ROUNDS − 1` (3 события, включая текущее);
-  `checkEndGame` использует `maxRounds || finalRound` как лимит. В состоянии —
-  `finalRound`; шапка — «Финальный отсчёт: осталось N раундов».
-- **Боты** (`botStep`, BALANCE-REPORT.md А5): без случайного шпионажа; сколько
-  купить — `botRollBuyPct` (доля по бюджету `botChoosePct` с параметрами
-  `BOT_BUY`, уменьшенная до посильной с комиссией; если по бюджету покупать
-  не стал бы, но у компании есть держатели — 5% вместо платы за отказ, когда
-  хватает денег); сделки — `botAcceptsTrade`, только не в убыток.
 
 После любого завершающего действия хода (`afterRollAction`): `pendingRoll`
 и `pendingForcedPrice` сбрасываются, `room.turn++`; если раунд закончен —
@@ -577,11 +544,6 @@ C = $8 000. Цена не может упасть ниже 10% от старто
   проходит с запасом. Причина нуля — `gameResult.noPointsReason`: `"short"`,
   `"kick"` (исключение голосованием), `"allBankrupt"` (разорились все); экран
   итогов и лента пишут её текстом.
-- Партия с лимитом заканчивается после события `maxRounds`, без лимита — после
-  финального отсчёта (`finalRound`, см. §4 «Темп партии») или когда остаётся
-  один не банкрот. Перед каждым событием `marketEvent` запоминает капитал
-  игроков (`room.preEventNetWorth`), и при конце по лимиту итоги показывают,
-  сколько дало последнее событие.
 - `room.lastGamePointsAward = {playerId, amount}` — сервер (`server.js`,
   `syncAccountPoints`) забирает это один раз за тик и дописывает очки в
   персистентный аккаунт победителя через `users.addPoints`, обновляя
@@ -589,9 +551,7 @@ C = $8 000. Цена не может упасть ниже 10% от старто
 - `room.gameResult` — не одноразовый (в отличие от award), хранится в
   комнате до начала новой партии: `{winnerId, winnerName, netWorth,
   pointsEarned, noPointsReason, turnsPlayed, minTurnsForPoints,
-  lastEventChanged, ranking:[{id,name,netWorth,bankrupt,points,cash,stocks,
-  estate,loan,lastEventDelta}]}` (состав капитала и сдвиг от последнего события
-  — для экрана итогов),
+  ranking:[{id,name,netWorth,bankrupt,points}]}`,
   отсортированный по убыванию чистого капитала — используется экраном
   завершения игры (ранги, медали, итоги).
 - Чистый капитал (`netWorth`) = наличные + Σ(доля_акции/100 × текущая цена)
@@ -700,10 +660,7 @@ message}`, `{type:"insiderCard", card}` (лично), и на любое усп�
 
 ### Форма `state`-пейлоада (`buildStatePayload`)
 
-Ключевые поля: `you, room, turn, roundLen, roundNumber, maxRounds, finalRound,
-feeInflationMult, feeInflationNext, feeInflationFromRound, settings
-(startingCash, turnSalary, eventIntervalTurns, tierForcedPaymentPct,
-feeInflation, buyCommission, finalCountdown), eventCount, deckRemaining, phase,
+Ключевые поля: `you, room, turn, roundLen, eventCount, deckRemaining, phase,
 hostPlayerId, canStart, chat (только в лобби), frozen, dividendMultiplier,
 tradeWindowEndsAt, tradeWindowMs, tradeReadyIds, currentPlayerId,
 pendingRoll, pendingRollMeta (готовый разбор для UI — какие кнопки

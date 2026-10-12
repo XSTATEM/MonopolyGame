@@ -19,8 +19,7 @@
   // Доля капитализации, которую платит игрок, отказавшийся покупать уже частично
   // выкупленные акции — выше у мелких/волатильных компаний (тир C), ниже у голубых
   // фишек (тир A), по аналогии с TIER_VOL.
-  // Запасное значение, если в комнате нет настроек; основное — DEFAULT_FORCED_PAYMENT_PCT.
-  const TIER_FORCED_PAYMENT_PCT = { A: 0.6, B: 0.45, C: 0.3 };
+  const TIER_FORCED_PAYMENT_PCT = { A: 0.06, B: 0.1, C: 0.16 };
   // Множитель дивидендов по тиру: голубые фишки (A) платят чаще и стабильнее (×1.0),
   // средние компании (B) — стандартно (×1.0), малые компании (C) платят реже, но
   // крупнее (×1.4). Применяется к итоговой выплате дивидендов.
@@ -56,32 +55,6 @@
   // контролёр назначал $1 млрд и забирал весь капитал соперника: в симуляциях
   // такой игрок выигрывал 98% партий (BALANCE-REPORT.md, А1).
   const FORCED_PRICE_CAP_MULT = 6;
-  // --- Темп и взаимодействие (BALANCE-REPORT.md, Б4, В1, В2, В3, В8) ---
-  // Плата за отказ по умолчанию, % капитализации × доля держателей (A/B/C).
-  // При 20/15/10 деньги между игроками почти не ходили (8,9 платежа за партию),
-  // а партия без лимита тянулась ~200 событий; 60/45/30 — проверенный пакет.
-  const DEFAULT_FORCED_PAYMENT_PCT = [60, 45, 30];
-  // «Инфляция выплат»: с раунда fromRound+1 плата за отказ и справедливая цена
-  // выкупа растут на stepPct% за раунд, но не больше maxMult. Конец партии
-  // дороже начала — лидеру труднее отсидеться, у отстающих есть шанс.
-  const FEE_INFLATION = { fromRound: 10, stepPct: 10, maxMult: 3, noLimitOnly: false };
-  // Комиссия держателям при покупке на броске: покупатель доли в компании, где
-  // уже есть другие держатели, платит им долю суммы отказа
-  // max((fullPct − pct) / fullPct, flat + perPct × pct): у мелкой покупки есть
-  // нижняя планка (1% — 80% платы, 2% — 60%, 3–4% — 40%), поэтому «купить 1%
-  // вместо платы» не лазейка (профиль dodgerMin, берущий самую дешёвую долю,
-  // выигрывает 1%); крупная платит больше: 10% — одна плата за отказ, 25% — 2,5.
-  // Пропорциональная комиссия выбрана по симуляциям: фиксированная половина платы
-  // кормила того, кто скупает всё подряд (greedy 61–73% побед), пропорциональная
-  // даёт greedy 41% против ботов и 52% за столом стратегий (было 60%), а осторожной
-  // игре через контрольный пакет — 31%.
-  const BUY_COMMISSION = { flat: 0, perPct: 0.1, fullPct: 5 };
-  // Рост цены от покупки по броску: +BUY_PRICE_IMPACT% за каждые 10% доли.
-  const BUY_PRICE_IMPACT = 2;
-  // Партия без лимита: после первого банкротства остаётся столько биржевых
-  // событий (включая текущее), затем победитель — по капиталу. Выбывший не
-  // ждёт конца ещё десятки ходов.
-  const FINAL_COUNTDOWN_ROUNDS = 3;
   // Защита рейтинга от накрутки: две учётки по кругу «Новая партия» + банкротство
   // (или лимит в 1 раунд, присланный в обход меню лобби) чеканили очки за пустые
   // партии. Очки за победу — только если стол сыграл хотя бы столько ходов:
@@ -399,11 +372,7 @@
       hostPlayerId: null,
       chat: [],
       nextChatId: 1,
-      // Число раундов, после которого побеждает лидер по капиталу; null — до
-      // банкротства всех соперников (с финальным отсчётом после первого).
-      // По умолчанию 30: без лимита партия длится часами (BALANCE-REPORT.md, Б3).
-      maxRounds: 30,
-      finalRound: null, // партия без лимита: последний раунд финального отсчёта после первого банкротства
+      maxRounds: null, // null = игра до банкротства всех соперников; иначе число раундов, после которого побеждает лидер по капиталу
       roundNumber: 1,
       pendingRoll: null,
       pendingForcedPrice: null, // {ticker, controllerId, targetId, amount} — контролирующий игрок назначил цену выкупа доли
@@ -424,12 +393,7 @@
         startingCash: STARTING_CASH,
         turnSalary: TURN_SALARY,
         eventIntervalTurns: EVENT_INTERVAL_TURNS,
-        tierForcedPaymentPct: DEFAULT_FORCED_PAYMENT_PCT.slice(), // A, B, C
-        // Правила темпа включены явно: у комнат из rooms.json и офлайн-сохранений
-        // до их появления флагов нет — такие партии доигрываются по старым правилам.
-        feeInflation: true,
-        buyCommission: true,
-        finalCountdown: true,
+        tierForcedPaymentPct: [20, 15, 10], // A, B, C
       },
     };
   }
@@ -470,40 +434,14 @@
     return room.players.find((p) => !p.bankrupt && (p.holdings[ticker] || 0) > 50);
   }
   function getForcedPaymentPct(room, tier) {
-    // Процент принудительной выплаты для тира (в долях, 0.6 = 60%) с учётом инфляции выплат.
+    // Возвращает процент принудительной выплаты для тира (в долях, например 0.06 = 6%)
     const settingsArr = room.settings?.tierForcedPaymentPct;
-    let base = TIER_FORCED_PAYMENT_PCT[tier] || 0.05;
     if (settingsArr && Array.isArray(settingsArr) && settingsArr.length === 3) {
       const idx = tier === 'A' ? 0 : tier === 'B' ? 1 : 2;
-      base = (settingsArr[idx] || 0) / 100;
+      return (settingsArr[idx] || 0) / 100;
     }
-    return base * feeInflationMult(room);
+    return TIER_FORCED_PAYMENT_PCT[tier] || 0.05;
   }
-  // Множитель «инфляции выплат» для текущего раунда (1 — инфляции нет).
-  function feeInflationMult(room) {
-    if (!room || room.settings?.feeInflation !== true) return 1;
-    if (FEE_INFLATION.noLimitOnly && room.maxRounds) return 1;
-    const extra = (room.roundNumber || 1) - FEE_INFLATION.fromRound;
-    if (extra <= 0) return 1;
-    return Math.min(FEE_INFLATION.maxMult, 1 + extra * FEE_INFLATION.stepPct / 100);
-  }
-  function buyCommissionFactor(pct) {
-    return Math.max((BUY_COMMISSION.fullPct - pct) / BUY_COMMISSION.fullPct, BUY_COMMISSION.flat + BUY_COMMISSION.perPct * pct);
-  }
-  // Комиссия держателям за покупку pct% по броску: { amount, owners, totalPct }.
-  // Как и плата за отказ: пропорционально долям держателей, с теми же множителями
-  // (сезон дивидендов, сквиз-аут, тир); не берётся, пока карта новостей отменила выплаты.
-  function buyCommission(room, ticker, buyerId, pct) {
-    const none = { amount: 0, owners: [], totalPct: 0 };
-    if (room.settings?.buyCommission !== true) return none;
-    const c = room.companies[ticker];
-    if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) return none;
-    const owners = room.players.filter((p) => !p.bankrupt && p.id !== buyerId && (p.holdings[ticker] || 0) > 0);
-    if (!owners.length) return none;
-    const totalPct = owners.reduce((sum, p) => sum + p.holdings[ticker], 0);
-    return { amount: refuseRollAmount(room, ticker, totalPct) * buyCommissionFactor(pct), owners, totalPct };
-  }
-  function buyCommissionAmount(room, ticker, buyerId, pct) { return buyCommission(room, ticker, buyerId, pct).amount; }
   function controlledTickers(room, playerId) {
     return COMPANIES.filter((c) => (room.players.find((p) => p.id === playerId)?.holdings[c.ticker] || 0) > 50).map((c) => c.ticker);
   }
@@ -826,16 +764,9 @@
     let winner = null;
     let byRoundLimit = false;
     let allBankrupt = false;
-    // Партия без лимита: первое банкротство запускает финальный отсчёт.
-    if (!room.maxRounds && room.finalRound == null && room.settings?.finalCountdown === true && room.phase === "roll"
-        && active.length >= 2 && room.players.some((p) => p.bankrupt && !p.kicked)) {
-      room.finalRound = (room.roundNumber || 1) + FINAL_COUNTDOWN_ROUNDS - 1;
-      addLog(room, `💀 Первое банкротство — финальный отсчёт: ещё ${FINAL_COUNTDOWN_ROUNDS} ${FINAL_COUNTDOWN_ROUNDS === 1 ? "биржевое событие" : FINAL_COUNTDOWN_ROUNDS < 5 ? "биржевых события" : "биржевых событий"}, затем победитель — по капиталу.`, "header");
-    }
-    const roundLimit = room.maxRounds || room.finalRound || null;
     if (room.players.length > 1 && active.length === 1) {
       winner = active[0];
-    } else if (roundLimit && room.roundNumber > roundLimit && active.length >= 1) {
+    } else if (room.maxRounds && room.roundNumber > room.maxRounds && active.length >= 1) {
       winner = active.reduce((best, p) => (richer(room, p, best) ? p : best), active[0]);
       byRoundLimit = true;
     } else if (room.phase === "roll" && room.players.length > 0 && active.length === 0) {
@@ -848,7 +779,7 @@
     }
     if (winner) {
       room.phase = "ended";
-      if (byRoundLimit) addLog(room, room.maxRounds ? `⏱️ Лимит партии (${room.maxRounds} раундов) достигнут — победитель определяется по капиталу.` : "⏱️ Финальный отсчёт завершён — победитель определяется по капиталу.", "header");
+      if (byRoundLimit) addLog(room, `⏱️ Лимит партии (${room.maxRounds} раундов) достигнут — победитель определяется по капиталу.`, "header");
       // Очки — за победу начисляются пропорционально итоговому капиталу (сумме, с которой игрок выиграл).
       // Потолок — страховка от абсурдных сумм (например, бесконечного капитала).
       const won = Math.round(netWorth(room, winner));
@@ -870,21 +801,8 @@
       room.gameResult = {
         winnerId: winner.id, winnerName: winner.name, netWorth: won, pointsEarned,
         noPointsReason, turnsPlayed: turns, minTurnsForPoints: MIN_TURNS_FOR_POINTS,
-        // Состав капитала и сдвиг от последнего события — чтобы финал был
-        // понятен: кто чем выиграл и как его изменило последнее событие.
-        lastEventChanged: byRoundLimit,
         ranking: room.players
-          .map((p) => {
-            const nw = Math.round(netWorth(room, p));
-            const stocks = Math.round(Object.keys(p.holdings || {}).reduce((sum, t) => sum + (room.companies[t] ? room.companies[t].price * ((p.holdings[t] || 0) / 100) : 0), 0));
-            const estate = Math.round(CITIES.reduce((sum, ct) => sum + (room.realEstate[ct.id].ownerId === p.id ? realEstatePrice(room, ct.id) : 0), 0));
-            const before = room.preEventNetWorth && room.preEventNetWorth[p.id];
-            return {
-              id: p.id, name: p.name, netWorth: nw, bankrupt: !!p.bankrupt, points: p.points || 0,
-              cash: Math.round(p.cash), stocks, estate, loan: p.loan ? Math.round(p.loan.principal) : 0,
-              lastEventDelta: byRoundLimit && Number.isFinite(before) && !p.bankrupt ? nw - before : null,
-            };
-          })
+          .map((p) => ({ id: p.id, name: p.name, netWorth: Math.round(netWorth(room, p)), bankrupt: !!p.bankrupt, points: p.points || 0 }))
           .sort((a, b) => b.netWorth - a.netWorth),
       };
       const noPointsText = noPointsReason === "short" ? `партия слишком короткая (сыграно ${turns} из ${MIN_TURNS_FOR_POINTS} ходов) — очки рейтинга не начисляются`
@@ -918,10 +836,6 @@
 
   function marketEvent(room) {
     const eventBeforeThis = room.eventCount;
-    // Капитал перед событием — экран итогов показывает, сколько дало или
-    // отняло последнее событие (оно иногда меняет победителя).
-    room.preEventNetWorth = {};
-    room.players.forEach((p) => { if (!p.bankrupt) room.preEventNetWorth[p.id] = Math.round(netWorth(room, p)); });
     room.eventCount++;
     room.roundNumber = (room.roundNumber || 1) + 1;
     room.dividendMultiplier = 1;
@@ -1237,8 +1151,6 @@
       const pcts = patch.tierForcedPaymentPct.map((v) => num(v, 1, 100));
       if (pcts.every((v) => v != null)) next.tierForcedPaymentPct = pcts;
     }
-    // Правила темпа: только явные true/false (из настроек лобби или симулятора).
-    ["feeInflation", "buyCommission", "finalCountdown"].forEach((k) => { if (typeof patch[k] === "boolean") next[k] = patch[k]; });
     room.settings = next;
     return { ok: true };
   }
@@ -1527,20 +1439,12 @@
     if (owned + pct > 100) return { error: "У банка недостаточно свободных акций этой компании." };
     const feePct = bankFeePct(p.reputation);
     const cost = c.price * (pct / 100) * (1 + feePct);
-    const commission = buyCommission(room, ticker, p.id, pct);
-    if (p.cash < cost + commission.amount) {
-      return { error: commission.amount > 0 ? `Недостаточно наличных: нужно ${fmt(cost + commission.amount)} вместе с комиссией держателям.` : "Недостаточно наличных." };
-    }
+    if (p.cash < cost) return { error: "Недостаточно наличных." };
     p.cash -= cost;
     p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
     addCostBasis(p, ticker, pct, cost);
-    applyPriceDelta(room, ticker, BUY_PRICE_IMPACT * (pct / 10));
+    applyPriceDelta(room, ticker, 2 * (pct / 10));
     addLog(room, `${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}${feePct > 0 ? ` (вкл. комиссию банка ${(feePct * 100).toFixed(1)}% из-за репутации)` : ""}. Новая цена: ${fmt(room.companies[ticker].price)}.`, "trade", [p.id]);
-    if (commission.amount > 0) {
-      p.cash -= commission.amount;
-      commission.owners.forEach((o) => { o.cash += commission.amount * (o.holdings[ticker] / commission.totalPct); });
-      addLog(room, `💼 ${p.name} купил(а) долю в ${ticker} и заплатил(а) комиссию держателям: ${fmt(commission.amount)} (${commission.owners.map((o) => o.name).join(", ")}).`, "dividend");
-    }
     checkFullOwnership(room, ticker);
     afterRollAction(room);
     return { ok: true };
@@ -1883,49 +1787,19 @@
 
   // Инвестирует случайную долю свободного кэша (не больше 35% на одну покупку),
   // но не больше свободного % у банка — простая, но не самоубийственная стратегия.
-  // Покупки бота по броску: держит резерв, тратит spendShare сверх него и берёт
-  // случайно от minPct до minPct + randPct − 1 процентов (не больше доступного).
-  const BOT_BUY = { reserve: 15000, spendShare: 0.35, minPct: 5, randPct: 15 };
   function botChoosePct(cash, price, freePct) {
     // Держим небольшой наличный резерв, а не тратим на акции до последнего —
     // иначе к моменту, когда бот попадает на свободную клетку недвижимости,
     // касса почти всегда пуста (см. симуляцию: недвижимость покупалась <1%
     // случаев из-за постоянного нуля свободного кэша). Резерв даёт реальный
     // шанс воспользоваться этой веткой.
-    const spendable = Math.max(0, (cash - BOT_BUY.reserve) * BOT_BUY.spendShare);
+    const reserve = 15000;
+    const spendable = Math.max(0, (cash - reserve) * 0.35);
     const affordablePct = Math.floor(spendable / (price / 100));
     let pct = Math.min(25, freePct, affordablePct);
     if (pct < 1) return 0;
-    pct = Math.max(1, Math.min(pct, BOT_BUY.minPct + Math.floor(Math.random() * BOT_BUY.randPct)));
+    pct = Math.max(1, Math.min(pct, 5 + Math.floor(Math.random() * 15)));
     return pct;
-  }
-
-  // Сколько процентов бот купит по броску (0 — откажется). Учитывает комиссию
-  // держателям. Если по своему бюджету покупать не стал бы, но есть держатели —
-  // покупает 5% вместо платы за отказ, когда хватает денег (BALANCE-REPORT.md, А5):
-  // иначе бот разбрасывался деньгами на отказах, и человек офлайн получал
-  // бесплатные +13…+31 п.п. побед. 1% вместо 5% нельзя — рынок заполнялся
-  // в пять раз медленнее, и партии без лимита не кончались.
-  function botRollBuyPct(room, roller, ticker) {
-    const free = 100 - totalOwnedPct(room, ticker);
-    if (free < 1) return 0;
-    const c = room.companies[ticker];
-    const fee = bankFeePct(roller.reputation);
-    const affordable = (pct) => roller.cash >= c.price * (pct / 100) * (1 + fee) + buyCommissionAmount(room, ticker, roller.id, pct);
-    let pct = botChoosePct(roller.cash, c.price, free);
-    while (pct >= 1 && !affordable(pct)) pct--;
-    if (pct >= 1) return pct;
-    const hasOwners = room.players.some((p) => !p.bankrupt && p.id !== roller.id && (p.holdings[ticker] || 0) > 0);
-    if (!hasOwners) return 0;
-    const small = Math.min(5, Math.floor(free));
-    return small >= 1 && affordable(small) ? small : 0;
-  }
-  // Бот принимает сделку, только если получает не меньше, чем отдаёт.
-  function botAcceptsTrade(room, to, trade) {
-    const got = room.companies[trade.ticker].price * (trade.pct / 100);
-    const paid = trade.price + (trade.wantTicker ? room.companies[trade.wantTicker].price * (trade.wantPct / 100) : 0);
-    const canPay = (trade.price === 0 || to.cash >= trade.price) && (!trade.wantTicker || (to.holdings[trade.wantTicker] || 0) >= trade.wantPct);
-    return canPay && got >= paid;
   }
 
   function botStep(room) {
@@ -1961,7 +1835,7 @@
         // roller.cash не учитывает грядущий платёж — проверяем pendingForcedPrice явно.
         const pendingPayment = room.pendingForcedPrice && room.pendingForcedPrice.targetId === roller.id ? room.pendingForcedPrice.amount : 0;
         const effectiveCash = roller.cash - pendingPayment;
-        const rollerWantsToBuy = free >= 1 && isBotPlayer(roller) && botRollBuyPct(room, { id: roller.id, cash: effectiveCash, reputation: roller.reputation }, ticker) >= 1;
+        const rollerWantsToBuy = free >= 1 && isBotPlayer(roller) && botChoosePct(effectiveCash, room.companies[ticker].price, free) >= 1;
         if (!rollerWantsToBuy) {
           const c = room.companies[ticker];
           const tier = companyByTicker(ticker).tier;
@@ -1978,7 +1852,10 @@
     for (const trade of room.pendingTrades) {
       if (!isBotPlayer(room.players.find((p) => p.id === trade.toId))) continue;
       const to = room.players.find((p) => p.id === trade.toId);
-      const accept = botAcceptsTrade(room, to, trade);
+      const got = room.companies[trade.ticker].price * (trade.pct / 100);
+      const paid = trade.price + (trade.wantTicker ? room.companies[trade.wantTicker].price * (trade.wantPct / 100) : 0);
+      const canPay = (trade.price === 0 || to.cash >= trade.price) && (!trade.wantTicker || (to.holdings[trade.wantTicker] || 0) >= trade.wantPct);
+      const accept = canPay && got >= paid * 0.9;
       return { acted: true, type: "respondTrade", result: respondTrade(room, to.id, trade.id, accept) };
     }
 
@@ -1994,8 +1871,21 @@
       const myControlled = controlledTickers(room, cur.id);
       const otherPlayers = room.players.filter(p => p.id !== cur.id && !p.bankrupt);
 
-      // Случайного шпионажа у бота больше нет: он сжигал на нём ~$15 тыс. за
-      // партию и проигрывал без пользы для себя (BALANCE-REPORT.md, А5).
+      // Шпионаж: если есть противники с высокой репутацией (>60) и не в кулдауне
+      if (otherPlayers.length > 0 && Math.random() < 0.3) {
+        const targets = otherPlayers.filter(p => {
+          const rep = p.reputation == null ? REPUTATION_START : p.reputation;
+          return rep > 60 && room.spyCooldown[p.id] !== room.eventCount;
+        });
+        if (targets.length > 0) {
+          const target = targets[Math.floor(Math.random() * targets.length)];
+          const cost = espionageCost(room, cur);
+          if (cur.cash >= cost * 1.5) {
+            const result = ctrlEspionage(room, cur.id, target.id);
+            if (result.ok) return { acted: true, type: "ctrlEspionage", result };
+          }
+        }
+      }
 
       // Дискредитация: если есть противники с высокой репутацией (>70) и не в кулдауне
       if (otherPlayers.length > 0 && Math.random() < 0.25) {
@@ -2074,7 +1964,9 @@
         return { acted: true, type: "payRealEstateRentFromRoll", result: payRealEstateRentFromRoll(room, cur.id) };
       }
       const ticker = roll.ticker;
-      const pct = botRollBuyPct(room, cur, ticker);
+      const free = 100 - totalOwnedPct(room, ticker);
+      const c = room.companies[ticker];
+      const pct = free >= 1 ? botChoosePct(cur.cash, c.price, free) : 0;
       if (pct >= 1) return { acted: true, type: "buyFromRoll", result: buyFromRoll(room, cur.id, pct) };
       const div = dividendFromRoll(room, cur.id);
       if (div.error) return { acted: false }; // ждём, пока контролирующий игрок назначит цену выкупа
@@ -2637,13 +2529,6 @@
         controllerWaitLeftMs: controllerWaitLeftMs(room, controller),
         controllerWaitMs: CONTROLLER_DECISION_MS,
         controllerFee: controller ? refuseRollAmount(room, roll.ticker, totalPct) : 0,
-        // Комиссия держателям при покупке: base × max((fullPct − pct) / fullPct, flat + perPct × pct);
-        // base — полная сумма отказа, 0 — комиссии нет (нет держателей, правило выключено,
-        // выплаты отменены картой). Множитель для 0% = 1, поэтому base = комиссия за 0%.
-        buyCommissionBase: buyCommission(room, roll.ticker, roll.playerId, 0).amount,
-        buyCommissionFlat: BUY_COMMISSION.flat,
-        buyCommissionPerPct: BUY_COMMISSION.perPct,
-        buyCommissionFullPct: BUY_COMMISSION.fullPct,
       };
     }
     if (roll.realEstateId) {
@@ -2672,18 +2557,9 @@
         startingCash: room.settings?.startingCash || STARTING_CASH,
         turnSalary: room.settings?.turnSalary ?? TURN_SALARY,
         eventIntervalTurns: room.settings?.eventIntervalTurns || EVENT_INTERVAL_TURNS,
-        tierForcedPaymentPct: room.settings?.tierForcedPaymentPct || DEFAULT_FORCED_PAYMENT_PCT,
-        feeInflation: room.settings?.feeInflation === true,
-        buyCommission: room.settings?.buyCommission === true,
-        finalCountdown: room.settings?.finalCountdown === true,
+        tierForcedPaymentPct: room.settings?.tierForcedPaymentPct || [20, 15, 10],
       },
       roundNumber: room.roundNumber || 1,
-      // Множитель инфляции выплат сейчас и в следующем раунде (для подсказки «растёт»),
-      // последний раунд финального отсчёта (партия без лимита после первого банкротства).
-      feeInflationMult: feeInflationMult(room),
-      feeInflationNext: feeInflationMult(Object.assign({}, room, { roundNumber: (room.roundNumber || 1) + 1 })),
-      feeInflationFromRound: FEE_INFLATION.fromRound,
-      finalRound: room.finalRound || null,
       maxRounds: room.maxRounds || null,
       eventCount: room.eventCount,
       deckRemaining: room.deckOrder.length - room.deckPos,
@@ -2837,8 +2713,6 @@
     ctrlEspionage, ctrlDiscredit, isRevealed, ctrlInvestigate, investigationCost, investigationChance, personalPr,
     startKickVote, voteKick, cancelKickVote, resolveKickVote, sendReaction, REACTION_EMOJIS, OFFLINE_KICK_GRACE_MS, hostAway,
     CONTROLLER_DECISION_MS, MIN_TURNS_FOR_POINTS, turnsPlayed,
-    DEFAULT_FORCED_PAYMENT_PCT, FEE_INFLATION, BUY_COMMISSION, FINAL_COUNTDOWN_ROUNDS,
-    feeInflationMult, buyCommission, buyCommissionAmount, botRollBuyPct, botAcceptsTrade, refuseRollAmount,
     buildStatePayload,
   };
 });

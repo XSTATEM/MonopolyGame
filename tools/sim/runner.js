@@ -45,8 +45,6 @@ const LOG_COUNTERS = [
   ["taxPaid", "tax", null],
   ["dividendSkipped", "dividend", "пропущены"],
   ["dividendBlocked", "dividend", "не проводится"],
-  ["buyCommission", "dividend", "комиссию держателям"],
-  ["finalCountdown", "header", "финальный отсчёт: ещё"],
   ["passiveRent", "realestate", "пассивную ренту"],
   ["reSetBonus", "realestate", "за комплект"],
   ["reTax", "realestate", "налог на недвижимость"],
@@ -468,7 +466,6 @@ function engineStep(S) {
 // Хочет ли движковый бот купить по броску (та же проверка, что в botStep, шаг 2).
 function engineWantsBuy(S, roller, ticker) {
   const { E, I, room } = S;
-  if (typeof I.botRollBuyPct === "function") return I.botRollBuyPct(room, roller, ticker) >= 1;
   const free = 100 - E.totalOwnedPct(room, ticker);
   if (free < 1) return false;
   const price = room.companies[ticker].price;
@@ -478,7 +475,6 @@ function engineWantsBuy(S, roller, ticker) {
 }
 function engineBuyPct(S, roller, ticker) {
   const { E, I, room } = S;
-  if (typeof I.botRollBuyPct === "function") return I.botRollBuyPct(room, roller, ticker);
   const free = 100 - E.totalOwnedPct(room, ticker);
   const price = room.companies[ticker].price;
   if (typeof I.botChoosePct === "function") return I.botChoosePct(roller.cash, price, free);
@@ -492,8 +488,7 @@ function engineForcedPrice(S, controller, ticker) {
   return Math.round(ctx.fairForcedPrice(ticker, controller) * (1.5 + S.rng()));
 }
 function engineAcceptTrade(S, to, trade) {
-  const { I, room } = S;
-  if (typeof I.botAcceptsTrade === "function") return I.botAcceptsTrade(room, to, trade);
+  const { room } = S;
   const got = room.companies[trade.ticker].price * (trade.pct / 100);
   const paid = trade.price + (trade.wantTicker ? room.companies[trade.wantTicker].price * (trade.wantPct / 100) : 0);
   const canPay = (trade.price === 0 || to.cash >= trade.price) && (!trade.wantTicker || (to.holdings[trade.wantTicker] || 0) >= trade.wantPct);

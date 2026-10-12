@@ -195,7 +195,7 @@
     <button type="button" class="secondary" id="btnRulesTutorial" style="width:100%;margin:0 0 12px;"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-play"/></svg> Пройти интерактивное обучение</button>
     <details class="tips" open>
       <summary>Цель игры</summary>
-      <div class="muted rules-p">Стать богаче соперников. Капитал — это наличные, акции по текущей цене и недвижимость минус долг банку. Партия идёт выбранное число раундов (по умолчанию 30) — побеждает самый богатый. В партии без лимита после первого банкротства остаётся ещё 3 раунда, затем тоже побеждает самый богатый. Место и отрыв от соперников видны под вашим капиталом, последние раунды отмечены в шапке.</div>
+      <div class="muted rules-p">Стать богаче соперников. Капитал — это наличные, акции по текущей цене и недвижимость минус долг банку. Партия идёт выбранное число раундов (побеждает самый богатый) или без лимита — до последнего неразорившегося игрока.</div>
     </details>
     <details class="tips">
       <summary>Ход: два кубика — строка и столбец</summary>
@@ -203,7 +203,7 @@
     </details>
     <details class="tips">
       <summary>Клетка компании</summary>
-      <div class="muted rules-p">Можно купить от 1 до 25% компании по текущей цене плюс комиссия банка. Если у компании уже есть держатели, а вы не покупаете, — платите им «плату за отказ»: процент от цены по классу компании (по умолчанию 60/45/30% для классов A/B/C), умноженный на их общую долю (точная сумма — на кнопке «Отказаться»). Покупаете долю — платите держателям комиссию: 10% платы за отказ за каждый купленный процент (10% доли — одна плата за отказ, 25% — две с половиной); у маленьких долей есть нижняя планка (1% — 80% платы, 2% — 60%, 3–4% — 40%), так что «купить 1% вместо платы» не выгодно. Сумма с комиссией видна над ползунком. С 11-го раунда плата за отказ и цена выкупа растут на 10% за раунд, максимум втрое. Если один игрок владеет больше чем 50% и других держателей нет, сумму выкупа назначает он; не назначил за 45 секунд — отказ можно оплатить ему по тарифу.</div>
+      <div class="muted rules-p">Можно купить от 1 до 25% компании по текущей цене плюс комиссия банка. Если у компании уже есть держатели, а вы не покупаете, — платите им «плату за отказ»: процент от цены по классу компании, умноженный на их общую долю (точная сумма — на кнопке «Отказаться»). Если один игрок владеет больше чем 50% и других держателей нет, сумму выкупа назначает он; не назначил за 45 секунд — отказ можно оплатить ему по тарифу.</div>
     </details>
     <details class="tips">
       <summary>Цены акций</summary>
@@ -325,7 +325,7 @@
       </div>
       <div>
         <label>Плата за отказ A/B/C, %</label>
-        <input type="text" id="offlineForcedPayment" value="60/45/30" placeholder="60/45/30" style="width:100%;">
+        <input type="text" id="offlineForcedPayment" value="20/15/10" placeholder="20/15/10" style="width:100%;">
       </div>
     </div>
     <div class="field-hint" style="margin:-4px 0 4px;">Плата за отказ — доля цены компании, которую платит держателям тот, кто попал на её клетку и не купил долю (для компаний класса A, B и C).</div>
@@ -334,7 +334,7 @@
       <option value="15">Быстрая · 15 раундов</option>
       <option value="30" selected>Средняя · 30 раундов</option>
       <option value="50">Долгая · 50 раундов</option>
-      <option value="0">Без лимита · до первого банкротства и ещё 3 раунда</option>
+      <option value="0">Без лимита · до последнего</option>
     </select>
     <button style="width:100%;margin-top:16px;" id="btnStartOffline">Начать игру</button>
     <button class="secondary" style="width:100%;margin-top:8px;" id="btnBackFromOffline"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
@@ -650,36 +650,13 @@ function fmt(n){ return "$" + Math.round(n).toLocaleString("ru-RU"); }
 // акций (1-25% вместо старых фиксированных кнопок 10%/25%). unitPrice — цена за 1%
 // пакета (уже с учётом банковской комиссии, если нужно), используется только для
 // живого пересчёта суммы под слайдером.
-// commission — комиссия держателям при покупке по броску (pendingRollMeta):
-// { base, flat, perPct, fullPct }; сумма = base × max((fullPct − pct) / fullPct, flat + perPct × pct)
-// — та же формула, что buyCommissionFactor в engine.js.
-function buyCommissionFor(commission, pct){
-  if(!commission || !(commission.base > 0)) return 0;
-  return commission.base * Math.max((commission.fullPct - pct) / commission.fullPct, commission.flat + commission.perPct * pct);
-}
-// Короткое объяснение правила комиссии под ползунком — по параметрам из состояния.
-function buyCommissionRuleText(c){
-  const pctOf = (v)=> (Math.round(v*1000)/10).toLocaleString("ru-RU") + "%";
-  const small = `у долей меньше ${c.fullPct}% есть нижняя планка — за 1% ${pctOf((c.fullPct - 1) / c.fullPct)} платы за отказ`;
-  if(c.perPct > 0 && !(c.flat > 0)) return `У компании есть держатели: покупая, вы платите им комиссию — ${pctOf(c.perPct)} платы за отказ за каждый процент доли; ${small}.`;
-  if(c.perPct > 0) return `У компании есть держатели: покупая, вы платите им комиссию — ${pctOf(c.flat)} платы за отказ и ещё ${pctOf(c.perPct)} за каждый процент доли; ${small}.`;
-  return `У компании есть держатели: покупая, вы платите им комиссию — ${pctOf(c.flat)} платы за отказ; ${small}.`;
-}
-function rollBuyCommission(meta){
-  return meta && meta.buyCommissionBase > 0
-    ? { base: meta.buyCommissionBase, flat: meta.buyCommissionFlat || 0, perPct: meta.buyCommissionPerPct || 0, fullPct: meta.buyCommissionFullPct || 5 } : null;
-}
-function pctSliderHtml(sliderId, max, value, unitPrice, label, commission){
+function pctSliderHtml(sliderId, max, value, unitPrice, label){
   value = Math.max(1, Math.min(max, value));
   const fill = max > 1 ? ((value-1)/(max-1)*100) : 100;
-  const comm = buyCommissionFor(commission, value);
-  const commAttrs = commission && commission.base > 0
-    ? ` data-comm-base="${commission.base}" data-comm-flat="${commission.flat}" data-comm-per="${commission.perPct}" data-comm-full="${commission.fullPct}"` : "";
   return `<div class="pct-slider-row">
-    <div class="pct-slider-readout"><label for="${sliderId}">${label || "Доля"}</label><span><b id="${sliderId}_pct">${value}%</b> · <span id="${sliderId}_amt">${fmt(unitPrice*value + comm)}</span></span></div>
+    <div class="pct-slider-readout"><label for="${sliderId}">${label || "Доля"}</label><span><b id="${sliderId}_pct">${value}%</b> · <span id="${sliderId}_amt">${fmt(unitPrice*value)}</span></span></div>
     <input type="range" class="pct-slider" id="${sliderId}" min="1" max="${max}" step="1" value="${value}" style="--fill:${fill.toFixed(1)}%"
-      data-unit="${unitPrice}"${commAttrs} oninput="onPctSlider(this)">
-    ${comm > 0 ? `<div class="slider-comm" id="${sliderId}_comm">в том числе комиссия держателям <b>${fmt(comm)}</b></div>` : ""}
+      data-unit="${unitPrice}" oninput="onPctSlider(this)">
   </div>`;
 }
 function onPctSlider(el){
@@ -689,11 +666,8 @@ function onPctSlider(el){
   el.style.setProperty("--fill", (max > 1 ? (pct-1)/(max-1)*100 : 100).toFixed(1) + "%");
   const pctOut = document.getElementById(el.id + "_pct");
   const amtOut = document.getElementById(el.id + "_amt");
-  const comm = el.dataset.commBase ? buyCommissionFor({ base: parseFloat(el.dataset.commBase), flat: parseFloat(el.dataset.commFlat), perPct: parseFloat(el.dataset.commPer), fullPct: parseFloat(el.dataset.commFull) }, pct) : 0;
   if(pctOut) pctOut.textContent = pct + "%";
-  if(amtOut) amtOut.textContent = fmt(unit*pct + comm);
-  const commOut = document.getElementById(el.id + "_comm");
-  if(commOut) commOut.innerHTML = `в том числе комиссия держателям <b>${fmt(comm)}</b>`;
+  if(amtOut) amtOut.textContent = fmt(unit*pct);
   const buyLbl = document.getElementById(el.id + "_btn");
   if(buyLbl) buyLbl.textContent = `Купить ${pct}%`;
 }
@@ -1806,7 +1780,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   // Ровно три числа: раньше «20/15» дополнялось до [20,15,20], и класс C
   // молча получал 20% вместо 10%.
   if(forcedArr && (forcedArr.length !== 3 || !forcedArr.every(Number.isFinite))){
-    errEl.textContent = "Плата за отказ — три числа через «/», например 60/45/30.";
+    errEl.textContent = "Плата за отказ — три числа через «/», например 20/15/10.";
     return;
   }
   if(loadOfflineSave() && !confirm("Начать новую партию? Сохранённая офлайн-партия будет заменена.")) return;
@@ -2264,16 +2238,6 @@ function detectNotifications(prev, msg){
   if(!msg || msg.you == null || !msg.players) return;
   if(!prev || prev.you !== msg.you || prev.phase === "lobby") return; // не спамим при входе/смене вида
 
-  // Финал партии: последние раунды с лимитом и финальный отсчёт после первого банкротства.
-  if(msg.phase === "roll" && !msg.tutorial){
-    const leftNow = finalRoundsLeft(msg), leftPrev = finalRoundsLeft(prev);
-    if(leftNow != null && (leftPrev == null || (msg.finalRound && !prev.finalRound))){
-      showToast({ kind:"warn", icon:"flag", key:"final-rounds",
-        title: msg.maxRounds ? "Финальные раунды" : "Финальный отсчёт",
-        text: (msg.maxRounds ? "" : "Первое банкротство. ") + `Осталось ${leftNow} ${pluralRu(leftNow, "раунд", "раунда", "раундов")} — затем побеждает самый богатый.` });
-    }
-  }
-
   const prevIncCount = (prev.mySpyIncidents||[]).length;
   const nowIncCount = (msg.mySpyIncidents||[]).length;
   if(nowIncCount > prevIncCount){
@@ -2465,7 +2429,7 @@ function renderLobby(s){
   const maxRoundsVal = s.maxRounds || 0;
   const st = s.settings || {};
   const stCash = st.startingCash || 100000, stSalary = st.turnSalary ?? 450, stInterval = st.eventIntervalTurns || 4;
-  const stForced = (st.tierForcedPaymentPct || [60,45,30]).join("/");
+  const stForced = (st.tierForcedPaymentPct || [20,15,10]).join("/");
   const roundsLabel = maxRoundsVal ? `Лимит партии: ${maxRoundsVal} раундов, победа по капиталу` : "Без лимита — до банкротства всех соперников";
   // Хост уже видит форму: обновляем значения, а не пересобираем её — иначе
   // сообщение в чате или вход игрока стирали бы число, которое он сейчас вводит.
@@ -2494,12 +2458,12 @@ function renderLobby(s){
         </div>
         <div>
           <label>Плата за отказ A/B/C, %</label>
-          <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="60/45/30" style="width:100%;">
+          <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="20/15/10" style="width:100%;">
         </div>
       </div>
       <label for="lobbyMaxRounds">Длительность партии</label>
       <select id="lobbyMaxRounds" style="margin-bottom:10px;">
-        <option value="0" ${maxRoundsVal===0?"selected":""}>Без лимита · до первого банкротства и ещё 3 раунда</option>
+        <option value="0" ${maxRoundsVal===0?"selected":""}>Без лимита · до последнего</option>
         <option value="15" ${maxRoundsVal===15?"selected":""}>Быстрая · 15 раундов</option>
         <option value="30" ${maxRoundsVal===30?"selected":""}>Средняя · 30 раундов</option>
         <option value="50" ${maxRoundsVal===50?"selected":""}>Долгая · 50 раундов</option>
@@ -2515,7 +2479,7 @@ function renderLobby(s){
       const fpRaw = document.getElementById("lobbyForcedPayment").value.trim();
       const tierForcedPaymentPct = fpRaw === "" ? null : fpRaw.split("/").map(x => x.trim() === "" ? NaN : Number(x.trim()));
       const fpOk = !!tierForcedPaymentPct && tierForcedPaymentPct.length === 3 && tierForcedPaymentPct.every(Number.isFinite);
-      if(tierForcedPaymentPct && !fpOk) flashLobbyError("Плата за отказ — три числа через «/», например 60/45/30.");
+      if(tierForcedPaymentPct && !fpOk) flashLobbyError("Плата за отказ — три числа через «/», например 20/15/10.");
       send({type:"updateRoomSettings", settings: {
         startingCash: numOf("lobbyStartingCash"), turnSalary: numOf("lobbyTurnSalary"), eventIntervalTurns: numOf("lobbyEventInterval"),
         tierForcedPaymentPct: fpOk ? tierForcedPaymentPct : undefined,
@@ -3699,18 +3663,6 @@ function updateControlBadge(s){
 // ---------------------------------------------------------------------
 // Главный ход: статус, рейтинг, капитал, ваши акции (кликабельно), действие хода
 // ---------------------------------------------------------------------
-// Сколько раундов осталось в финале: партия с лимитом — последние 3 раунда,
-// без лимита — финальный отсчёт после первого банкротства. null — не финал.
-const FINAL_ROUNDS_WARN = 3;
-function finalRoundsLeft(s){
-  const round = s.roundNumber || 1;
-  const limit = s.maxRounds || s.finalRound;
-  if(!limit) return null;
-  const left = limit - round + 1;
-  if(left < 1) return null;
-  if(s.maxRounds && left > FINAL_ROUNDS_WARN) return null;
-  return left;
-}
 function statusRowHtml(s){
   const interval = s.roundLen || 4;
   const turnsLeft = Math.max(1, interval - (s.turn||1) + 1);
@@ -3723,14 +3675,6 @@ function statusRowHtml(s){
   const extras = [];
   if(s.frozen) extras.push(`<span class="rep-badge">${ico("snow","ico-sm")} Цены заморожены</span>`);
   if((s.dividendMultiplier||1) > 1) extras.push(`<span class="rep-badge rep-mid">${ico("coins","ico-sm")} Выплаты ×${s.dividendMultiplier}</span>`);
-  if(s.phase !== "ended"){
-    const finalLeft = finalRoundsLeft(s);
-    if(finalLeft != null) extras.push(`<span class="rep-badge final" title="${s.maxRounds ? "После последнего события побеждает самый богатый." : "После первого банкротства партия идёт ещё несколько событий, затем побеждает самый богатый."}">${ico("flag","ico-sm")} ${s.maxRounds ? "Финал" : "Финальный отсчёт"}: ${finalLeft === 1 ? "последний раунд" : `осталось ${finalLeft} ${pluralRu(finalLeft, "раунд", "раунда", "раундов")}`}</span>`);
-    const infl = s.feeInflationMult || 1;
-    const fmtMult = (m)=> "×" + (Math.round(m*10)/10).toLocaleString("ru-RU");
-    if(infl > 1) extras.push(`<span class="rep-badge rep-mid" title="Плата за отказ и цена выкупа растут на 10% каждый раунд${(s.feeInflationNext||infl) > infl ? "" : " (достигнут максимум)"}.">${ico("percent","ico-sm")} Плата за отказ ${fmtMult(infl)}${(s.feeInflationNext||infl) > infl ? " ↑" : ""}</span>`);
-    else if((s.feeInflationNext||1) > 1) extras.push(`<span class="rep-badge" title="С каждым следующим раундом плата за отказ и цена выкупа растут на 10%.">${ico("percent","ico-sm")} Со следующего раунда плата за отказ растёт</span>`);
-  }
   const sub = s.phase === "ended"
     ? `<span>Партия окончена</span><span class="sep">·</span><span>${roomText}</span>`
     : `<span class="g-dot" aria-hidden="true"></span><span>Событие через ${turnsLeft} ${turnsWord}</span><span class="sep">·</span><span>${roomText}</span>`;
@@ -3763,18 +3707,6 @@ function myAssetsValue(s, me){
   }, 0);
   return stocks + estate;
 }
-// Место по капиталу и отрыв: лидеру — от второго, остальным — до первого.
-function placeGapHtml(s, me){
-  if(me.bankrupt || s.phase === "ended") return "";
-  const active = s.players.filter(p=>!p.bankrupt).slice().sort((a,b)=> b.netWorth - a.netWorth);
-  if(active.length < 2) return "";
-  const place = active.findIndex(p=>p.id===me.id) + 1;
-  if(place < 1) return "";
-  const text = place === 1
-    ? `1-е место · отрыв ${fmt(me.netWorth - active[1].netWorth)}`
-    : `${place}-е место · до 1-го ${fmt(active[0].netWorth - me.netWorth)}`;
-  return `<span class="rep-badge place${place===1?" lead":""}" title="Место по капиталу среди активных игроков">${ico("trophy","ico-sm")} ${text}</span>`;
-}
 function capSummaryHtml(s){
   const me = s.players.find(p=>p.id===you);
   if(!me) return "";
@@ -3789,7 +3721,6 @@ function capSummaryHtml(s){
       <div><span class="cs-label">Капитал</span><span class="cs-val" data-num="net">${csVal(me.netWorth)}</span></div>
     </div>
     <div class="rep-badge-row">
-      ${placeGapHtml(s, me)}
       <span class="rep-badge ${rep.cls}" title="Репутация влияет на комиссию банка и условия кредита">${ico("star","ico-sm")} Репутация ${me.reputation} · ${rep.text.toLowerCase()}</span>
       ${me.loanPrincipal ? `<span class="rep-badge loan">${ico("bank","ico-sm")} Долг ${fmt(me.loanPrincipal)}</span>` : ""}
     </div>`;
@@ -3977,16 +3908,9 @@ function gameEndPopupHtml(s){
     // Исключённый голосованием движком тоже помечен bankrupt — подписываем по-разному.
     const pl = s.players.find(p=>p.id===r.id);
     const out = r.bankrupt ? (pl && pl.kicked ? "исключён" : "банкрот") : "";
-    // Состав капитала и сдвиг от последнего события (снимки старого сервера без этих полей — без строки).
-    const parts = r.cash != null && !r.bankrupt
-      ? [`наличные ${fmt(r.cash)}`, `акции ${fmt(r.stocks||0)}`, r.estate ? `недвижимость ${fmt(r.estate)}` : "", r.loan ? `долг ${fmt(r.loan)}` : ""].filter(Boolean).join(" · ") : "";
-    const delta = r.lastEventDelta;
-    const deltaHtml = Number.isFinite(delta) && delta !== 0
-      ? ` · <span class="${delta > 0 ? "up" : "down"}">последнее событие ${delta > 0 ? "+" : "−"}${fmt(Math.abs(delta))}</span>` : "";
     return `<div class="end-rank-row${isMe?" me":""}" style="--i:${i}">
       <span class="end-rank-name"><span class="end-rank-pos">${i+1}</span>${escapeHtml(r.name)}${isMe?' <span class="muted">(вы)</span>':""}${out?` <span class="muted">· ${out}</span>`:""}</span>
       <b>${fmt(r.netWorth)}</b>
-      ${parts || deltaHtml ? `<span class="end-rank-detail">${parts}${deltaHtml}</span>` : ""}
     </div>`;
   }).join("");
   // Почему очков нет (engine.js checkEndGame → gameResult.noPointsReason). Без
@@ -4085,11 +4009,9 @@ function rollPopupHtml(s){
     const startPct = Math.min(10, buyMax);
     const fee = s.bankFeePct||0;
     const buyUnit = c.price/100 * (1 + fee);
-    const commission = rollBuyCommission(meta);
-    const commNote = commission ? ` ${buyCommissionRuleText(commission)}` : "";
     buyHtml = `<div class="sheet-box">
-      ${pctSliderHtml("rpBuySlider", buyMax, startPct, buyUnit, "Доля к покупке", commission)}
-      <div class="sheet-note">${fee ? `Сумма включает комиссию банка ${(fee*100).toFixed(1).replace(".", ",")}% — она зависит от репутации.` : "Комиссии банка нет — у вас высокая репутация."}${commNote}${myPct?` У вас уже ${myPct}%.`:""}${refuseHint}</div>
+      ${pctSliderHtml("rpBuySlider", buyMax, startPct, buyUnit, "Доля к покупке")}
+      <div class="sheet-note">${fee ? `Сумма включает комиссию банка ${(fee*100).toFixed(1).replace(".", ",")}% — она зависит от репутации.` : "Комиссии банка нет — у вас высокая репутация."}${myPct?` У вас уже ${myPct}%.`:""}${refuseHint}</div>
     </div>`;
     primary = `<button type="button" class="grow" onclick="send({type:'buyFromRoll',pct:pctSliderVal('rpBuySlider')})"><span id="rpBuySlider_btn">Купить ${startPct}%</span></button>`;
   }
@@ -4772,9 +4694,8 @@ function refreshCompanyModal(){
       const buyMax = Math.min(25, Math.floor(free));
       const buyUnit = c.price/100 * (1 + (s.bankFeePct||0));
       // Доля в подписи кнопки (как в листе броска) — onPctSlider обновляет её по id.
-      const meta = s.pendingRollMeta && s.pendingRollMeta.ticker === c.ticker ? s.pendingRollMeta : null;
       actionsHtml += `<div class="sheet-box">
-        ${pctSliderHtml("cmBuySlider", buyMax, Math.min(10, buyMax), buyUnit, "Доля к покупке", rollBuyCommission(meta))}
+        ${pctSliderHtml("cmBuySlider", buyMax, Math.min(10, buyMax), buyUnit, "Доля к покупке")}
         <button type="button" class="block" onclick="send({type:'buyFromRoll',pct:pctSliderVal('cmBuySlider')});closeCompanyModal();"><span id="cmBuySlider_btn">Купить ${Math.min(10, buyMax)}%</span></button>
       </div>`;
     }
