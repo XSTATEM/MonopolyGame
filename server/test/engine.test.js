@@ -8,7 +8,8 @@
 // выкупа, выплату «не больше, чем есть у плательщика», порядок проверок в
 // dividendFromRoll, конец партии при общем разорении, лимиты сделок, правила
 // исключения голосованием и очередь ходов после выбывания посреди хода,
-// срок решения контролёра о цене выкупа и минимальную длину партии для очков.
+// срок решения контролёра о цене выкупа и минимальную длину партии для очков,
+// пакет баланса А5 + Б1–Б4 (бот движка, кредит, настройки новой комнаты).
 // ---------------------------------------------------------------------
 const assert = require("assert/strict");
 const path = require("path");
@@ -599,6 +600,7 @@ function cellOf(ticker) {
 
 test("контролёр молчит: до срока бросок не закрыть, после — плата по тарифу контролёру", () => {
   const { r, A, B, ticker } = rollOnHeld(["A", "B"], 60);
+  A.cash = 1e7; // вдвоём плата по кривой (×11.3) больше стартового капитала — сценарий не о банкротстве
   fixRandom(0); // случайный пропуск выплаты на оплату по тарифу не влияет
   const meta0 = E.buildStatePayload(r, A.id).pendingRollMeta;
   assert.ok(Number.isFinite(r.pendingRoll.controllerWaitSince), "первый снимок не поставил метку ожидания");
@@ -832,6 +834,658 @@ test("ничья по капиталу при лимите раундов: по�
   assert.equal(r.phase, "ended");
   assert.equal(r.gameResult.winnerName, "B");
   return r;
+});
+
+// ---------------------------------------------------------------------
+// Пакет баланса А5 + Б1–Б4 (BALANCE-REPORT.md, раздел 0): бот движка,
+// кредит, настройки новой комнаты, плата по тарифу после срока контролёра
+// ---------------------------------------------------------------------
+// Ходящий бот A стоит на клетке ticker (все игроки — боты).
+function botRollOn(names, ticker) {
+  const r = game(names, true);
+  const A = P(r, "A");
+  r.rolledThisTurn = true;
+  r.pendingRoll = { playerId: A.id, row: 1, col: 1, ticker: ticker || "AAPL", realEstateId: null };
+  return { r, A, B: P(r, "B") };
+}
+// Цена покупки по броску с комиссией банка — та же формула, что rollBuyCost в движке.
+const rollCost = (r, p, ticker, pct) => r.companies[ticker].price * (pct / 100) * (1 + E.bankFeePct(p.reputation));
+
+test("бот А5: на 5% денег хватает — покупает 5% (или остаток), а не платит за отказ", () => {
+  fixRandom(0.99); // без спецдействий и случайного пропуска выплаты
+  const { r, A, B } = botRollOn(["A", "B"]);
+  B.holdings.AAPL = 30;
+  A.cash = 10000; // меньше резерва $15 000 — botChoosePct сам ничего бы не купил
+  const cost = rollCost(r, A, "AAPL", 5);
+  const b0 = B.cash;
+  const s = E.botStep(r);
+  assert.equal(s.type, "buyFromRoll");
+  assert.ok(!s.result.error, s.result.error);
+  assert.equal(A.holdings.AAPL, 5);
+  assert.ok(Math.abs(10000 - A.cash - cost) < 1e-6, "списано не по цене 5%");
+  assert.equal(B.cash, b0, "держатель получил плату за отказ");
+  assert.equal(r.pendingRoll, null);
+  // Свободно 3% (остальное у бота-контролёра) — бот берёт остаток, контролёр цену не назначает.
+  const rest = botRollOn(["A", "B"]);
+  rest.B.holdings.AAPL = 97;
+  rest.A.cash = 10000;
+  const s2 = E.botStep(rest.r);
+  assert.equal(s2.type, "buyFromRoll");
+  assert.equal(rest.A.holdings.AAPL, 3);
+  assert.equal(rest.r.pendingForcedPrice, null);
+  return [r, rest.r];
+});
+
+test("бот А5: на 5% денег не хватает — платит за отказ (dividendFromRoll)", () => {
+  fixRandom(0.99);
+  // Стол на 4: вдвоём плата по кривой (×11.3) выше цены самих 5% — на неё
+  // тоже не хватило бы, и сценарий превратился бы в банкротство.
+  const { r, A, B } = botRollOn(["A", "B", "C", "D"]);
+  B.holdings.AAPL = 5;
+  A.cash = 1500;
+  assert.ok(A.cash < rollCost(r, A, "AAPL", 5));
+  // тир A: 60% капитализации × эффективная доля держателя (кривая платы)
+  const fee = r.companies.AAPL.price * 0.6 * E.holdersFeeFactor(r, 5);
+  assert.ok(fee < A.cash, `плата ${fee} не по карману — сценарий не воспроизведён`);
+  const b0 = B.cash;
+  const s = E.botStep(r);
+  assert.equal(s.type, "dividendFromRoll");
+  assert.ok(!s.result.error, s.result.error);
+  assert.ok(!A.holdings.AAPL, "бот купил без денег");
+  assert.ok(Math.abs(B.cash - b0 - fee) < 1e-6, "держатель не получил плату за отказ");
+  assert.equal(r.pendingRoll, null);
+  return r;
+});
+
+test("бот А5: отказ бесплатен (карта новостей, держатель выбыл) — запасной покупки нет", () => {
+  fixRandom(0.99);
+  // Карта «выплата не проводится»: отказ ничего не стоит — тратить деньги незачем.
+  const card = botRollOn(["A", "B"]);
+  card.B.holdings.AAPL = 30;
+  card.A.cash = 10000;
+  card.r.companies.AAPL.skipDividendUntil = card.r.eventCount + 2;
+  const b0 = card.B.cash;
+  let s = E.botStep(card.r);
+  assert.equal(s.type, "dividendFromRoll");
+  assert.ok(!card.A.holdings.AAPL, "купил, хотя отказ бесплатен");
+  assert.equal(card.A.cash, 10000);
+  assert.equal(card.B.cash, b0);
+  // Единственный держатель выбыл — платить некому, покупки тоже нет.
+  const gone = botRollOn(["A", "B", "C"]);
+  gone.B.holdings.AAPL = 30;
+  gone.B.bankrupt = true;
+  gone.A.cash = 10000;
+  s = E.botStep(gone.r);
+  assert.equal(s.type, "dividendFromRoll");
+  assert.ok(!gone.A.holdings.AAPL);
+  assert.equal(gone.A.cash, 10000);
+  // Карта не освобождает от единоличного контролёра — с ним бот по-прежнему берёт 5%.
+  const ctrl = botRollOn(["A", "B"]);
+  ctrl.B.holdings.AAPL = 60;
+  ctrl.A.cash = 10000;
+  ctrl.r.companies.AAPL.skipDividendUntil = ctrl.r.eventCount + 2;
+  s = E.botStep(ctrl.r);
+  assert.equal(s.type, "buyFromRoll");
+  assert.equal(ctrl.A.holdings.AAPL, 5);
+  return [card.r, gone.r, ctrl.r];
+});
+
+test("бот А5: сделку на 1 цент дороже рынка отклоняет, по рынку — принимает", () => {
+  const r = game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  B.isBot = true;
+  A.holdings.AAPL = 25;
+  // 25% по $39 999.96 = $9 999.99 — предложение за $10 000 дороже рынка на цент.
+  r.companies.AAPL.price = 39999.96;
+  assert.ok(!E.proposeTrade(r, A.id, B.id, "AAPL", 25, 10000).error);
+  let s = E.botStep(r);
+  assert.equal(s.type, "respondTrade");
+  assert.ok(!s.result.error, s.result.error);
+  assert.equal(A.holdings.AAPL, 25, "бот купил дороже рынка");
+  assert.ok(!B.holdings.AAPL);
+  r.companies.AAPL.price = 40000; // 25% = ровно $10 000
+  const a0 = A.cash;
+  assert.ok(!E.proposeTrade(r, A.id, B.id, "AAPL", 25, 10000).error);
+  s = E.botStep(r);
+  assert.equal(s.type, "respondTrade");
+  assert.ok(!s.result.error, s.result.error);
+  assert.equal(B.holdings.AAPL, 25, "бот отказался от сделки по рынку");
+  assert.equal(A.cash, a0 + 10000);
+  return r;
+});
+
+test("кредит Б2: ставка 6 / 3.5 / 1% за событие при репутации 0 / 50 / 100", () => {
+  const r = game(["A", "B"]);
+  const A = P(r, "A");
+  for (const [rep, rate] of [[0, 6], [20, 5], [50, 3.5], [90, 1.5], [100, 1]]) {
+    A.reputation = rep;
+    assert.equal(E.loanTerms(r, A).ratePct, rate, "репутация " + rep);
+  }
+  return r;
+});
+
+test("кредит Б2: бонус за полное погашение — кредит не моложе 2 событий и не символический", () => {
+  const r = game(["A", "B"]);
+  const A = P(r, "A");
+  const take = (amount) => assert.ok(!E.takeLoan(r, A.id, amount).error, "takeLoan " + amount);
+  const repayAll = () => assert.ok(!E.repayLoan(r, A.id, A.loan.principal).error);
+  // Капитал при выдаче ≈ $100 000 — «настоящий» кредит от $10 000.
+  r.eventCount = 10;
+  take(20000);
+  r.eventCount = 11;
+  let rep0 = A.reputation;
+  repayAll();
+  assert.equal(A.loan, null);
+  assert.equal(A.reputation, rep0, "бонус за кредит, проживший одно событие");
+  take(20000);
+  r.eventCount = 13;
+  rep0 = A.reputation;
+  repayAll();
+  assert.equal(A.reputation, rep0 + 3, "нет бонуса за кредит, проживший два события");
+  take(5000); // меньше 10% капитала
+  r.eventCount = 15;
+  rep0 = A.reputation;
+  repayAll();
+  assert.equal(A.reputation, rep0, "бонус за символический кредит");
+  return r;
+});
+
+test("кредит: бонус за частичное погашение не фармится (возраст, размер, раз в событие на игрока)", () => {
+  const r = game(["A", "B"]);
+  const A = P(r, "A");
+  const take = (amount) => assert.ok(!E.takeLoan(r, A.id, amount).error, "takeLoan " + amount);
+  const repay = (amount) => assert.ok(!E.repayLoan(r, A.id, amount).error, "repayLoan " + amount);
+  r.eventCount = 10;
+  const rep0 = A.reputation;
+  // Цикл из отчёта: взять — погасить 10% — погасить остаток; раньше +1 за круг.
+  for (let i = 0; i < 50; i++) { take(20000); repay(2000); repay(A.loan.principal); }
+  assert.equal(A.reputation, rep0, "цикл «взять — 10% — остаток» поднял репутацию");
+  // Кредит прожил событие: первый ощутимый платёж — +1, второй в том же событии — нет.
+  take(20000);
+  r.eventCount = 11;
+  repay(2000);
+  assert.equal(A.reputation, rep0 + 1, "нет бонуса за честный частичный платёж");
+  repay(2000);
+  assert.equal(A.reputation, rep0 + 1, "второй бонус в том же событии");
+  // Отметка — на игроке: новый кредит (даже «состаренный») её не сбрасывает.
+  repay(A.loan.principal);
+  take(20000);
+  A.loan.takenEvent = 9;
+  repay(2000);
+  assert.equal(A.reputation, rep0 + 1, "новый кредит сбросил отметку бонуса");
+  // В следующем событии — снова можно, но платёж меньше 10% кредита бонуса не даёт.
+  r.eventCount = 12;
+  repay(1000);
+  assert.equal(A.reputation, rep0 + 1, "бонус за платёж меньше 10% кредита");
+  repay(2000);
+  assert.equal(A.reputation, rep0 + 2);
+  repay(A.loan.principal);
+  // Мелкие кредиты: меньше $1000 и меньше 10% капитала при выдаче — без бонуса
+  // (раньше кредит $1000 с платежами по $100 за ход давал репутацию почти даром).
+  for (const amount of [900, 5000]) {
+    take(amount);
+    r.eventCount++;
+    const before = A.reputation;
+    repay(Math.ceil(amount * 0.2));
+    assert.equal(A.reputation, before, "бонус за символический кредит " + amount);
+    repay(A.loan.principal);
+  }
+  return r;
+});
+
+test("новая комната: «до банкротства» со страховкой 150 ходов у каждого и плата за отказ [60, 45, 30] по кривой", () => {
+  const r = E.freshRoom("T");
+  // Длительность — в своих ходах у каждого; раунды посчитает startGame.
+  assert.equal(r.maxRounds, null);
+  assert.equal(r.settings.maxTurnsPerPlayer, 150);
+  assert.equal(E.DEFAULT_MAX_TURNS_PER_PLAYER, 150);
+  assert.deepEqual(r.settings.tierForcedPaymentPct, [60, 45, 30]);
+  assert.deepEqual(E.TIER_FORCED_PAYMENT_PCT, { A: 0.6, B: 0.45, C: 0.3 });
+  // Кривая платы (BALANCE-REPORT.md, раздел 00): K = 1.5, P = 1, N_EXP = 3.5, потолок стола 6.5.
+  assert.equal(E.FEE_CURVE_K, 1.5);
+  assert.equal(E.FEE_CURVE_P, 1);
+  assert.equal(E.FEE_CURVE_N_EXP, 3.5);
+  assert.equal(E.FEE_CURVE_N_MAX, 6.5);
+  // Клиенту уходят те же значения; ключ maxTurnsPerPlayer есть всегда (null — старая комната).
+  E.addPlayer(r, "A", "", "", 0, "default", false);
+  const st = E.buildStatePayload(r, r.players[0].id);
+  assert.equal(st.settings.maxTurnsPerPlayer, 150);
+  assert.deepEqual(st.settings.tierForcedPaymentPct, [60, 45, 30]);
+  assert.equal(st.maxRounds, null);
+  delete r.settings.maxTurnsPerPlayer;
+  delete r.settings.tierForcedPaymentPct;
+  const legacy = E.buildStatePayload(r, r.players[0].id);
+  assert.ok("maxTurnsPerPlayer" in legacy.settings);
+  assert.equal(legacy.settings.maxTurnsPerPlayer, null);
+  assert.deepEqual(legacy.settings.tierForcedPaymentPct, [60, 45, 30], "запасное значение без настроек");
+  return r;
+});
+
+test("контролёр молчит: плата по тарифу не выше потолка цены выкупа", () => {
+  fixRandom(0.99);
+  // Тир C (×1.4), полное поглощение (×3), Дивидендный сезон (×2): без потолка — 8.4 справедливой цены.
+  const { r, A, B, ticker } = rollOnHeld(["A", "B"], 100, "YDEX");
+  A.cash = 1e7; // вдвоём плата по кривой (×11.3) больше стартового капитала — сценарий о потолке, не о банкротстве
+  r.companies[ticker].fullyOwned = true;
+  r.dividendMultiplier = 2;
+  expireControllerWait(r);
+  const cap = E.forcedPriceCap(r, ticker, 100);
+  const meta = E.buildStatePayload(r, A.id).pendingRollMeta;
+  assert.equal(meta.controllerFee, cap, "подсказка клиенту не равна потолку");
+  const a0 = A.cash, b0 = B.cash;
+  assert.ok(!E.dividendFromRoll(r, A.id).error);
+  assert.ok(Math.abs(a0 - A.cash - cap) < 1e-6, "списано больше потолка");
+  assert.ok(Math.abs(B.cash - b0 - cap) < 1e-6, "контролёр получил не потолок");
+  assert.ok(r.log.some((e) => /потолком цены выкупа/.test(e.text)), "в ленте нет пометки о потолке");
+  // Перебор тиров и множителей: списано не больше потолка и ровно столько, сколько в подсказке.
+  const rooms = [r];
+  for (const t of ["AAPL", "NVDA", "YDEX"]) for (const mult of [1, 2]) for (const flag of ["", "squeezedOut", "fullyOwned"]) {
+    const x = rollOnHeld(["A", "B"], flag === "fullyOwned" ? 100 : 80, t);
+    x.A.cash = 1e7;
+    if (flag) x.r.companies[t][flag] = true;
+    x.r.dividendMultiplier = mult;
+    expireControllerWait(x.r);
+    const fee = E.buildStatePayload(x.r, x.A.id).pendingRollMeta.controllerFee;
+    const c0 = x.A.cash;
+    assert.ok(!E.dividendFromRoll(x.r, x.A.id).error);
+    const paid = c0 - x.A.cash;
+    const label = `${t} ×${mult} ${flag || "без сквиз-аута"}`;
+    assert.ok(paid > 0 && paid <= E.forcedPriceCap(x.r, t, x.B.holdings[t]) + 1e-6, `${label}: ${paid}`);
+    assert.ok(Math.abs(paid - fee) < 1e-6, `${label}: подсказка ${fee}, списано ${paid}`);
+    // Без множителей потолок не мешает — ровно тариф.
+    if (t === "AAPL" && mult === 1 && !flag) assert.ok(Math.abs(paid - x.r.companies[t].price * 0.6 * E.holdersFeeFactor(x.r, 80)) < 1e-6, label);
+    rooms.push(x.r);
+  }
+  return rooms;
+});
+
+test("бот: покупка по броску не прошла — бросок закрывается отказом, насос не зацикливается", () => {
+  fixRandom(0.99);
+  // Имитация расхождения расчётов цены: внутри buyFromRoll наличных бота на цент
+  // меньше цены 5%, а botBuyPct видит настоящие — бот решает «хватает», движок
+  // отвечает «недостаточно наличных».
+  const poorInBuy = (p, buyCost) => {
+    let value = p.cash;
+    const seen = { buy: 0 };
+    Object.defineProperty(p, "cash", {
+      configurable: true, enumerable: true,
+      get() { if (/\bbuyFromRoll\b/.test(new Error().stack)) { seen.buy++; return buyCost - 0.01; } return value; },
+      set(v) { value = v; },
+    });
+    return seen;
+  };
+  const plain = (p) => { const v = p.cash; Object.defineProperty(p, "cash", { value: v, writable: true, enumerable: true, configurable: true }); };
+  // Держатель-миноритарий: бот сразу платит за отказ.
+  const { r, A, B } = botRollOn(["A", "B"]);
+  B.holdings.AAPL = 5;
+  A.cash = 16000; // botChoosePct ещё ничего не берёт, запасные 5% — по карману
+  const seen = poorInBuy(A, rollCost(r, A, "AAPL", 5));
+  const b0 = B.cash;
+  const s = E.botStep(r);
+  assert.ok(seen.buy > 0, "бот не пытался купить — сценарий не воспроизведён");
+  assert.equal(s.type, "dividendFromRoll");
+  assert.ok(!s.result.error, s.result.error);
+  assert.ok(!A.holdings.AAPL);
+  assert.ok(B.cash > b0, "держатель не получил плату за отказ");
+  assert.equal(r.pendingRoll, null, "бросок остался висеть");
+  assert.equal(E.botStep(r).type, "endTurn");
+  plain(A);
+  // Отказ тоже пока невозможен (контролёр-человек думает) — бот ждёт (acted: false),
+  // а не повторяет неудачную покупку; после срока платит по тарифу.
+  const w = botRollOn(["A", "B"]);
+  w.B.isBot = false;
+  w.B.holdings.AAPL = 60;
+  w.A.cash = 16000;
+  const seenW = poorInBuy(w.A, rollCost(w.r, w.A, "AAPL", 5));
+  for (let i = 0; i < 5; i++) assert.equal(E.botStep(w.r).acted, false, "насос крутит неудачную покупку");
+  assert.ok(seenW.buy > 0, "бот не пытался купить");
+  assert.ok(w.r.pendingRoll);
+  expireControllerWait(w.r);
+  const s2 = E.botStep(w.r);
+  assert.equal(s2.type, "dividendFromRoll");
+  assert.ok(!s2.result.error, s2.result.error);
+  assert.equal(w.r.pendingRoll, null);
+  plain(w.A);
+  return [r, w.r];
+});
+
+// ---------------------------------------------------------------------
+// Кривая платы за отказ (FEE_CURVE_K / FEE_CURVE_P / FEE_CURVE_N_EXP /
+// FEE_CURVE_N_MAX): при K = 0 и N_EXP = 0 нейтральна, при K > 0 плата и цена
+// выкупа растут быстрее доли держателей, а подсказки клиенту совпадают со
+// списанием. По умолчанию K = 1.5, P = 1, N_EXP = 3.5, N_MAX = 6.5.
+// ---------------------------------------------------------------------
+// Копия движка с другими значениями верхнеуровневых констант — как
+// --override в tools/sim: литерал в «const NAME = …;» заменяется до исполнения.
+function engineWith(consts) {
+  let src = require("fs").readFileSync(path.join(__dirname, "..", "public", "engine.js"), "utf8");
+  for (const [name, value] of Object.entries(consts)) {
+    const re = new RegExp(`^(  )const ${name} = [^;\\n]+;`, "m");
+    assert.ok(re.test(src), `в engine.js нет «const ${name} = …;»`);
+    src = src.replace(re, `$1const ${name} = ${JSON.stringify(value)};`);
+  }
+  const m = { exports: {} };
+  new Function("module", src)(m);
+  return m.exports;
+}
+// Как rollOnHeld, но на заданной копии движка; ботом может быть только B.
+function rollOnHeldWith(X, names, heldPct, ticker, botB) {
+  const r = X.freshRoom("T");
+  names.forEach((n) => X.addPlayer(r, n, "", "", 0, "default", !!botB && n === "B"));
+  const res = X.startGame(r, r.hostPlayerId);
+  assert.ok(!res.error, "startGame: " + res.error);
+  r.turnOrder = r.players.map((p) => p.id);
+  r.turnIndex = 0;
+  r.settings.eventIntervalTurns = 100;
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings[ticker] = heldPct;
+  r.rolledThisTurn = true;
+  r.pendingRoll = { playerId: A.id, row: 1, col: 1, ticker, realEstateId: null };
+  return { r, A, B };
+}
+
+test("кривая платы: K = 0 и N_EXP = 0 — нейтральна (прежняя линейная плата), подсказки выкупа — суммы движка", () => {
+  const X = engineWith({ FEE_CURVE_K: 0, FEE_CURVE_N_EXP: 0 });
+  const r = rollOnHeldWith(X, ["A", "B", "C"], 0, "AAPL").r;
+  for (let pct = 0; pct <= 100; pct++) assert.equal(X.holdersFeeFactor(r, pct), pct / 100, `доля ${pct}%`);
+  // Контролёр (70% NVDA, тир B, ставка 45%): справедливая цена и потолок в
+  // pendingRollMeta — ровно те, что проверит setForcedPrice.
+  const x = rollOnHeldWith(X, ["A", "B"], 70, "NVDA");
+  const meta = X.buildStatePayload(x.r, x.B.id).pendingRollMeta;
+  const fair = x.r.companies.NVDA.price * 0.45 * 0.7;
+  assert.equal(meta.fairPrice, Math.round(fair));
+  assert.equal(meta.fairPrice, Math.round(X.forcedFairPrice(x.r, "NVDA", 70)));
+  assert.equal(meta.priceCap, X.forcedPriceCap(x.r, "NVDA", 70));
+  assert.equal(meta.priceCap, Math.max(1, Math.round(fair * 6)));
+  assert.equal(meta.feeCurve, false);
+  // Миноритарии без контролёра: сумм выкупа нет, плата за отказ — линейная.
+  const y = rollOnHeldWith(X, ["A", "B"], 30, "AAPL");
+  const m2 = X.buildStatePayload(y.r, y.A.id).pendingRollMeta;
+  assert.equal(m2.fairPrice, 0);
+  assert.equal(m2.priceCap, 0);
+  assert.ok(Math.abs(m2.refuseAmount - y.r.companies.AAPL.price * 0.6 * 0.3) < 1e-9, `refuseAmount ${m2.refuseAmount}`);
+  return [r, x.r, y.r];
+});
+
+test("кривая платы: K > 0 — плата за отказ и цена выкупа растут быстрее доли", () => {
+  fixRandom(0.99); // без случайного пропуска выплаты
+  // Без поправки на стол (N_EXP = 0) — проверяется только форма кривой.
+  const X = engineWith({ FEE_CURVE_K: 2, FEE_CURVE_P: 1, FEE_CURVE_N_EXP: 0 });
+  const r = rollOnHeldWith(X, ["A", "B"], 0, "AAPL").r;
+  // f(x) = x × (1 + 2x): 25% → 0.375, 50% → 1, 100% → 3 (втрое дороже линейной).
+  const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg}: ${a} ≠ ${b}`);
+  near(X.holdersFeeFactor(r, 25), 0.375, "25%");
+  near(X.holdersFeeFactor(r, 50), 1, "50%");
+  near(X.holdersFeeFactor(r, 100), 3, "100%");
+  assert.equal(X.holdersFeeFactor(r, 0), 0);
+  for (let pct = 2; pct <= 100; pct++) {
+    assert.ok(X.holdersFeeFactor(r, pct) / pct > X.holdersFeeFactor(r, pct - 1) / (pct - 1), `надбавка не растёт на ${pct}%`);
+  }
+  // Миноритарий 40% AAPL: подпись «Отказаться» = списание = цена × 60% × 0.4 × 1.8.
+  const m = rollOnHeldWith(X, ["A", "B"], 40, "AAPL");
+  const refuse = X.buildStatePayload(m.r, m.A.id).pendingRollMeta.refuseAmount;
+  near(refuse, m.r.companies.AAPL.price * 0.6 * 0.4 * 1.8, "refuseAmount");
+  const a0 = m.A.cash;
+  assert.ok(!X.dividendFromRoll(m.r, m.A.id).error);
+  near(a0 - m.A.cash, refuse, "списано за отказ");
+  // Контролёр 80% NVDA: справедливая цена, потолок и плата по тарифу — по той же кривой.
+  const c = rollOnHeldWith(X, ["A", "B"], 80, "NVDA");
+  const fair = c.r.companies.NVDA.price * 0.45 * 0.8 * 2.6;
+  const meta = X.buildStatePayload(c.r, c.B.id).pendingRollMeta;
+  assert.equal(meta.fairPrice, Math.round(fair));
+  assert.equal(meta.priceCap, Math.max(1, Math.round(fair * 6)));
+  near(meta.controllerFee, fair, "плата по тарифу (тир B без множителей — справедливая цена)");
+  assert.ok(X.setForcedPrice(c.r, c.B.id, meta.priceCap + 1).error, "потолок не проверяется по кривой");
+  assert.ok(!X.setForcedPrice(c.r, c.B.id, meta.priceCap).error, "ровно потолок отклонён");
+  // Срок решения вышел — бросающий платит ровно подсказку controllerFee.
+  const d = rollOnHeldWith(X, ["A", "B"], 80, "NVDA");
+  d.r.pendingRoll.controllerWaitSince = Date.now() - X.CONTROLLER_DECISION_MS - 1;
+  const fee = X.buildStatePayload(d.r, d.A.id).pendingRollMeta.controllerFee;
+  const d0 = d.A.cash;
+  assert.ok(!X.dividendFromRoll(d.r, d.A.id).error);
+  near(d0 - d.A.cash, fee, "списано по тарифу");
+  // Бот-контролёр назначает цену от той же справедливой цены: fair × (1.5 + 0.99).
+  const b = rollOnHeldWith(X, ["A", "B"], 80, "NVDA", true);
+  const bs = X.botStep(b.r);
+  assert.equal(bs.type, "setForcedPrice");
+  assert.ok(!bs.result.error, bs.result.error);
+  assert.equal(b.r.pendingForcedPrice.amount, Math.round(b.r.companies.NVDA.price * 0.45 * 0.8 * 2.6 * 2.49));
+  return [r, m.r, c.r, d.r, b.r];
+});
+
+test("кривая платы: FEE_CURVE_N_EXP — поправка на число активных игроков, FEE_CURVE_N_MAX — её потолок", () => {
+  const X = engineWith({ FEE_CURVE_K: 0, FEE_CURVE_N_EXP: 1, FEE_CURVE_N_MAX: 99 });
+  const two = rollOnHeldWith(X, ["A", "B"], 0, "AAPL").r;
+  const four = rollOnHeldWith(X, ["A", "B", "C", "D"], 0, "AAPL").r;
+  assert.ok(Math.abs(X.holdersFeeFactor(two, 30) - 0.6) < 1e-12, "вдвоём — ×2");
+  assert.equal(X.holdersFeeFactor(four, 30), 0.3, "вчетвером — без поправки");
+  four.players[3].bankrupt = true; // выбывшие не считаются: трое активных — ×4/3
+  assert.ok(Math.abs(X.holdersFeeFactor(four, 30) - 0.4) < 1e-12, "трое активных — ×4/3");
+  const eight = rollOnHeldWith(X, ["A", "B", "C", "D", "E", "F", "G", "H"], 0, "AAPL").r;
+  assert.ok(Math.abs(X.holdersFeeFactor(eight, 30) - 0.15) < 1e-12, "без потолка ввосьмером — ×1/2");
+  // Потолок 6: за столом на 8 поправка как на 6, на 2–6 игроков он не влияет.
+  const Y = engineWith({ FEE_CURVE_K: 0, FEE_CURVE_N_EXP: 1, FEE_CURVE_N_MAX: 6 });
+  const eightY = rollOnHeldWith(Y, ["A", "B", "C", "D", "E", "F", "G", "H"], 0, "AAPL").r;
+  assert.ok(Math.abs(Y.holdersFeeFactor(eightY, 30) - 0.2) < 1e-12, "с потолком 6 ввосьмером — ×4/6");
+  const twoY = rollOnHeldWith(Y, ["A", "B"], 0, "AAPL").r;
+  assert.ok(Math.abs(Y.holdersFeeFactor(twoY, 30) - 0.6) < 1e-12, "вдвоём потолок не влияет");
+  return [two, eight, eightY];
+});
+
+test("кривая платы по умолчанию: K = 1.5, P = 1 — 20/50/80% и множитель стола (4/n)^3.5, n ≤ 6.5", () => {
+  const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg}: ${a} ≠ ${b}`);
+  const r4 = game(["A", "B", "C", "D"]);
+  // Вчетвером множитель стола ×1: f(x) = x × (1 + 1.5x).
+  near(E.holdersFeeFactor(r4, 20), 0.26, "20%"); // в 1.3 раза дороже линейной
+  near(E.holdersFeeFactor(r4, 50), 0.875, "50%"); // в 1.75 раза
+  near(E.holdersFeeFactor(r4, 80), 1.76, "80%"); // в 2.2 раза
+  near(E.holdersFeeFactor(r4, 100), 2.5, "100%");
+  assert.equal(E.holdersFeeFactor(r4, 0), 0);
+  // Плата растёт быстрее доли: надбавка к линейной увеличивается с каждым процентом.
+  for (let pct = 2; pct <= 100; pct++) {
+    assert.ok(E.holdersFeeFactor(r4, pct) / pct > E.holdersFeeFactor(r4, pct - 1) / (pct - 1), `надбавка не растёт на ${pct}%`);
+  }
+  // Множитель стола по числу активных игроков: 2 → ×11.3, 3 → ×2.74, 5 → ×0.46,
+  // 6 → ×0.24, 7 и 8 — как 6.5 (×0.18).
+  const names = ["A", "B", "C", "D", "E", "F", "G", "H"];
+  const rooms = [r4];
+  const expect = { 2: 11.3137, 3: 2.7371, 4: 1, 5: 0.4579, 6: 0.2419, 7: 0.1828, 8: 0.1828 };
+  for (let n = 2; n <= 8; n++) {
+    const r = game(names.slice(0, n));
+    const mult = E.holdersFeeFactor(r, 50) / 0.875;
+    near(mult, Math.pow(4 / Math.min(6.5, n), 3.5), `${n} игроков`);
+    assert.ok(Math.abs(mult - expect[n]) < 1e-4, `${n} игроков: ×${mult}`);
+    rooms.push(r);
+  }
+  // Выбывшие не считаются: из четверых один банкрот — множитель как за столом на 3.
+  r4.players[3].bankrupt = true;
+  near(E.holdersFeeFactor(r4, 50), 0.875 * Math.pow(4 / 3, 3.5), "трое активных");
+  return rooms;
+});
+
+test("кривая платы по умолчанию: подпись «Отказаться» = списание, цена выкупа и потолок — по той же кривой", () => {
+  fixRandom(0.99); // без случайного пропуска выплаты
+  const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} ≠ ${b}`);
+  // Стол на 4, KO (тир B, ставка 45%): у B 20%, у C 30% — вместе 50%, контролёра нет.
+  const x = rollOnHeld(["A", "B", "C", "D"], 20, "KO");
+  const C = P(x.r, "C");
+  C.holdings.KO = 30;
+  const price = x.r.companies.KO.price;
+  const meta = E.buildStatePayload(x.r, x.A.id).pendingRollMeta;
+  assert.equal(meta.feeCurve, true);
+  near(meta.feeFactor, 0.875, "эффективная доля");
+  near(meta.refuseAmount, price * 0.45 * 0.875, "refuseAmount"); // 39.4% цены вместо 22.5%
+  const a0 = x.A.cash, b0 = x.B.cash, c0 = C.cash;
+  assert.ok(!E.dividendFromRoll(x.r, x.A.id).error);
+  near(a0 - x.A.cash, meta.refuseAmount, "списано за отказ");
+  near((x.B.cash - b0) + (C.cash - c0), meta.refuseAmount, "держатели получили не всю плату");
+  near(x.B.cash - b0, meta.refuseAmount * 0.4, "доля B (20 из 50)");
+  // В ленте — ставка класса, а не «45% капитализации» (сумма — 39.4% цены).
+  const refuseLog = x.r.log.filter((e) => /отказался от покупки KO/.test(e.text)).pop();
+  assert.ok(refuseLog && /по ставке класса 45%/.test(refuseLog.text) && !/капитализации/.test(refuseLog.text), refuseLog && refuseLog.text);
+  // Контролёр 80% NVDA вчетвером: справедливая цена = цена × 45% × 1.76, потолок — 6 таких.
+  const c = rollOnHeld(["A", "B", "C", "D"], 80, "NVDA");
+  const fair = c.r.companies.NVDA.price * 0.45 * 1.76;
+  const cm = E.buildStatePayload(c.r, c.B.id).pendingRollMeta;
+  assert.equal(cm.fairPrice, Math.round(fair));
+  assert.equal(cm.fairPrice, Math.round(E.forcedFairPrice(c.r, "NVDA", 80)));
+  assert.equal(cm.priceCap, Math.max(1, Math.round(fair * 6)));
+  assert.equal(cm.priceCap, E.forcedPriceCap(c.r, "NVDA", 80));
+  near(cm.controllerFee, fair, "плата по тарифу (тир B без множителей — справедливая цена)");
+  assert.ok(E.setForcedPrice(c.r, c.B.id, cm.priceCap + 1).error, "потолок не проверяется по кривой");
+  assert.ok(!E.setForcedPrice(c.r, c.B.id, cm.priceCap).error, "ровно потолок отклонён");
+  // Плата и справедливая цена — одна формула: отказ миноритариям при той же доле
+  // равен справедливой цене контролёра (тир B, без множителей).
+  const m = rollOnHeld(["A", "B", "C", "D"], 40, "NVDA");
+  P(m.r, "C").holdings.NVDA = 40;
+  near(E.buildStatePayload(m.r, m.A.id).pendingRollMeta.refuseAmount, E.forcedFairPrice(m.r, "NVDA", 80), "отказ = справедливая цена");
+  return [x.r, c.r, m.r];
+});
+
+// ---------------------------------------------------------------------
+// Длительность партии в своих ходах у каждого (settings.maxTurnsPerPlayer):
+// раунды считаются при старте по числу игроков, старые комнаты живут по maxRounds
+// ---------------------------------------------------------------------
+test("длительность: maxTurnsPerPlayer → maxRounds при старте (2 / 4 / 6 игроков)", () => {
+  const names = ["A", "B", "C", "D", "E", "F"];
+  assert.equal(E.roundsForTurnsPerPlayer(150, 2, 4), 75);
+  assert.equal(E.roundsForTurnsPerPlayer(150, 3, 4), 113); // ⌈112.5⌉
+  assert.equal(E.roundsForTurnsPerPlayer(0, 4, 4), null);
+  assert.equal(E.roundsForTurnsPerPlayer(-5, 4, 4), null);
+  assert.equal(E.roundsForTurnsPerPlayer(NaN, 4, 4), null);
+  const rooms = [];
+  const expected = { 150: [75, 150, 225], 70: [35, 70, 105], 40: [20, 40, 60] };
+  for (const turns of [null, 150, 70, 40]) {
+    [2, 4, 6].forEach((n, i) => {
+      const r = lobby(names.slice(0, n));
+      if (turns != null) assert.ok(!E.updateRoomSettings(r, r.hostPlayerId, { maxTurnsPerPlayer: turns }).error);
+      assert.equal(r.maxRounds, null, "в лобби раундов ещё нет");
+      assert.ok(!E.startGame(r, r.hostPlayerId).error);
+      // null — настройка по умолчанию: те же 150 ходов у каждого.
+      assert.equal(r.maxRounds, expected[turns == null ? 150 : turns][i], `${turns} ходов, ${n} игроков`);
+      assert.equal(E.buildStatePayload(r, r.players[0].id).maxRounds, r.maxRounds);
+      rooms.push(r);
+    });
+  }
+  // Событие раз в 3 хода: 150 ходов × 4 игрока / 3 = 200 раундов.
+  const r3 = lobby(names.slice(0, 4));
+  assert.ok(!E.updateRoomSettings(r3, r3.hostPlayerId, { eventIntervalTurns: 3 }).error);
+  assert.ok(!E.startGame(r3, r3.hostPlayerId).error);
+  assert.equal(r3.maxRounds, 200);
+  // 0 — без лимита.
+  const r0 = lobby(names.slice(0, 4));
+  assert.ok(!E.updateRoomSettings(r0, r0.hostPlayerId, { maxTurnsPerPlayer: 0 }).error);
+  assert.ok(!E.startGame(r0, r0.hostPlayerId).error);
+  assert.equal(r0.maxRounds, null);
+  // Не в сети к старту — в партию не попадает и в раундах не считается: трое → ⌈150 × 3 / 4⌉.
+  const off = lobby(names.slice(0, 4));
+  off.players[3].connected = false;
+  assert.ok(!E.startGame(off, off.hostPlayerId).error);
+  assert.equal(off.players.length, 3);
+  assert.equal(off.maxRounds, 113);
+  return rooms.concat([r3, r0, off]);
+});
+
+test("длительность: лимит в ходах — у каждого ровно столько своих ходов, потом побеждает самый богатый", () => {
+  const r = lobby(["A", "B"]);
+  assert.ok(!E.updateRoomSettings(r, r.hostPlayerId, { maxTurnsPerPlayer: 2 }).error);
+  assert.ok(!E.startGame(r, r.hostPlayerId).error);
+  assert.equal(r.maxRounds, 1); // 2 хода × 2 игрока / 4 хода в раунде
+  const made = {};
+  for (let i = 0; i < 4 && r.phase === "roll"; i++) {
+    const name = playTurn(r);
+    made[name] = (made[name] || 0) + 1;
+  }
+  assert.equal(r.phase, "ended", "партия не закончилась по лимиту");
+  assert.ok(made.A === 2 && made.B === 2, JSON.stringify(made));
+  // Числа в ленте — с согласованным словом: «2 хода», «1 раунд» (а не «2 ходов, 1 раундов»).
+  assert.ok(r.log.some((e) => /Лимит партии \(2 хода у каждого, 1 раунд\)/.test(e.text)), "в ленте нет лимита в ходах");
+  // Раунды из длительности в ходах бывают любыми: 70 ходов × 3 игрока / 4 = 53 раунда.
+  const r3 = lobby(["A", "B", "C"]);
+  assert.ok(!E.updateRoomSettings(r3, r3.hostPlayerId, { maxTurnsPerPlayer: 70 }).error);
+  assert.ok(!E.startGame(r3, r3.hostPlayerId).error);
+  assert.equal(r3.maxRounds, 53);
+  r3.roundNumber = 54;
+  E.checkEndGame(r3);
+  assert.equal(r3.phase, "ended");
+  assert.ok(r3.log.some((e) => /Лимит партии \(70 ходов у каждого, 53 раунда\)/.test(e.text)), "в ленте «53 раундов»");
+  return [r, r3];
+});
+
+test("длительность: старый клиент (setMaxRounds) и комнаты из rooms.json живут по maxRounds", () => {
+  const names = ["A", "B", "C", "D"];
+  // Старый клиент задаёт лимит в раундах — он и действует при любом числе игроков.
+  const a = lobby(names);
+  assert.ok(!E.setMaxRounds(a, a.hostPlayerId, 30).error);
+  assert.ok(!("maxTurnsPerPlayer" in a.settings), "длительность в ходах осталась");
+  assert.equal(E.buildStatePayload(a, a.players[0].id).settings.maxTurnsPerPlayer, null);
+  assert.ok(!E.startGame(a, a.hostPlayerId).error);
+  assert.equal(a.maxRounds, 30);
+  const b = lobby(names);
+  assert.ok(!E.setMaxRounds(b, b.hostPlayerId, 0).error);
+  assert.ok(!E.startGame(b, b.hostPlayerId).error);
+  assert.equal(b.maxRounds, null);
+  // Комната из rooms.json (до этой версии): в настройках нет ключа, лимит — 50 раундов.
+  const old = lobby(names);
+  delete old.settings.maxTurnsPerPlayer;
+  old.maxRounds = 50;
+  const restored = JSON.parse(JSON.stringify(old));
+  assert.ok(!E.startGame(restored, restored.hostPlayerId).error);
+  assert.equal(restored.maxRounds, 50);
+  // Новый клиент в такой комнате выбирает длительность в ходах — прежний лимит снимается.
+  const c = lobby(names);
+  delete c.settings.maxTurnsPerPlayer;
+  c.maxRounds = 30;
+  assert.ok(!E.updateRoomSettings(c, c.hostPlayerId, { maxTurnsPerPlayer: 70 }).error);
+  assert.equal(c.maxRounds, null);
+  assert.ok(c.log.some((e) => /70 ходов у каждого/.test(e.text)), "в ленте нет новой длительности");
+  assert.ok(!E.startGame(c, c.hostPlayerId).error);
+  assert.equal(c.maxRounds, 70);
+  // Пределы: 0…1000, нечисловое и null — без изменений; не хост и не в лобби — отказ.
+  const d = lobby(names);
+  assert.ok(!E.updateRoomSettings(d, d.hostPlayerId, { maxTurnsPerPlayer: 5000 }).error);
+  assert.equal(d.settings.maxTurnsPerPlayer, 1000);
+  assert.ok(!E.updateRoomSettings(d, d.hostPlayerId, { maxTurnsPerPlayer: -3 }).error);
+  assert.equal(d.settings.maxTurnsPerPlayer, 0);
+  assert.ok(!E.updateRoomSettings(d, d.hostPlayerId, { maxTurnsPerPlayer: "abc", startingCash: 50000 }).error);
+  assert.equal(d.settings.maxTurnsPerPlayer, 0);
+  assert.ok(!E.updateRoomSettings(d, d.hostPlayerId, { maxTurnsPerPlayer: null }).error);
+  assert.equal(d.settings.maxTurnsPerPlayer, 0);
+  assert.ok(E.updateRoomSettings(d, P(d, "B").id, { maxTurnsPerPlayer: 40 }).error, "не хост изменил длительность");
+  assert.equal(d.settings.maxTurnsPerPlayer, 0);
+  assert.ok(!E.startGame(d, d.hostPlayerId).error);
+  assert.ok(E.updateRoomSettings(d, d.hostPlayerId, { maxTurnsPerPlayer: 40 }).error, "длительность изменена посреди партии");
+  return [a, b, restored, c, d];
+});
+
+test("длительность: реванш пересчитывает раунды по числу игроков, обучение не затронуто", () => {
+  const r = game(["A", "B", "C", "D"]);
+  assert.equal(r.maxRounds, 150);
+  r.settings.eventIntervalTurns = 4; // game() отодвигает события — реванш перенял бы и это
+  P(r, "D").kicked = true; // исключённый в реванш не переходит — остаются трое
+  const fresh = E.newGameKeepPlayers(r);
+  assert.equal(fresh.phase, "roll");
+  assert.equal(fresh.players.length, 3);
+  assert.equal(fresh.settings.maxTurnsPerPlayer, 150);
+  assert.equal(fresh.maxRounds, 113);
+  // Реванш старой комнаты (лимит в раундах) сохраняет её лимит.
+  const old = game(["A", "B"]);
+  delete old.settings.maxTurnsPerPlayer;
+  old.maxRounds = 30;
+  assert.equal(E.newGameKeepPlayers(old).maxRounds, 30);
+  // Реванш, где в сети остался один, — лобби: раунды посчитает startGame.
+  const solo = game(["A", "B"]);
+  P(solo, "B").connected = false;
+  const lob = E.newGameKeepPlayers(solo);
+  assert.equal(lob.phase, "lobby");
+  assert.equal(lob.maxRounds, null);
+  // Учебная партия (tutorial.js): без лимита, applyGameLength её не трогает.
+  const T = require(path.join(__dirname, "..", "public", "tutorial.js"));
+  const { room } = T.buildRoom(E, "Инвестор");
+  assert.equal(room.maxRounds, null);
+  assert.equal(E.applyGameLength(room), null);
+  assert.equal(room.maxRounds, null);
+  return [fresh, lob, room];
 });
 
 // ---------------------------------------------------------------------

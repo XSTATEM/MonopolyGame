@@ -4,6 +4,10 @@ const path = require("path");
 const { WebSocketServer } = require("ws");
 const engine = require("./public/engine.js");
 const users = require("./users.js");
+// Магазин и видео с наградой. Без настроек в окружении всё выключено:
+// каталог отвечает {enabled:false}, остальные маршруты — 404.
+const Payments = require("./payments.js");
+const Ads = require("./ads.js");
 
 // Настройки из окружения. На своём сервере они лежат в /etc/birzha.env
 // (см. deploy/README.md); без них сервер работает как раньше — на всех
@@ -123,8 +127,19 @@ const AUTH_MAX_FAILS = 20;
 const TOO_MANY_FAILS = "Слишком много неудачных попыток входа. Подождите 10 минут.";
 const authFails = new Map(); // ip -> {count, resetAt}
 
+// Заголовки прокси принимаем, только если соединение пришло от него самого —
+// с локального или внутреннего адреса (nginx на этой машине, Docker, балансировщик
+// хостинга). Если порт по ошибке открыт наружу при TRUST_PROXY=1, клиент не
+// подставит себе X-Real-IP и не обойдёт лимиты и проверку адресов ЮKassa.
+function isLocalPeer(addr) {
+  let a = String(addr || "").toLowerCase();
+  if (a.startsWith("::ffff:")) a = a.slice(7);
+  if (a === "::1" || /^127\./.test(a) || /^10\./.test(a) || /^192\.168\./.test(a)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(a) || /^169\.254\./.test(a) || /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a)) return true;
+  return /^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a);
+}
 function clientIp(req) {
-  if (TRUST_PROXY) {
+  if (TRUST_PROXY && isLocalPeer(req.socket && req.socket.remoteAddress)) {
     const real = String(req.headers["x-real-ip"] || "").trim();
     if (real) return real;
     // nginx дописывает адрес клиента В КОНЕЦ X-Forwarded-For; начало списка
@@ -174,6 +189,12 @@ const regLimit = ipLimiter(60 * 60 * 1000, 10);
 const TOO_MANY_REGS = "Слишком много регистраций с вашего адреса — попробуйте через час.";
 // Новые комнаты: иначе один скрипт с десятком сокетов занимал все MAX_ROOMS.
 const roomLimit = ipLimiter(10 * 60 * 1000, 20);
+// Магазин и реклама: заказы, проверка покупок, билеты на видео. Каждый такой
+// запрос может уйти к провайдеру — ограничиваем поток с одного IP.
+const shopLimit = ipLimiter(10 * 60 * 1000, 120);
+// Вебхук ЮKassa — без входа, и каждое уведомление проверяется запросом к API
+// ЮKassa с ключом магазина. Настоящих уведомлений единицы — поток выдуманных режем.
+const hookLimit = ipLimiter(10 * 60 * 1000, 300);
 
 // Вход в комнату теперь требует аккаунт: ник — это логин, доступ к нему
 // закрыт паролем (scrypt-хэш в users.js), чтобы прогресс/очки нельзя было
@@ -251,7 +272,8 @@ function handleJoin(ws, msg) {
     }
   }
 
-  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.points, profile.equippedBoardSkin);
+  // За столом показывается рейтинг (только победы), а не баланс очков.
+  const result = engine.addPlayer(room, profile.username, profile.gender, profile.avatar, profile.rating, profile.equippedBoardSkin);
   if (result.error) { dropIfEmpty(room); return sendTo(ws, { type: "error", message: result.error }); }
   // Фото профиля — ссылкой на /api/avatar, а не самой картинкой (см. users.photoUrl).
   result.player.avatarPhoto = users.photoUrl(profile);
@@ -525,6 +547,9 @@ function sweepRooms() {
   for (const [ip, rec] of authFails) if (now > rec.resetAt) authFails.delete(ip);
   regLimit.sweep(now);
   roomLimit.sweep(now);
+  shopLimit.sweep(now);
+  hookLimit.sweep(now);
+  Ads.sweep(now);
 }
 
 // ---------------------------------------------------------------------
@@ -550,7 +575,8 @@ function applyCors(req, res) {
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Authorization — GET-маршруты магазина (токен сессии в заголовке, не в адресе).
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
@@ -579,7 +605,8 @@ function sendJson(res, status, obj, headers) {
 // браузер мог бы отправить токен сессии по открытому http.
 function isHttps(req) {
   if (req.socket && req.socket.encrypted) return true;
-  return TRUST_PROXY && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+  return TRUST_PROXY && isLocalPeer(req.socket && req.socket.remoteAddress)
+    && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
 }
 // При успешном логине/регистрации сервер, помимо токена в теле ответа,
 // проставляет и обычную куку — так браузер сам пришлёт её при следующем
@@ -606,6 +633,33 @@ function handleApiPost(req, res, fn, opts) {
     .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
 }
 const AUTH = { auth: true };
+
+// Как handleApiPost, но fn может вернуть промис: платёжным маршрутам нужны
+// запросы к провайдерам. Исключение внутри fn — это ошибка сервера (500 и лог),
+// а не «ошибка действия»: ожидаемые отказы fn возвращает как {error, code}
+// (httpStatus — код ответа, если не 400). opts.limiter — лимит запросов с IP.
+function handleApiPostAsync(req, res, fn, opts) {
+  const ip = clientIp(req);
+  const guarded = !!(opts && opts.auth);
+  if (guarded && authBlocked(ip)) return sendJson(res, 429, { error: TOO_MANY_FAILS });
+  if (opts && opts.limiter) {
+    if (opts.limiter.blocked(ip)) return sendJson(res, 429, { error: "Слишком много запросов — подождите немного.", code: "rate_limited" });
+    opts.limiter.note(ip);
+  }
+  readJsonBody(req, 64 * 1024)
+    .then((body) => Promise.resolve().then(() => fn(body || {}, ip)).then((result) => {
+      result = result || {};
+      if (guarded && result.authFailed) noteAuthFail(ip);
+      delete result.authFailed;
+      const status = result.httpStatus || (result.error ? 400 : 200);
+      delete result.httpStatus;
+      sendJson(res, status, result, { "Cache-Control": "no-store" });
+    }, (e) => {
+      console.error("shop:", e && e.message);
+      sendJson(res, 500, { error: "Внутренняя ошибка сервера." });
+    }))
+    .catch((e) => sendJson(res, 400, { error: e.message || "Ошибка запроса." }));
+}
 
 const server = http.createServer((req, res) => {
   let reqPath;
@@ -696,6 +750,24 @@ const server = http.createServer((req, res) => {
   if (reqPath === "/api/skins/equip" && req.method === "POST") {
     return handleApiPost(req, res, (b) => users.equipSkin(b.username, b.password, b.skinId, b.kind, b.token), AUTH);
   }
+
+  // Магазин и реклама (payments.js, ads.js). Без настроек в окружении
+  // маршруты отвечают «выключено», а каталог — {enabled:false}.
+  const SHOP = { auth: true, limiter: shopLimit };
+  if (reqPath === "/api/shop/catalog" && req.method === "GET") return Payments.handleCatalog(req, res);
+  if (reqPath === "/api/shop/order" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Payments.createOrder(b), SHOP);
+  if (reqPath.startsWith("/api/shop/order/") && req.method === "GET") return Payments.handleOrderStatus(req, res, reqPath.slice("/api/shop/order/".length));
+  if (reqPath === "/api/shop/yookassa/webhook" && req.method === "POST") {
+    const ip = clientIp(req);
+    if (hookLimit.blocked(ip)) return sendJson(res, 429, { error: "Слишком много запросов." }, { "Cache-Control": "no-store" });
+    hookLimit.note(ip);
+    return Payments.handleYookassaWebhook(req, res, ip);
+  }
+  if (reqPath === "/api/shop/verify" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Payments.verify(b), SHOP);
+  if (reqPath === "/api/shop/entitlements" && req.method === "GET") return Payments.handleEntitlements(req, res);
+  if (reqPath === "/api/ads/start" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Ads.start(b), SHOP);
+  if (reqPath === "/api/ads/reward" && req.method === "POST") return handleApiPostAsync(req, res, (b) => Ads.reward(b), SHOP);
+  if (reqPath === "/api/ads/admob-ssv" && req.method === "GET") return Ads.handleAdmobSsv(req, res);
 
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";
   const filePath = path.join(PUBLIC_DIR, reqPath);
@@ -805,5 +877,9 @@ process.on("uncaughtException", (e) => {
 });
 
 restoreRooms();
+// Магазин: помощники HTTP передаём в модули (без дублей), там же — сверка
+// заказов при старте и фоновые задачи (таймеры с unref).
+Payments.init({ sendJson, readJsonBody });
+Ads.init({ sendJson });
 const onListen = () => { console.log(`Trade Monopoly сервер запущен: http://${HOST || "localhost"}:${PORT}`); };
 if (HOST) server.listen(PORT, HOST, onListen); else server.listen(PORT, onListen);

@@ -94,6 +94,10 @@
 body.theme-emerald{ --stage-c1:#1E4536; --stage-c2:#0F2219; --stage-c3:#08130E; --stage-accent:#4FE3A8; --frame:#2B4A3B; }
 body.theme-midnight{ --stage-c1:#283063; --stage-c2:#141733; --stage-c3:#0A0B1C; --stage-accent:#8FA8FF; --frame:#2E3566; }
 body.theme-royal{ --stage-c1:#5A2338; --stage-c2:#2B0F1B; --stage-c3:#170810; --stage-accent:#E3B34F; --frame:#5E2A3B; }
+/* Премиум («Золото биржи», «Неон») и набор «Уолл-стрит» — см. skins.js. */
+body.theme-gold{ --stage-c1:#5C4A1E; --stage-c2:#2B200B; --stage-c3:#171006; --stage-accent:#F2C94C; --frame:#5E4A1F; }
+body.theme-neon{ --stage-c1:#1B2A4A; --stage-c2:#0C1222; --stage-c3:#05080F; --stage-accent:#39E6FF; --frame:#24335A; }
+body.theme-wallstreet{ --stage-c1:#1F3B2C; --stage-c2:#0F1E16; --stage-c3:#08110C; --stage-accent:#C9A45C; --frame:#2A4A38; }
 
 /* ---------------------------------------------------------------------
    База
@@ -206,12 +210,21 @@ button.chip{min-height:36px;}
 .delta.flat{color:var(--text-2);background:var(--line);}
 .eyebrow{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);}
 
-/* Логотип компании: токен цвета сектора с аббревиатурой (одинаково на поле и в списках). */
+/* Логотип компании: токен цвета сектора (одинаково на поле и в списках). С картинкой
+   (.has-img) на нём светлая плашка с логотипом, по краю видна рамка цвета сектора;
+   без картинки (файла нет, не загрузился) — аббревиатура. */
 .co-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--r-xs);flex:none;vertical-align:middle;margin-right:8px;
   color:#fff;font-family:var(--font-mono);font-weight:700;font-size:9.5px;letter-spacing:-.02em;background:var(--surface-3);overflow:hidden;box-shadow:inset 0 -2px 0 rgba(0,0,0,.16);}
 .co-logo.sec-tech{background:var(--sec-tech);} .co-logo.sec-media{background:var(--sec-media);} .co-logo.sec-consumer{background:var(--sec-consumer);}
 .co-logo.sec-industrial{background:var(--sec-industrial);} .co-logo.sec-finance{background:var(--sec-finance);} .co-logo.sec-re{background:var(--sec-re);}
 .cell-logo-name{display:inline-flex;align-items:center;}
+.has-img > .co-abbr{display:none;}
+/* Размеры в % от токена/клетки — картинка не сдвигает раскладку ни до, ни после
+   загрузки. Не позиционирована: заливки анимаций (::before/::after клетки поля,
+   anim.js) остаются поверх неё. pointer-events:none — клик и долгое нажатие
+   достаются кнопке, а не картинке (без меню «сохранить изображение» на телефоне). */
+.logo-img{display:block;flex:none;box-sizing:border-box;width:84%;height:84%;min-width:0;min-height:0;padding:9%;
+  object-fit:contain;background:#FBF8F1;border-radius:22%;pointer-events:none;-webkit-user-drag:none;-webkit-touch-callout:none;}
 
 /* ---------------------------------------------------------------------
    Экраны меню (светлая тема)
@@ -229,37 +242,173 @@ button.chip{min-height:36px;}
 .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
 .screen-head h1{margin:0;}
 
-.brand{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:22px;}
-.brand-mark{width:64px;height:64px;border-radius:20px;background:linear-gradient(160deg,#FFFFFF,#DCEBE3);box-shadow:0 10px 24px rgba(76,122,107,.25), inset 0 1px 0 #fff;
-  display:flex;align-items:flex-end;justify-content:center;gap:5px;padding:0 0 15px;}
-.brand-mark i{display:block;width:7px;border-radius:4px;background:#4C7A6B;}
-.brand-mark i:nth-child(1){height:16px;opacity:.75;} .brand-mark i:nth-child(2){height:28px;} .brand-mark i:nth-child(3){height:12px;opacity:.6;} .brand-mark i:nth-child(4){height:22px;}
-.brand-title{font-size:30px;line-height:1.05;font-weight:800;letter-spacing:-.02em;margin:0;}
-.brand-sub{font-size:14px;color:var(--text-2);margin:2px 0 0;}
+/* ---------------------------------------------------------------------
+   Главное меню (#mainMenu, docs/MONETIZATION-SPEC.md §12). Телефон: одна
+   колонка — шапка (знак, название, чип аккаунта), тёмный «герой» с главным
+   действием и режимами (цвета — от экипированной темы стола), ниже светлые
+   пункты как раньше. Компьютер (≥1024×600): герой слева, остальное справа.
+   --------------------------------------------------------------------- */
+/* Невидимый текст только для чтения с экрана (подпись поля кода комнаты; общая утилита). */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
-.menu-cards{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
-.menu-card{display:flex;align-items:center;gap:14px;width:100%;min-height:76px;padding:16px 18px;border-radius:var(--r-xl);border:none;color:#fff;text-align:left;font-size:16px;font-weight:800;justify-content:flex-start;}
-.menu-card .menu-card-icon{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex:none;}
-.menu-card .menu-card-icon .ico{width:24px;height:24px;}
-.menu-card .menu-card-sub{display:block;font-size:13px;font-weight:600;margin-top:2px;}
-.menu-card .menu-card-go{margin-left:auto;opacity:.85;}
-.menu-card.online{background:#4C7A6B;}
-.menu-card.offline{background:var(--clay);}
-.menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px;}
+.menu-screen{align-items:flex-start;}
+.menu-shell{width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px;}
+.menu-shell > .menu-continue{margin:0;}
+.menu-shell .tutorial-offer > button{min-height:44px;} /* цели нажатия не меньше 44 px */
+
+.menu-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;}
+.brand{display:flex;align-items:center;gap:10px;flex:none;}
+.brand-mark{width:40px;height:40px;border-radius:13px;flex:none;background:linear-gradient(160deg,#FFFFFF,#DCEBE3);box-shadow:0 6px 16px rgba(76,122,107,.25), inset 0 1px 0 #fff;
+  display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:0 0 9px;}
+.brand-mark i{display:block;width:5px;border-radius:3px;background:#4C7A6B;}
+.brand-mark i:nth-child(1){height:10px;opacity:.75;} .brand-mark i:nth-child(2){height:17px;} .brand-mark i:nth-child(3){height:7px;opacity:.6;} .brand-mark i:nth-child(4){height:13px;}
+.brand-title{font-size:20px;line-height:1.1;font-weight:800;letter-spacing:-.02em;margin:0;white-space:nowrap;}
+
+/* Чип аккаунта: гость — «Войти», вошёл — аватар, ник, баланс, корона Премиума. */
+.account-chip{flex:0 1 auto;min-width:0;min-height:44px;padding:7px 14px 7px 7px;gap:8px;border-radius:var(--r-pill);justify-content:flex-start;
+  background:rgba(255,255,255,.78);color:var(--text);border:1px solid rgba(255,255,255,.95);box-shadow:var(--shadow-1);font-size:13px;font-weight:700;}
+.account-chip .acc-dot{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:var(--accent);color:var(--on-accent);font-size:16px;line-height:1;}
+.account-chip.signed-in .acc-dot{background:var(--surface-3);color:var(--text);}
+.account-chip .acc-dot img{width:100%;height:100%;object-fit:cover;}
+.account-chip .acc-name{min-width:0;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.account-chip .acc-points{display:inline-flex;align-items:center;gap:4px;flex:none;padding-left:8px;border-left:1px solid var(--line-strong);
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.account-chip .acc-points .ico{color:var(--warn);}
+.account-chip .acc-crown{flex:none;fill:var(--amber);color:var(--warn);margin-left:-2px;}
+.acc-modal-hint{font-size:13px;margin:10px 0 0;}
+
+/* «Играть»: тёмные токены внутри (.theme-dark), фон — сцена темы стола. */
+.menu-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;margin:0;padding:0 16px 12px;color:var(--text);
+  background:radial-gradient(120% 140% at 10% 0%, var(--stage-c1), var(--stage-c2) 55%, var(--stage-c3));
+  border:1px solid var(--line-strong);border-radius:var(--r-2xl);box-shadow:var(--shadow-1);}
+/* Фоновый график цветом акцента темы стола — за текстом и кнопками (isolation выше). */
+.menu-hero::before{content:"";position:absolute;z-index:-1;top:30px;right:0;width:62%;height:96px;pointer-events:none;opacity:.28;background:var(--stage-accent);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 120' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-opacity='.5'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14V120H0z' fill='url(%23g)'/%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 120' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-opacity='.5'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14V120H0z' fill='url(%23g)'/%3E%3Cpath d='M0 104L28 96 52 100 84 78 112 84 144 60 172 66 204 42 232 50 264 26 292 32 320 14' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat;}
+.menu-ticker{height:30px;margin:0 -16px 14px;display:flex;align-items:center;overflow:hidden;background:rgba(0,0,0,.2);border-bottom:1px solid var(--line);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);}
+.menu-ticker-track{display:flex;flex:none;width:max-content;animation:menuTicker 40s linear infinite;}
+.menu-ticker.paused .menu-ticker-track{animation-play-state:paused;}
+.menu-tick{flex:none;padding-right:22px;font-family:var(--font-mono);font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.menu-tick b{color:var(--text-2);font-weight:700;}
+@keyframes menuTicker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+/* Без анимаций — неподвижная лента (общее правило оставило бы один проезд). */
+body.reduce-motion .menu-ticker-track{animation:none !important;}
+@media (prefers-reduced-motion:reduce){ .menu-ticker-track{animation:none !important;} }
+.menu-hero .menu-hero-title{font-size:24px;line-height:1.15;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--text);margin:0;}
+.menu-hero-sub{font-size:13.5px;line-height:1.4;color:var(--text);opacity:.82;margin:4px 0 14px;}
+
+.menu-quick{width:100%;min-height:64px;padding:10px 14px 10px 10px;gap:12px;justify-content:flex-start;text-align:left;border-radius:var(--r-xl);
+  background:var(--primary);color:var(--on-primary);box-shadow:0 8px 22px rgba(224,177,104,.22);}
+.menu-quick-icon{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(26,20,15,.14);}
+.menu-quick-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.menu-quick-text b{font-size:17px;font-weight:800;}
+.menu-quick-text span{font-size:13px;font-weight:600;opacity:.8;}
+/* Есть сохранённая партия: главная — «Продолжить», «Играть с ботами» — вторая. */
+/* Карточки в герое чуть прозрачные — сквозь них проступает цвет темы стола.
+   rgba — запасной фон для WebView старше Chrome 111 без color-mix(): иначе там
+   остался бы янтарный фон кнопки по умолчанию под светлым текстом. */
+.menu-quick.is-secondary{background:rgba(46,37,30,.8);background:color-mix(in srgb, var(--surface-2) 80%, transparent);color:var(--text);border-color:var(--line-strong);box-shadow:none;}
+.menu-quick.is-secondary .menu-quick-icon{background:var(--primary);color:var(--on-primary);}
+
+.menu-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;}
+.menu-mode{min-height:0;padding:12px;gap:2px;flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:left;border-radius:var(--r-lg);
+  background:rgba(46,37,30,.8);background:color-mix(in srgb, var(--surface-2) 80%, transparent);color:var(--text);border-color:var(--line);font-size:15px;}
+.menu-mode-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.menu-mode.online .menu-mode-icon{background:var(--accent);color:var(--on-accent);}
+.menu-mode.offline .menu-mode-icon{background:var(--clay);color:var(--on-clay);}
+.menu-mode b{font-weight:800;}
+.menu-mode-sub{font-size:12.5px;font-weight:600;color:var(--text-2);}
+@media (max-width:359px){ .menu-modes{grid-template-columns:minmax(0,1fr);} }
+
+.menu-code-toggle{align-self:center;min-height:44px;margin-top:2px;padding:8px 12px;background:transparent;border:none;color:var(--accent);font-size:13.5px;
+  text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;}
+.menu-code-toggle[aria-expanded="true"]{color:var(--text-2);}
+.menu-code-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;margin-bottom:4px;}
+.menu-code-row input{width:100%;text-transform:uppercase;font-family:var(--font-mono);letter-spacing:.06em;}
+.menu-code-row input::placeholder{text-transform:none;font-family:var(--font-ui);letter-spacing:0;}
+.menu-code-row .err{grid-column:1 / -1;margin:0;min-height:0;}
+
+/* Светлые пункты: «Магазин», «Обучение» (как карточка «Продолжить»). */
+.menu-row{width:100%;min-height:64px;padding:10px 16px 10px 12px;gap:14px;justify-content:flex-start;text-align:left;border-radius:var(--r-xl);
+  background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);}
+.menu-row-icon{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--on-accent);}
+.menu-row.shop .menu-row-icon{background:var(--amber);color:var(--on-amber);}
+.menu-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.menu-row-text b{font-size:15px;font-weight:800;}
+.menu-row-text span{font-size:13px;font-weight:600;color:var(--text-2);}
+.menu-row > .ico{color:var(--text-3);}
+.menu-row .chip{flex:none;min-height:32px;padding:4px 12px;color:var(--text);font-variant-numeric:tabular-nums;}
+
+/* «Продолжить партию» — главная кнопка меню, пока есть сохранение. */
+.menu-continue.is-primary{background:var(--amber);color:var(--on-amber);border-color:transparent;box-shadow:0 10px 24px rgba(168,120,40,.25);}
+.menu-continue.is-primary .menu-continue-icon{background:rgba(26,20,15,.14);color:var(--on-amber);}
+.menu-continue.is-primary .menu-continue-text span{color:rgba(26,20,15,.78);}
+
+.menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
 .menu-tile{background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-lg);min-height:76px;padding:12px 4px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;}
 .menu-tile .ico{width:22px;height:22px;color:var(--accent);}
 .menu-tile span{white-space:nowrap;}
-@media (max-width:380px){ .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
-.menu-links{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:18px;font-size:13px;}
-.menu-links a{color:var(--text-2);display:inline-flex;align-items:center;gap:6px;text-decoration:none;min-height:36px;}
+/* На телефонах 340–400 px четыре плитки остаются в один ряд (чуть ниже и мельче):
+   иначе «Настройки» и «Правила» уходили за нижний край экрана 360×640. */
+@media (max-width:399px){ .menu-tile{min-height:64px;padding:10px 2px;gap:4px;font-size:12px;} }
+@media (max-width:339px){ .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+.menu-links{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px;}
+.menu-links a{color:var(--text-2);display:inline-flex;align-items:center;gap:6px;text-decoration:none;min-height:44px;}
 .menu-links a:hover{color:var(--text);}
 
-.account-corner-btn{position:fixed;top:calc(12px + var(--safe-t));right:calc(12px + var(--safe-r));z-index:40;min-height:40px;
-  background:rgba(255,255,255,.75);color:var(--text);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-pill);
-  padding:6px 14px 6px 6px;font-size:13px;font-weight:700;display:none;align-items:center;gap:8px;box-shadow:var(--shadow-1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-.account-corner-btn.show{display:inline-flex;}
-.account-corner-btn .acc-dot{width:28px;height:28px;border-radius:14px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;}
+/* Наведение на компьютере: лёгкий подъём; нажатие — общее scale(.98). */
+.menu-quick, .menu-mode, .menu-row, .menu-tile, .menu-shell > .menu-continue{transition:filter .15s, transform .15s, box-shadow .15s, background-color .15s;}
+@media (hover:hover){
+  .menu-row:hover:not(:active), .menu-tile:hover:not(:active), .menu-shell > .menu-continue:hover:not(:active){transform:translateY(-1px);box-shadow:0 10px 26px rgba(36,31,26,.12);}
+  .menu-mode:hover:not(:active){transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.35);}
+  .menu-quick:hover:not(:active){transform:translateY(-1px);box-shadow:0 12px 28px rgba(224,177,104,.32);}
+  .menu-quick.is-secondary:hover:not(:active){box-shadow:0 10px 24px rgba(0,0,0,.35);}
+}
+
+/* Первый показ меню за сессию: пункты проявляются по очереди (не больше 8 шагов). */
+.menu-shell.menu-enter > *{animation:menuEnter .22s ease-out both;}
+.menu-shell.menu-enter > :nth-child(2){animation-delay:30ms;} .menu-shell.menu-enter > :nth-child(3){animation-delay:60ms;}
+.menu-shell.menu-enter > :nth-child(4){animation-delay:90ms;} .menu-shell.menu-enter > :nth-child(5){animation-delay:120ms;}
+.menu-shell.menu-enter > :nth-child(6){animation-delay:150ms;} .menu-shell.menu-enter > :nth-child(7){animation-delay:180ms;}
+.menu-shell.menu-enter > :nth-child(n+8){animation-delay:210ms;}
+@keyframes menuEnter{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
+@media (prefers-reduced-motion:reduce){ .menu-shell.menu-enter > *{animation:none !important;} }
+
+/* Узкий телефон: название в две строки, ник в чипе короче; совсем узкий — без ника. */
+@media (max-width:479px){
+  .brand-title{width:min-content;white-space:normal;font-size:17px;line-height:1.05;}
+  .account-chip .acc-name{max-width:9ch;}
+}
+@media (max-width:359px){
+  .account-chip.signed-in .acc-name{display:none;}
+}
+/* Планшет: колонка шире и по центру экрана. */
+@media (min-width:640px){
+  .menu-screen{align-items:center;}
+  .menu-shell{max-width:520px;}
+}
+/* Компьютер: две колонки — герой слева на всю высоту правой колонки, пункты
+   справа. Последняя строка 1fr забирает лишнюю высоту героя, поэтому пункты
+   справа не растягиваются и не расходятся; скрытые (hidden) места не занимают. */
+@media (min-width:1024px) and (min-height:600px){
+  .menu-shell{max-width:920px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);grid-template-rows:auto repeat(6,auto) 1fr;
+    column-gap:20px;row-gap:0;align-content:start;}
+  .menu-top{grid-column:1 / -1;margin-bottom:16px;}
+  .menu-hero{grid-column:1;grid-row:2 / span 7;padding:0 24px 20px;}
+  .menu-hero::before{top:40px;bottom:300px;width:72%;height:auto;min-height:110px;} /* график — над кнопками «Играть» */
+  .menu-shell > :not(.menu-top):not(.menu-hero){grid-column:2;margin:0 0 12px;}
+  .menu-ticker{height:34px;margin:0 -24px 22px;}
+  .menu-tick{font-size:12.5px;}
+  .menu-hero .menu-hero-title{font-size:30px;}
+  .menu-hero-sub{font-size:14.5px;margin-bottom:auto;padding-bottom:20px;}
+  .menu-quick{min-height:72px;}
+  .menu-mode{padding:16px;}
+  .menu-links{justify-content:flex-start;}
+}
 .account-modal-tabs{display:flex;gap:4px;margin:14px 0 6px;border-radius:var(--r-pill);background:var(--surface-3);padding:4px;}
 .account-modal-tabs button{flex:1;border-radius:var(--r-pill);background:transparent;color:var(--text-2);font-size:14px;min-height:38px;padding:6px 0;}
 .account-modal-tabs button.active{background:var(--surface-2);color:var(--text);box-shadow:var(--shadow-1);}
@@ -307,6 +456,77 @@ button.chip{min-height:36px;}
 .skin-swatch{width:20px;height:20px;border-radius:6px;border:1px solid rgba(0,0,0,.15);}
 .skin-emoji-row{font-size:16px;letter-spacing:2px;}
 .skin-card button{width:100%;min-height:38px;font-size:13px;}
+/* Скины из Премиума и наборов (открываются покупкой в магазине) */
+.skin-card.exclusive{border-color:color-mix(in srgb, var(--amber) 50%, var(--line));}
+.skin-tag{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding:1px 8px;border-radius:var(--r-pill);background:var(--warn-bg);color:var(--warn);
+  font-size:11px;font-weight:800;vertical-align:1px;}
+.skin-tag.premium{padding:2px 6px;}
+.skin-tag.premium .ico{width:13px;height:13px;vertical-align:0;}
+.skins-balance{margin:0;}
+
+/* Премиум: корона в рейтинге, модалке аккаунта, профиле и магазине — всегда
+   вместе с текстом (видимым или .sr-only), не только цветом. */
+.rating-crown{display:inline-flex;align-items:center;flex:none;color:var(--warn);}
+.rating-name.has-crown{display:flex;align-items:center;gap:5px;min-width:0;}
+.rating-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rating-crown .ico, .shop-premium-chip .ico, .skin-tag.premium .ico{fill:var(--amber);}
+.shop-premium-chip{background:var(--warn-bg);color:var(--warn);border-color:transparent;min-height:28px;padding:3px 10px;font-size:12px;vertical-align:1px;}
+.acc-modal-stats{display:inline-block;margin-top:4px;font-size:13px;font-weight:600;color:var(--text-2);}
+
+/* ---------------------------------------------------------------------
+   Магазин (shop.js): светлая карточка экрана, Премиум — тёмная плашка с
+   градиентом экипированной темы стола (как «герой» главного меню).
+   --------------------------------------------------------------------- */
+.shop-box section{background:transparent;border:none;border-radius:0;padding:0;margin:18px 0 0;box-shadow:none;}
+.shop-box section > h2{margin:0 0 8px;}
+.shop-balance{margin:6px 0 0;}
+.shop-note{font-size:13px;line-height:1.45;padding:10px 12px;border-radius:var(--r-md);background:var(--surface-3);color:var(--text);margin:10px 0;}
+.shop-note.warn{background:var(--warn-bg);color:var(--warn);font-weight:700;}
+.shop-notice{font-size:14px;margin:14px 0 0;}
+.shop-providers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 0;}
+.shop-providers-label{font-size:13px;font-weight:700;color:var(--text-2);margin-right:2px;}
+.shop-providers .chip{min-height:44px;} /* кнопки оплаты — не меньше 44 px */
+.shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+@media (max-width:460px){ .shop-grid{grid-template-columns:1fr;} }
+.shop-card{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px;display:flex;flex-direction:column;gap:6px;
+  transition:border-color .2s, box-shadow .2s;}
+.shop-card-title{display:flex;align-items:center;gap:6px;font-weight:800;font-size:15px;}
+.shop-card-title .ico{color:var(--warn);}
+.shop-card-sub{flex:1;font-size:12.5px;line-height:1.35;color:var(--text-2);}
+.shop-card-preview{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.shop-card-preview .skin-preview{display:flex;gap:4px;}
+.shop-card button{width:100%;min-height:44px;font-size:13px;margin-top:2px;}
+#skinsTopUpBtn{min-height:44px;} /* «Пополнить» ведёт к оплате — полноразмерная цель нажатия */
+.shop-card.owned{opacity:.8;}
+/* Подсветка товара, к которому привели («Премиум» на скине, «Пополнить») */
+.shop-focus{border-color:var(--amber) !important;box-shadow:0 0 0 3px color-mix(in srgb, var(--amber) 35%, transparent) !important;}
+
+.shop-box section.shop-premium{margin-top:14px;padding:16px;border-radius:var(--r-xl);color:var(--text);
+  background:radial-gradient(120% 140% at 10% 0%, var(--stage-c1), var(--stage-c2) 55%, var(--stage-c3));
+  border:1px solid var(--line-strong);box-shadow:var(--shadow-1);transition:border-color .2s, box-shadow .2s;}
+.shop-premium-head{display:flex;align-items:center;gap:12px;}
+.shop-premium-icon{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--amber);color:var(--on-amber);}
+.shop-premium-icon .ico{width:24px;height:24px;}
+.shop-box .shop-premium h2{margin:0;font-size:20px;letter-spacing:-.01em;text-transform:none;color:var(--text);}
+.shop-premium-sub{font-size:13px;font-weight:600;color:var(--text-2);}
+.shop-premium-text{font-size:14px;color:var(--text-2);margin:12px 0 14px;}
+.shop-premium-list{list-style:none;margin:12px 0 14px;padding:0;display:flex;flex-direction:column;gap:7px;}
+.shop-premium-list li{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.4;}
+.shop-premium-list .ico{color:var(--up);margin-top:2px;}
+.shop-premium button{width:100%;min-height:48px;font-size:15px;}
+.shop-premium-active{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:var(--r-md);background:var(--up-bg);color:var(--up);font-weight:800;}
+
+#btnRewardedAd{width:100%;min-height:48px;background:var(--accent);color:var(--on-accent);}
+#shopAdStatus{font-size:13px;margin-top:6px;text-align:center;min-height:1em;}
+.shop-email{margin-top:14px;}
+.shop-status{font-size:13px;margin-top:6px;min-height:1em;}
+.shop-box details.tips{margin-top:12px;}
+.shop-history-row{display:flex;justify-content:space-between;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13.5px;}
+.shop-history-row:last-child{border-bottom:none;}
+.shop-history-row > .muted{text-align:right;}
+.shop-history-row.refunded > span:first-child{text-decoration:line-through;color:var(--text-3);}
+.shop-legal{font-size:12px;line-height:1.5;margin:14px 0 0;}
+.shop-legal a{color:var(--text-2);}
 
 details.tips{border-bottom:1px solid var(--line);}
 details.tips summary{cursor:pointer;font-weight:800;color:var(--text);list-style:none;padding:12px 2px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;}
@@ -447,6 +667,8 @@ main{margin:0;padding:0;}
 .stage-cell.sec-industrial{background:var(--sec-industrial);} .stage-cell.sec-finance{background:var(--sec-finance);}
 .stage-cell.re-cell{background:var(--sec-re);}
 .stage-cell .ico{width:58%;height:58%;max-width:15px;max-height:15px;stroke-width:2.2;}
+/* На поле рамка цвета сектора чуть шире, чем у токена в списках: по ней и читается сектор. */
+.stage-cell .logo-img{width:78%;height:78%;padding:6%;}
 .cell-owner{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:4px;background:var(--owner,#fff);box-shadow:0 0 0 1.5px var(--board);pointer-events:none;}
 .re-stars{position:absolute;bottom:1px;left:0;right:0;font-size:7px;line-height:1;text-align:center;color:#FFD76B;letter-spacing:-1px;pointer-events:none;}
 /* Перекрестие броска: строка и столбец подсвечены, остальное приглушено. */
@@ -742,6 +964,29 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
 .end-rank-row:nth-child(3) .end-rank-pos{background:#C08A5B;color:#1A140F;}
 .end-reward-card{margin-bottom:14px;text-align:left;}
 
+/* Читаемый финал партии с лимитом раундов (BALANCE-REPORT.md, В4): состав
+   капитала в итогах, место и отрыв у капитала, места на чипах, метка финала. */
+.end-rank-row{flex-wrap:wrap;}
+.end-rank-parts{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:2px 12px;padding-left:34px;font-size:12px;font-weight:600;color:var(--text-2);font-variant-numeric:tabular-nums;}
+.end-rank-ev{font-weight:700;}
+.end-finish-note{margin:-6px 0 14px;font-size:13px;line-height:1.45;color:var(--text-2);}
+.end-finish-note b{color:var(--text);font-family:var(--font-mono);}
+.cap-standing{display:flex;align-items:center;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;margin-top:8px;padding:7px 12px;border-radius:var(--r-lg);
+  background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--text-2);}
+.cap-standing-place{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.cap-standing-place b{color:var(--text);}
+.cap-standing-gap{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.cap-standing.final{border-color:color-mix(in srgb, var(--warn) 55%, transparent);background:color-mix(in srgb, var(--warn-bg) 60%, var(--surface));}
+.pchip-place{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
+  background:var(--surface-3);color:var(--text-2);font:700 10.5px/1 var(--font-mono);flex:none;}
+.pchip-place.p1{background:#E0B168;color:#1A140F;}
+.pchip-place.p2{background:#C9C2B6;color:#1A140F;}
+.pchip-place.p3{background:#C08A5B;color:#1A140F;}
+.rep-badge.g-final{text-wrap:balance;}
+.event-finale-note{display:flex;align-items:flex-start;gap:8px;margin:10px 0 4px;padding:10px 12px;border-radius:var(--r-md);background:var(--warn-bg);
+  border:1px solid color-mix(in srgb, var(--warn) 45%, transparent);color:var(--text);font-size:13.5px;font-weight:600;line-height:1.4;}
+.event-finale-note .ico{flex:none;margin-top:2px;color:var(--warn);}
+
 /* =====================================================================
    Адаптив
    ===================================================================== */
@@ -952,8 +1197,6 @@ body.overlay-open .game-menu-btn{display:none;}
 }
 /* Настройки партии: поля в одной строке сетки — на одной высоте. */
 .settings-grid > div{display:flex;flex-direction:column;justify-content:flex-end;}
-/* Главное меню: кнопка аккаунта не заходит на карточки. */
-#mainMenu{padding-top:calc(64px + var(--safe-t));}
 .co-name .co-mine{display:inline;font-weight:700;color:var(--stage-accent);}
 /* Десктоп: справа от поля — место под кнопки зума. Поле по центру колонки,
    если места хватает, иначе сдвигается влево ровно на ширину кнопок. */
@@ -1227,6 +1470,14 @@ body.overlay-open .game-menu-btn{display:none;}
 @keyframes tabPop{0%{transform:scale(.8);}60%{transform:scale(1.12);}100%{transform:none;}}
 .anim-fade{animation:rowIn .22s ease-out both;animation-delay:var(--d-anim-fade,0ms);}
 
+/* --- Финал партии с лимитом: метка в шапке вспыхивает при входе в финал -- */
+.rep-badge.g-final.anim-final{animation:finalGlow .7s ease-out 2 both;animation-delay:var(--d-anim-final,0ms);}
+@keyframes finalGlow{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);transform:none;}
+  35%{transform:scale(1.06);}
+  100%{box-shadow:0 0 0 10px transparent;transform:none;}
+}
+
 /* --- Отклик на нажатие ---------------------------------------------------- */
 .dock > button:active{transform:scale(.96);}
 .sheet-actions > button:active{transform:scale(.97);}
@@ -1246,9 +1497,7 @@ body.overlay-open .game-menu-btn{display:none;}
    оказалась бы под сводкой. Нажатия принимают только карточка и плашка —
    у затемнения и колец pointer-events:none.
    ===================================================================== */
-.menu-card.tutorial{background:rgba(255,255,255,.7);color:var(--text);border:1px solid rgba(255,255,255,.9);min-height:64px;padding:12px 18px;}
-.menu-card.tutorial .menu-card-icon{background:var(--accent);color:var(--on-accent);}
-.menu-card.tutorial .menu-card-sub{color:var(--text-2);}
+/* Пункт «Обучение» в меню — .menu-row.tutorial (блок «Главное меню»). */
 .tutorial-offer{cursor:pointer;gap:10px;} /* тап по тексту тоже начинает обучение (tutorial.js) */
 .tutorial-offer .menu-continue-text span{white-space:normal;}
 .tutorial-offer > button{flex:none;}

@@ -11,8 +11,11 @@
 //    исполнения. Не нашли объявление — громкая ошибка, а не тихий прогон;
 //  - перед финальным `return { … }` фабрики вставляется «крючок», который
 //    отдаёт симулятору внутренние (не экспортируемые) функции и константы
-//    движка: стоимости мер, botChoosePct, getForcedPaymentPct и т.п.
-//    Если движок переименует что-то из них, профили откатятся на свои копии формул.
+//    движка: стоимости мер, botBuyPct/botChoosePct, getForcedPaymentPct и т.п.
+//    Если движок переименует что-то из них, профили откатятся на свои копии формул;
+//  - порог, с которым botStep принимает сделку, записан прямо в его теле —
+//    крючок его не достаёт, поэтому множитель читается из исходника
+//    (detectTradeAcceptMult) и отдаётся драйверу как env.tradeAcceptMult.
 // ---------------------------------------------------------------------
 const fs = require("fs");
 const path = require("path");
@@ -148,6 +151,25 @@ function injectHook(src) {
   return { src: src.slice(0, ret.index) + hook + src.slice(ret.index), names: [...names] };
 }
 
+// Множитель порога, с которым engine.botStep принимает адресованную боту сделку:
+// строка `const accept = canPay && got >= paid [* k];` в теле botStep. До пакета
+// А5 было k = 0.9, после — без множителя (k = 1). Вместо числа может стоять
+// константа фабрики — её значение берётся из внутренностей движка (internals).
+// Строки нет, она не одна с разными k или k не число — null: тогда драйвер
+// (runner.js) решает сам по наличию botBuyPct.
+function detectTradeAcceptMult(src, internals) {
+  const re = /^[ \t]*const[ \t]+accept[ \t]*=[ \t]*canPay[ \t]*&&[ \t]*got[ \t]*>=[ \t]*paid(?:[ \t]*\*[ \t]*([A-Za-z_$][\w$]*|\d*\.?\d+))?[ \t]*;/gm;
+  const ks = new Set();
+  for (const m of String(src || "").matchAll(re)) {
+    if (m[1] == null) ks.add(1);
+    else if (/^[\d.]/.test(m[1])) ks.add(Number(m[1]));
+    else ks.add(internals ? internals[m[1]] : undefined);
+  }
+  if (ks.size !== 1) return null;
+  const k = [...ks][0];
+  return typeof k === "number" && Number.isFinite(k) && k > 0 ? k : null;
+}
+
 // Готовит исходник один раз (в главном потоке): потоки-воркеры получают уже
 // подготовленный текст, а не перечитывают файл — иначе правка engine.js
 // посреди прогона дала бы разным потокам разные версии правил.
@@ -169,7 +191,8 @@ const GLOBAL_ALIASES = ["Math", "Date", "Number", "Object", "JSON", "Array", "St
   "Error", "TypeError", "RangeError", "isFinite", "isNaN", "parseInt", "parseFloat", "Intl", "RegExp", "Promise", "console", "module", "__simHook"];
 
 // Исполняет подготовленный исходник в новом vm-контексте.
-// Возвращает { E — экспорт движка, I — внутренности (могут быть пустыми), setRng(fn) }.
+// Возвращает { E — экспорт движка, I — внутренности (могут быть пустыми),
+// tradeAcceptMult — порог сделки ботов движка или null, setRng(fn) }.
 function instantiateEngine(prepared) {
   const box = { rng: Math.random, internals: null, hookError: null };
   const sandbox = {
@@ -190,10 +213,13 @@ function instantiateEngine(prepared) {
   if (!E || typeof E.freshRoom !== "function" || typeof E.botStep !== "function") {
     throw new Error(`${prepared.file}: движок не экспортировал freshRoom/botStep — это точно engine.js?`);
   }
+  const I = box.internals || {};
   return {
     E,
-    I: box.internals || {},
+    I,
     hookError: box.hookError,
+    // Из подготовленного текста: воркеры получают только { file, src }.
+    tradeAcceptMult: detectTradeAcceptMult(prepared.src, I),
     prepared,
     setRng(fn) { box.rng = fn; },
   };
@@ -205,5 +231,5 @@ function loadEngine(opts) {
 
 module.exports = {
   DEFAULT_ENGINE_PATH, makeRng, parseLiteral, applyOverrides, listConstants, injectHook,
-  prepareEngineSource, instantiateEngine, loadEngine,
+  detectTradeAcceptMult, prepareEngineSource, instantiateEngine, loadEngine,
 };

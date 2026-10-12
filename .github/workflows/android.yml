@@ -4,7 +4,12 @@
 # остальных веток) и во вкладке Actions → запуск → Artifacts → trade-monopoly-android.
 # Подписанная релизная сборка включается, если в Settings → Secrets заданы
 # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
-# (см. mobile/README.md).
+# (см. mobile/README.md). Gradle собирает релиз без подписи и без секретов, а подписывают
+# его apksigner/jarsigner отдельным шагом, который не запускает код проекта и плагинов.
+# Сборки для RuStore и Google Play (покупки, реклама) — только ручным запуском с выбором
+# store; они лежат в Artifacts и в Releases не публикуются. Push всегда собирает direct.
+# Адрес онлайн-сервера по умолчанию — Variable TM_SERVER_URL (Settings → Secrets and
+# variables → Actions → Variables), без неё — бесплатный сервер на Render.
 name: Android APK
 
 on:
@@ -23,9 +28,14 @@ on:
   workflow_dispatch:
     inputs:
       server_url:
-        description: "Адрес онлайн-сервера (https://…)"
+        description: "Адрес онлайн-сервера (https://…); пусто — Variable TM_SERVER_URL или сервер на Render"
         required: false
-        default: "https://birzha-multiplayer.onrender.com"
+        default: ""
+      store:
+        description: "Сборка: direct — APK для сайта/Releases, rustore — для RuStore, googleplay — для Google Play"
+        type: choice
+        options: [direct, rustore, googleplay]
+        default: direct
 
 # Токену сборки нужно только чтение кода.
 permissions:
@@ -34,10 +44,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Сборки для магазинов с SDK рекламы и оплаты заметно дольше обычной.
+    timeout-minutes: 45
     # Новый push отменяет незаконченную сборку той же ветки.
     concurrency:
-      group: android-build-${{ github.ref }}
+      group: android-build-${{ github.ref }}-${{ github.event.inputs.store || 'direct' }}
       cancel-in-progress: true
     outputs:
       stable_debug_key: ${{ steps.dbgkey.outputs.stable }}
@@ -45,10 +56,21 @@ jobs:
       run:
         working-directory: mobile
     env:
-      TM_SERVER_URL: ${{ github.event.inputs.server_url || 'https://birzha-multiplayer.onrender.com' }}
+      # Адрес из поля ручного запуска, иначе Variable TM_SERVER_URL, иначе Render.
+      TM_SERVER_URL: ${{ github.event.inputs.server_url || vars.TM_SERVER_URL || 'https://birzha-multiplayer.onrender.com' }}
       # Секреты нельзя проверять в if напрямую. В env задачи — только признак
-      # наличия ключа; сам ключ видит лишь шаг подписи, а не npm-зависимости и gradle.
+      # наличия ключа; сам ключ и пароли видит лишь шаг подписи (apksigner и
+      # jarsigner), а не npm-зависимости, gradle и сборочные скрипты плагинов.
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      # Тип сборки и id рекламы/магазинов (Settings → Secrets and variables →
+      # Actions → Variables). Это не секреты: все id всё равно попадают в APK.
+      # Без них и без ручного выбора store сборка идёт как раньше.
+      TM_STORE: ${{ github.event.inputs.store || 'direct' }}
+      TM_YANDEX_REWARDED_ID: ${{ vars.TM_YANDEX_REWARDED_ID }}
+      TM_ADMOB_APP_ID: ${{ vars.TM_ADMOB_APP_ID }}
+      TM_ADMOB_REWARDED_ID: ${{ vars.TM_ADMOB_REWARDED_ID }}
+      TM_RUSTORE_CONSOLE_APP_ID: ${{ vars.TM_RUSTORE_CONSOLE_APP_ID }}
+      TM_RUSTORE_PAY_SCHEME: ${{ vars.TM_RUSTORE_PAY_SCHEME }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -70,6 +92,34 @@ jobs:
       - name: Установить зависимости
         run: npm ci
 
+      # Правила переменных сборки (scripts/build-flavor.mjs): несколько секунд, без SDK.
+      - name: Проверить правила сборки
+        run: node scripts/build-flavor.test.mjs
+
+      # Магазин (оплата, проверка покупок) настраивается только на своём сервере:
+      # на бесплатном Render его нет, и покупки в такой сборке не заработают.
+      - name: Предупредить о сервере без магазина
+        if: ${{ env.TM_STORE != 'direct' }}
+        run: |
+          case "$TM_SERVER_URL" in
+            *.onrender.com|*.onrender.com/*)
+              echo "::warning::Сборка $TM_STORE ходит на $TM_SERVER_URL — на бесплатном Render магазина нет. Укажите адрес своего сервера в поле запуска или в Variable TM_SERVER_URL (mobile/README.md)." ;;
+          esac
+
+      # RuStore и Google Play принимают только подписанные сборки, причём тем же
+      # ключом, что и прежние версии в консоли, — без ключа сборка бесполезна.
+      - name: Проверить подпись для сборки в магазин
+        if: ${{ env.TM_STORE != 'direct' && env.HAS_KEYSTORE != 'true' }}
+        run: |
+          echo "::error::Для сборки $TM_STORE нужна подпись: задайте секреты ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (см. mobile/README.md)."
+          exit 1
+
+      # Проверяет Variables (формат id, обязательные для rustore/googleplay) и
+      # ставит только нужные плагины; при ошибке останавливает сборку с пояснением.
+      - name: Платежи и реклама в приложении (только если настроены)
+        if: ${{ env.TM_STORE != 'direct' || env.TM_YANDEX_REWARDED_ID != '' }}
+        run: node scripts/enable-native.mjs
+
       - name: Сгенерировать Android-проект, иконки и сплэш
         run: npm run android:init
 
@@ -82,8 +132,10 @@ jobs:
       # Без постоянного ключа gradle на чистой машине создаёт новый debug-ключ,
       # и Android не ставит новую сборку поверх прежней («Приложение не установлено»).
       # Ключ задаётся секретом ANDROID_DEBUG_KEYSTORE_BASE64 (см. mobile/README.md).
+      # Отладочная сборка нужна только direct: в магазины грузят подписанный релиз.
       - name: Постоянный ключ отладочной сборки (если задан)
         id: dbgkey
+        if: ${{ env.TM_STORE == 'direct' }}
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
@@ -97,30 +149,62 @@ jobs:
           fi
 
       - name: Собрать отладочный APK
+        if: ${{ env.TM_STORE == 'direct' }}
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon
 
       # Подписанный релиз — только из master, тегов или ручного запуска,
-      # а не из каждой ветки и не из pull request.
-      - name: Собрать подписанный релиз (если заданы секреты)
+      # а не из каждой ветки и не из pull request. Gradle (а с ним build.gradle
+      # всех плагинов, включая сторонние) собирает его БЕЗ подписи и без секретов
+      # в окружении; подпись — следующим шагом.
+      - name: Собрать релиз без подписи (если заданы секреты)
+        id: release
         if: ${{ env.HAS_KEYSTORE == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
         working-directory: mobile/android
+        run: |
+          ./gradlew assembleRelease bundleRelease --no-daemon
+          echo "built=true" >> "$GITHUB_OUTPUT"
+
+      # Подпись инструментами Android SDK и JDK — код проекта здесь не запускается.
+      # APK: zipalign → apksigner (схемы v1–v3 по minSdk), под прежним именем
+      # app-release.apk; AAB для Play Console — jarsigner (ключ загрузки).
+      - name: Подписать релиз
+        if: ${{ steps.release.outputs.built == 'true' }}
+        working-directory: mobile/android/app/build/outputs
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          ./gradlew assembleRelease bundleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.keystore" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          set -euo pipefail
+          ks="$RUNNER_TEMP/release.keystore"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$ks"
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          bt=$(ls -d "$sdk"/build-tools/*/ 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -z "$bt" ] || [ ! -x "${bt}apksigner" ]; then echo "::error::Не найдены build-tools Android SDK (apksigner) в $sdk"; exit 1; fi
+          unsigned=apk/release/app-release-unsigned.apk
+          if [ ! -f "$unsigned" ]; then echo "::error::Нет $unsigned — gradle не собрал релиз без подписи"; ls -R apk; exit 1; fi
+          "${bt}zipalign" -p -f 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          "${bt}apksigner" sign --ks "$ks" --ks-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD \
+            --out apk/release/app-release.apk "$RUNNER_TEMP/aligned.apk"
+          "${bt}apksigner" verify apk/release/app-release.apk
+          rm -f "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          aab=bundle/release/app-release.aab
+          if [ -f "$aab" ]; then
+            jarsigner -keystore "$ks" -storepass:env KEYSTORE_PASSWORD -keypass:env KEY_PASSWORD "$aab" "$KEY_ALIAS"
+            # Без -strict: самоподписанный ключ загрузки — норма, а -strict счёл бы это ошибкой.
+            verified=$(jarsigner -verify "$aab" 2>&1 || true)
+            case "$verified" in *"jar verified"*) ;; *) echo "::error::AAB не подписан: $verified"; exit 1 ;; esac
+          fi
+          rm -f "$ks"
 
+      # У direct прежнее имя — его скачивает задача release; магазинные сборки —
+      # trade-monopoly-android-rustore / -googleplay (для Google Play нужен .aab).
       - uses: actions/upload-artifact@v4
         with:
-          name: trade-monopoly-android
+          name: trade-monopoly-android${{ env.TM_STORE != 'direct' && format('-{0}', env.TM_STORE) || '' }}
           path: |
             mobile/android/app/build/outputs/apk/**/*.apk
             mobile/android/app/build/outputs/bundle/**/*.aab
@@ -130,10 +214,11 @@ jobs:
   # под постоянным тегом, поэтому адрес файла не меняется от сборки к сборке.
   # Право на запись есть только у этой задачи; она не видит ни секретов, ни
   # зависимостей сборки — только готовый артефакт. Pull request'ы не публикуются,
-  # ручной запуск со своим адресом сервера — тоже (чтобы не подменить общую ссылку).
+  # ручной запуск со своим адресом сервера — тоже (чтобы не подменить общую ссылку),
+  # как и сборки для магазинов (store=rustore/googleplay — только в Artifacts).
   release:
     needs: build
-    if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') && (github.event_name != 'workflow_dispatch' || github.event.inputs.server_url == '' || github.event.inputs.server_url == 'https://birzha-multiplayer.onrender.com') }}
+    if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') && (github.event_name != 'workflow_dispatch' || github.event.inputs.server_url == '' || github.event.inputs.server_url == (vars.TM_SERVER_URL || 'https://birzha-multiplayer.onrender.com')) && (github.event_name != 'workflow_dispatch' || github.event.inputs.store == '' || github.event.inputs.store == 'direct') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Начатую публикацию не отменяем: иначе релиз мог остаться удалённым.

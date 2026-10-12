@@ -7,6 +7,8 @@
 //   что есть), server.js, users.js и сами тесты;
 // - ищет повторно объявленные функции верхнего уровня: поздняя декларация
 //   молча побеждает раннюю, и правка «не той» копии ни на что не влияет;
+// - сверяет логотипы (LOGO_FILES в index.html, logos/logos.json, файлы
+//   logos/) и список офлайн-кеша SHELL в sw.js с файлами в public/;
 // - грузит engine.js в Node и прогоняет несколько партий одних ботов:
 //   ни исключений, ни нечисловых (NaN/Infinity) наличных.
 // ---------------------------------------------------------------------
@@ -73,6 +75,52 @@ for (const p of jsFiles) {
   if (dups.length) fail(`повторно объявленные функции в ${rel(p)}: ${dups.join(", ")}`);
 }
 ok(`повторы функций проверены в ${jsFiles.length} .js`);
+
+// --- логотипы и офлайн-кеш ------------------------------------------------
+// LOGO_FILES в index.html, logos/logos.json, файлы в logos/ и список SHELL в
+// sw.js должны совпадать: лишний файл в SHELL — пустой запрос при установке
+// service worker, забытый — логотип без сети пропадёт (останется аббревиатура).
+try {
+  const swPath = path.join(publicDir, "sw.js");
+  const shellSrc = fs.existsSync(swPath) ? (/const SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(swPath, "utf8")) || [])[1] : null;
+  const shell = shellSrc != null ? [...shellSrc.matchAll(/"([^"]+)"/g)].map((m) => m[1]) : null;
+  if (shell) {
+    const missing = shell.filter((u) => u !== "/" && !fs.existsSync(path.join(publicDir, u)));
+    if (missing.length) fail(`sw.js: в SHELL нет таких файлов: ${missing.join(", ")}`);
+    else ok(`sw.js: все ${shell.length} адресов SHELL есть в public/`);
+  }
+  const html = fs.readFileSync(indexPath, "utf8");
+  const mapSrc = (/const LOGO_FILES = \{([\s\S]*?)\};/.exec(html) || [])[1];
+  const logosDir = path.join(publicDir, "logos");
+  if (mapSrc != null || fs.existsSync(logosDir)) {
+    const inHtml = Object.fromEntries([...(mapSrc || "").matchAll(/([A-Z0-9]+)\s*:\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]));
+    const jsonPath = path.join(logosDir, "logos.json");
+    const inJson = fs.existsSync(jsonPath)
+      ? Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(jsonPath, "utf8"))).map(([t, v]) => [t, v.file]))
+      : {};
+    const onDisk = fs.existsSync(logosDir) ? fs.readdirSync(logosDir).filter((f) => /\.(svg|png)$/i.test(f)).sort() : [];
+    const tickers = require(path.join(publicDir, "engine.js")).COMPANIES.map((c) => c.ticker);
+    const problems = [];
+    const noLogo = tickers.filter((t) => !inHtml[t]);
+    if (noLogo.length) problems.push(`нет в LOGO_FILES: ${noLogo.join(", ")}`);
+    const diffJson = [...new Set([...Object.keys(inHtml), ...Object.keys(inJson)])].filter((t) => inHtml[t] !== inJson[t]);
+    if (diffJson.length) problems.push(`LOGO_FILES и logos.json расходятся: ${diffJson.map((t) => `${t} (${inHtml[t] || "—"} / ${inJson[t] || "—"})`).join(", ")}`);
+    const files = [...new Set(Object.values(inHtml))].sort();
+    const absent = files.filter((f) => !onDisk.includes(f));
+    if (absent.length) problems.push(`нет файлов в public/logos: ${absent.join(", ")}`);
+    const unused = onDisk.filter((f) => !files.includes(f));
+    if (unused.length) problems.push(`файлы logos/ не в LOGO_FILES: ${unused.join(", ")}`);
+    if (shell) {
+      const inShell = shell.filter((u) => u.startsWith("/logos/")).map((u) => u.slice("/logos/".length)).sort();
+      const notCached = files.filter((f) => !inShell.includes(f));
+      const extra = inShell.filter((f) => !files.includes(f));
+      if (notCached.length) problems.push(`нет в SHELL sw.js: ${notCached.join(", ")}`);
+      if (extra.length) problems.push(`лишние в SHELL sw.js: ${extra.join(", ")}`);
+    }
+    if (problems.length) fail("логотипы: " + problems.join("; "));
+    else ok(`логотипы (${files.length}): index.html, logos.json, public/logos и SHELL совпадают`);
+  }
+} catch (e) { fail("проверка логотипов упала: " + e.stack); }
 
 // --- движок: партии одних ботов -------------------------------------------
 try {

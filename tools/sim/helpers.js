@@ -89,8 +89,10 @@ function makeCtx(S, me) {
       return ctx.refuseCost(t) * (1 - skip);
     },
     // «Справедливая» цена выкупа, от которой движок считает завышение (setForcedPrice).
+    // Через forcedFairPrice движка — с его кривой платы (FEE_CURVE_*, --override).
     fairForcedPrice(t, controllerP) {
       const held = ctx.held(t, controllerP || me);
+      if (typeof I.forcedFairPrice === "function") return I.forcedFairPrice(room, t, held);
       return ctx.price(t) * ctx.forcedPct(ctx.tier(t)) * (held / 100);
     },
     excessiveMult() { return Number.isFinite(I.FORCED_PRICE_EXCESSIVE_MULT) ? I.FORCED_PRICE_EXCESSIVE_MULT : 4; },

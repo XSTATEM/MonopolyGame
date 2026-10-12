@@ -4,7 +4,7 @@
 // (при stale-while-revalidate новая страница могла бы встретиться со старым
 // скриптом), а без сети офлайн-партия (хот-сит с ботами) открывается из кеша.
 // /api/* и WebSocket не кешируются.
-const VERSION = "tm-2026-10-11-balance-a";
+const VERSION = "tm-2026-10-12-shop-review";
 const CACHE = `shell-${VERSION}`;
 const SHELL = [
   "/",
@@ -15,6 +15,7 @@ const SHELL = [
   "/native.js",
   "/anim.js",
   "/tutorial.js",
+  "/shop.js",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -25,6 +26,16 @@ const SHELL = [
   "/fonts/manrope-latin-ext-wght-normal.woff2",
   "/fonts/jetbrains-mono-cyrillic-wght-normal.woff2",
   "/fonts/jetbrains-mono-latin-wght-normal.woff2",
+  // Логотипы компаний (logos/, собирает tools/logos/build-logos.mjs) — чтобы
+  // офлайн-партия шла с логотипами. Список должен совпадать с LOGO_FILES в
+  // index.html и файлами в logos/ — это проверяет test/check.js.
+  "/logos/AAPL.svg", "/logos/MSFT.svg", "/logos/GOOGL.svg", "/logos/NVDA.svg",
+  "/logos/IBM.png", "/logos/INTC.svg", "/logos/SONY.svg", "/logos/AMZN.png",
+  "/logos/DIS.png", "/logos/NFLX.svg", "/logos/META.svg", "/logos/YDEX.png",
+  "/logos/VKCO.svg", "/logos/MCD.svg", "/logos/NKE.svg", "/logos/KO.svg", "/logos/WMT.png",
+  "/logos/PEP.svg", "/logos/SBUX.svg", "/logos/RKT.png", "/logos/ADS.svg", "/logos/BA.svg",
+  "/logos/TSLA.svg", "/logos/MMM.svg", "/logos/AFLT.svg", "/logos/F.svg", "/logos/V.svg",
+  "/logos/SBER.svg", "/logos/GAZP.png", "/logos/MGNT.png", "/logos/MTSS.png",
 ];
 
 self.addEventListener("install", (event) => {
