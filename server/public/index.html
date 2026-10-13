@@ -289,23 +289,23 @@
     </details>
     <details class="tips">
       <summary>Клетка компании</summary>
-      <div class="muted rules-p">Можно купить от 1 до 25% компании по текущей цене плюс комиссия банка. Если у компании уже есть держатели, а вы не покупаете, — платите им «плату за отказ». Она растёт быстрее их общей доли: чем больше компании раскуплено, тем дороже отказ. Считается так: цена компании × ставка класса (A — 60%, B — 45%, C — 30%) × доля держателей × (1 + 1,5 × доля держателей). Пример для класса B за столом на четверых:</div>
-      <!-- Числа — engine.js, holdersFeeFactor при K = 1.5, P = 1 и 4 игроках; таблица множителей — (4/n)^3.5, n ≤ 6.5 -->
+      <div class="muted rules-p">Попали на компанию, у которой уже есть держатели, — сразу платите им, это обязательно. Плата растёт быстрее их общей доли: цена компании × ставка класса (A — 60%, B — 45%, C — 30%) × доля держателей × (1 + 1,5 × доля держателей) × ¾. Своя доля защищает: каждый ваш процент в этой компании снижает плату на 10%, с 10% не платите вовсе. Пример для класса B, если своей доли нет:</div>
+      <!-- Числа — engine.js, holdersFeeFactor при K = 1.5, P = 1, LANDING_FEE_MULT = 0.75; в правилах 2 поправки на стол нет (FEE_CURVE_N_EXP_V2 = 0) -->
       <div class="table-scroll" style="margin:0 2px 10px;">
         <table>
-          <thead><tr><th scope="col">У держателей</th><th scope="col">Плата за отказ</th><th scope="col">Без надбавки</th></tr></thead>
+          <thead><tr><th scope="col">У держателей</th><th scope="col">Плата</th><th scope="col">Без надбавки</th></tr></thead>
           <tbody>
-            <tr style="cursor:default;"><td>20%</td><td class="mono">11,7% цены</td><td class="mono">9%</td></tr>
-            <tr style="cursor:default;"><td>50%</td><td class="mono">39,4% цены</td><td class="mono">22,5%</td></tr>
-            <tr style="cursor:default;"><td>80%</td><td class="mono">79,2% цены</td><td class="mono">36%</td></tr>
+            <tr style="cursor:default;"><td>20%</td><td class="mono">8,8% цены</td><td class="mono">6,8%</td></tr>
+            <tr style="cursor:default;"><td>50%</td><td class="mono">29,5% цены</td><td class="mono">16,9%</td></tr>
+            <tr style="cursor:default;"><td>80%</td><td class="mono">59,4% цены</td><td class="mono">27%</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="muted rules-p">За меньшим столом плата выше (вдвоём ×11, втроём ×2,7), за большим — ниже (впятером ×0,46, вшестером ×0,24, от семи игроков ×0,18); считаются только неразорившиеся. Так партия до банкротства занимает около 100 ходов у каждого при любом числе игроков. Точная сумма — на кнопке «Отказаться». Если один игрок владеет больше чем 50% и других держателей нет, сумму выкупа назначает он: справедливая цена считается по той же формуле, больше 6 справедливых назначить нельзя. Не назначил за 45 секунд — отказ можно оплатить ему по тарифу.</div>
+      <div class="muted rules-p">Число игроков на плату не влияет. После платы можно купить от 1 до 25% по текущей цене плюс комиссия банка — или нажать «Не покупать». Если один игрок владеет больше чем 50% и других держателей нет, сумму назначает он (не больше 6 справедливых, со скидкой за вашу долю); купить долю можно после оплаты. Не назначил за 45 секунд — платите ему по тарифу.</div>
     </details>
     <details class="tips">
       <summary>Цены акций</summary>
-      <div class="muted rules-p">Цена компании — стоимость всех 100% её акций. Класс A стартует с $40 000 и колеблется слабо, B — с $20 000, C — с $8 000 и самый волатильный. Покупка поднимает цену (+2% за каждые 10%), продажа банку снижает.</div>
+      <div class="muted rules-p">Цена компании — стоимость всех 100% её акций. Класс A стартует с $40 000 и колеблется слабо, B — с $20 000, C — с $8 000 и самый волатильный. Покупка поднимает цену (+2% за каждые 10%), продажа банку снижает. На каждом биржевом событии компания платит держателям дивиденды — 3% своей цены, по долям.</div>
     </details>
     <details class="tips">
       <summary>Раунды и биржевые события</summary>
@@ -313,7 +313,7 @@
     </details>
     <details class="tips">
       <summary>Продажа и сделки</summary>
-      <div class="muted rules-p">В свой ход, до или после броска, можно продать до 25% пакета банку или предложить игроку сделку: деньги и/или его акции взамен. Всё это — во вкладке «Портфель».</div>
+      <div class="muted rules-p">В свой ход, до или после броска, можно продать до 25% пакета банку или предложить игроку сделку: деньги и/или его акции взамен. Банк при покупке у вас берёт комиссию 15%, у сделки с игроком комиссии нет. Всё это — во вкладке «Портфель». Купить долю можно и вне броска: раз в ход до 3% любой компании с наценкой 50% — в карточке компании. Боты тоже торгуют и предлагают сделки друг другу.</div>
     </details>
     <details class="tips">
       <summary>Недвижимость</summary>
@@ -321,7 +321,7 @@
     </details>
     <details class="tips">
       <summary>Контрольный пакет (больше 50%)</summary>
-      <div class="muted rules-p">Открывает спецдействия во вкладке «Влияние»: PR-кампанию (+10% к цене), вброс негатива о чужой компании (−15%), инсайд (подсмотреть карту новостей), шорт. При доле больше 75% — выкуп миноритариев, при 100% двух компаний одного сектора — слияние.</div>
+      <div class="muted rules-p">Открывает спецдействия во вкладке «Влияние»: PR-кампанию (+10% к цене), вброс негатива о чужой компании (−15%), инсайд (подсмотреть карту новостей), шорт. При доле больше 75% — выкуп миноритариев, при 100% двух компаний одного сектора — слияние. Негатив, инсайд, шпионаж, дискредитация, расследование и личный PR бесплатны, но каждая мера доступна раз в 3 события; PR-кампания компании и шорт — за деньги.</div>
     </details>
     <details class="tips">
       <summary>Шпионаж и репутация</summary>
@@ -447,7 +447,7 @@
         <input type="number" id="offlineEventInterval" value="4" min="1" max="10" style="width:100%;">
       </div>
       <div>
-        <label>Плата за отказ A/B/C, % <button type="button" class="hint-q" data-hint-key="offline-fee" data-hint="Плата за отказ — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку и не купил долю. Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
+        <label>Плата держателям A/B/C, % <button type="button" class="hint-q" data-hint-key="offline-fee" data-hint="Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
         <input type="text" id="offlineForcedPayment" value="60/45/30" placeholder="60/45/30" style="width:100%;">
       </div>
     </div>
@@ -2349,7 +2349,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
   // Ровно три числа: раньше «20/15» дополнялось до [20,15,20], и класс C
   // молча получал 20% вместо 10%.
   if(forcedArr && (forcedArr.length !== 3 || !forcedArr.every(Number.isFinite))){
-    errEl.textContent = "Плата за отказ — три числа через «/», например 60/45/30.";
+    errEl.textContent = "Плата держателям — три числа через «/», например 60/45/30.";
     return;
   }
   if(offlineScenario && scenarioLocked(GameEngine.scenarioById(offlineScenario))){ errEl.textContent = "Этот сценарий нужно купить в магазине."; return; }
@@ -2841,7 +2841,7 @@ function detectNotifications(prev, msg){
   if(nowFP && nowFP.targetId === msg.you && (!prevFP || prevFP.targetId !== msg.you || prevFP.ticker !== nowFP.ticker)){
     // Это штраф бросающему за отказ от покупки, а не выкуп его доли (доли у него нет).
     showToast({ kind:"warn", icon:"crown", title:"Вам назначили принудительную цену выкупа",
-      text:`За отказ от покупки ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}.`,
+      text: msg.rulesV === 2 ? `За попадание на ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}. После оплаты можно купить долю.` : `За отказ от покупки ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}.`,
       onClick: ()=> openTab("turn") });
   }
 
@@ -3127,7 +3127,7 @@ function renderLobby(s){
           <input type="number" id="lobbyEventInterval" value="${stInterval}" min="1" max="10" style="width:100%;">
         </div>
         <div>
-          <label>Плата за отказ A/B/C, % ${hintBtn("lobby-fee", `Плата за отказ — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку и не купил долю. Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ.`)}</label>
+          <label>Плата держателям A/B/C, % ${hintBtn("lobby-fee", `Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ.`)}</label>
           <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="60/45/30" style="width:100%;">
         </div>
       </div>
@@ -3151,7 +3151,7 @@ function renderLobby(s){
       const fpRaw = document.getElementById("lobbyForcedPayment").value.trim();
       const tierForcedPaymentPct = fpRaw === "" ? null : fpRaw.split("/").map(x => x.trim() === "" ? NaN : Number(x.trim()));
       const fpOk = !!tierForcedPaymentPct && tierForcedPaymentPct.length === 3 && tierForcedPaymentPct.every(Number.isFinite);
-      if(tierForcedPaymentPct && !fpOk) flashLobbyError("Плата за отказ — три числа через «/», например 60/45/30.");
+      if(tierForcedPaymentPct && !fpOk) flashLobbyError("Плата держателям — три числа через «/», например 60/45/30.");
       send({type:"updateRoomSettings", settings: {
         startingCash: numOf("lobbyStartingCash"), turnSalary: numOf("lobbyTurnSalary"), eventIntervalTurns: numOf("lobbyEventInterval"),
         tierForcedPaymentPct: fpOk ? tierForcedPaymentPct : undefined,
@@ -4898,7 +4898,7 @@ function forcedPriceWaitingPopupHtml(s){
       ${logoHtml(meta.ticker,48)}
       <div class="sheet-head-main">
         <div class="sheet-title">Назначьте цену выкупа</div>
-        <div class="sheet-sub">${escapeHtml(roller?roller.name:"Игрок")} отказывается от доли в ${escapeHtml(c?c.name:meta.ticker)}</div>
+        <div class="sheet-sub">${escapeHtml(roller?roller.name:"Игрок")} ${meta.rulesV === 2 ? "попал(а) на" : "отказывается от доли в"} ${escapeHtml(c?c.name:meta.ticker)}</div>
       </div>
     </div>
     <div class="sheet-box sheet-note">Справедливая ≈ <b class="mono">${fmt(fair)}</b> · максимум <b class="mono">${fmt(capPrice)}</b>${hintBtn("forced-price", `${meta.feeCurve ? "Справедливая цена растёт быстрее вашей доли: чем больше компании у вас, тем дороже выкуп. " : ""}Цена больше 4 справедливых: репутация −12, и с вероятностью 50% антимонопольная служба изымет часть пакета.`)}</div>

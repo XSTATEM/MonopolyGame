@@ -1811,7 +1811,9 @@ test("правила 2: дивиденды держателям, комисси�
   r.deckData[r.deckOrder[r.deckPos]] = { type: "global", title: "Тихий день", percent: 0 };
   const a0 = A.cash, b0 = B.cash;
   E.marketEvent(r);
-  const expected = r.companies.AAPL.price * 0.2 * 0.05 + r.companies.KO.price * 0.1 * 0.05;
+  const D = E.HOLDER_DIVIDEND_PCT;
+  assert.ok(D > 0, "дивиденды включены");
+  const expected = r.companies.AAPL.price * 0.2 * D + r.companies.KO.price * 0.1 * D;
   assert.ok(Math.abs((A.cash - a0) - expected) < 1, `дивиденды ${A.cash - a0} ≈ ${expected}`);
   assert.equal(B.cash, b0, "без акций — без дивидендов");
   assert.ok(r.log.some((e) => /Дивиденды держателям: A \+/.test(e.text)));

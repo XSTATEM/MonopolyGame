@@ -92,7 +92,9 @@
   //  - Плата держателям обязательна: попали на компанию с чужими держателями —
   //    платите сразу; покупка доли — уже сверх платы. Своя доля в компании
   //    снижает плату на LANDING_FEE_DISCOUNT_PER_PCT за процент (от 10% — 0).
-  //    Контролёр (>50%) по-прежнему сам назначает цену выкупа.
+  //    Контролёр (>50%) по-прежнему сам назначает цену выкупа. Ставка — прежняя
+  //    × LANDING_FEE_MULT и без поправки на число игроков (FEE_CURVE_N_EXP_V2):
+  //    вдвоём прежний ×11 при обязательной плате разорял половину игроков.
   //  - Покупка вне броска: раз в ход до DIRECT_BUY_MAX_PCT с наценкой.
   //  - Дивиденды держателям на каждом событии — HOLDER_DIVIDEND_PCT цены.
   //  - Меры влияния бесплатны, каждая раз в MEASURE_COOLDOWN событий (PR
@@ -102,10 +104,11 @@
   // ---------------------------------------------------------------------
   const RULES_VERSION = 2;
   const LANDING_FEE_DISCOUNT_PER_PCT = 0.10;
-  const LANDING_FEE_MULT = 0.5;
+  const LANDING_FEE_MULT = 0.75;
+  const FEE_CURVE_N_EXP_V2 = 0;
   const DIRECT_BUY_MAX_PCT = 3;
   const DIRECT_BUY_MARKUP = 0.5;
-  const HOLDER_DIVIDEND_PCT = 0.05;
+  const HOLDER_DIVIDEND_PCT = 0.03;
   const MEASURE_COOLDOWN = 3;
   const SELL_BANK_COMMISSION = 0.15;
   const BOT_TRADE_CHANCE = 0.25;
@@ -733,7 +736,11 @@
     const x = pct / 100;
     let f = x;
     if (FEE_CURVE_K && x > 0) f = x * (1 + FEE_CURVE_K * Math.pow(x, FEE_CURVE_P));
-    if (FEE_CURVE_N_EXP) f *= Math.pow(4 / Math.min(FEE_CURVE_N_MAX, Math.max(1, activePlayers(room).length)), FEE_CURVE_N_EXP);
+    // Поправка на стол: за малым столом плата выше. В правилах 2 плата
+    // обязательна, и прежний множитель (вдвоём ×11) разорял за полпартии —
+    // там показатель мягче (FEE_CURVE_N_EXP_V2).
+    const nExp = rulesV2(room) ? FEE_CURVE_N_EXP_V2 : FEE_CURVE_N_EXP;
+    if (nExp) f *= Math.pow(4 / Math.min(FEE_CURVE_N_MAX, Math.max(1, activePlayers(room).length)), nExp);
     return f;
   }
   // «Справедливая» цена выкупа доли контролёра: цена × ставка тира × эффективная
@@ -3702,7 +3709,7 @@
     settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
     addPlayer, setConnected, leaveLobby, newGameKeepPlayers, startGame, updateRoomSettings, setMaxRounds, deleteRoom, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
-    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, directBuyCost, prCampaignCost, rulesV2, measureCooldownLeft,
+    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, directBuyCost, prCampaignCost, rulesV2, measureCooldownLeft, HOLDER_DIVIDEND_PCT,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort, ctrlPublicIPO, ctrlMergeCompanies,
     declareBankruptcy, forceEvent,
     adjustReputation, bankFeePct, loanTerms, takeLoan, repayLoan, processLoans,
