@@ -326,7 +326,16 @@ function handleMessage(ws, raw) {
     case "newGame": return handleNewGame(conn);
     case "startGame": return run(conn, engine.startGame(room, conn.playerId));
     case "setMaxRounds": return run(conn, engine.setMaxRounds(room, conn.playerId, msg.maxRounds));
-    case "updateRoomSettings": return run(conn, engine.updateRoomSettings(room, conn.playerId, msg.settings));
+    case "updateRoomSettings": {
+      // Платный сценарий может выбрать только хост, который его купил. Без
+      // настроенного магазина купить нельзя — тогда все сценарии открыты.
+      const sid = msg.settings && typeof msg.settings === "object" && msg.settings.scenario ? String(msg.settings.scenario) : "";
+      const sc = sid ? engine.scenarioById(sid) : null;
+      if (sc && !sc.free && Payments.shopEnabled() && !users.ownsScenario(conn.accountUsername, sid)) {
+        return sendError(conn, `Сценарий «${sc.title}» не куплен — его можно купить в магазине.`);
+      }
+      return run(conn, engine.updateRoomSettings(room, conn.playerId, msg.settings));
+    }
     case "deleteRoom": return handleDeleteRoom(conn);
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": {

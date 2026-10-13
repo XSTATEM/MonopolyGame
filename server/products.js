@@ -25,6 +25,19 @@ const PRODUCTS = [
   { id: "tm_set_wallstreet", kind: "non-consumable", enabled: true, rub: 149, points: 0,
     unlocks: { avatarPacks: ["wallstreet"], boardSkins: ["wallstreet"] },
     title: "Набор «Уолл-стрит»", subtitle: "Тема стола и 8 аватаров — только в этом наборе" },
+  // Сценарии рынка (engine.js, SCENARIOS). «Пузырь доткомов» бесплатный.
+  { id: "tm_scn_crisis2008", kind: "non-consumable", enabled: true, rub: 149, points: 0,
+    unlocks: { scenarios: ["crisis2008"] },
+    title: "Сценарий «Кризис 2008»", subtitle: "Банкротство инвестбанка и паника на рынках — переживите обвал" },
+  { id: "tm_scn_rumarket", kind: "non-consumable", enabled: true, rub: 149, points: 0,
+    unlocks: { scenarios: ["rumarket"] },
+    title: "Сценарий «Российский рынок»", subtitle: "Ставка ЦБ, дивиденды, девальвация и удары по отдельным компаниям" },
+  { id: "tm_scn_commodity", kind: "non-consumable", enabled: true, rub: 149, points: 0,
+    unlocks: { scenarios: ["commodity"] },
+    title: "Сценарий «Сырьевой суперцикл»", subtitle: "Нефть по $150 и коллапс сырья — поймайте разворот" },
+  { id: "tm_scn_all", kind: "non-consumable", enabled: true, rub: 349, points: 0,
+    unlocks: { scenarios: ["crisis2008", "rumarket", "commodity"] },
+    title: "Все сценарии", subtitle: "Три платных сценария дешевле, чем по отдельности" },
 ];
 
 // Что входит в Премиум — для витрины магазина (порядок = порядок в списке).
@@ -46,7 +59,7 @@ function rubValue(product) { return product.rub.toFixed(2); }
 function rubText(product) { return product.rub + " ₽"; }
 function unlocksOf(product) {
   const u = product.unlocks || {};
-  return { avatarPacks: (u.avatarPacks || []).slice(), boardSkins: (u.boardSkins || []).slice() };
+  return { avatarPacks: (u.avatarPacks || []).slice(), boardSkins: (u.boardSkins || []).slice(), scenarios: (u.scenarios || []).slice() };
 }
 
 module.exports = { PRODUCTS, PREMIUM_BENEFITS, byId, storeId, byStoreId, rubValue, rubText, unlocksOf };

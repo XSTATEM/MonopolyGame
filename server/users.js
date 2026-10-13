@@ -9,6 +9,7 @@ const path = require("path");
 const crypto = require("crypto");
 const Skins = require("./public/skins.js");
 const Products = require("./products.js");
+const Engine = require("./public/engine.js"); // сценарии рынка (SCENARIOS)
 
 // Каталог данных можно вынести за пределы кода (DATA_DIR в /etc/birzha.env),
 // чтобы аккаунты переживали обновления и переустановку.
@@ -163,6 +164,22 @@ function effectiveOwned(rec, kind) {
 function ownsSkin(rec, kind, id) {
   return effectiveOwned(rec, kind).includes(id);
 }
+// Сценарии рынка (engine.js, SCENARIOS): бесплатные — всем, платные — по
+// покупке (unlocks.scenarios в entitlements). Как и скины наборов, не хранятся
+// отдельно, а вычисляются: возврат снимает их удалением записи entitlements.
+function ownedScenariosRec(rec) {
+  const own = new Set();
+  for (const pid of Object.keys((rec && rec.entitlements) || {})) {
+    const product = Products.byId(pid);
+    if (product) Products.unlocksOf(product).scenarios.forEach((id) => own.add(id));
+  }
+  return Engine.SCENARIOS.filter((sc) => sc.free || own.has(sc.id)).map((sc) => sc.id);
+}
+function ownsScenario(username, id) {
+  const key = usernameKey(username);
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  return !!rec && ownedScenariosRec(rec).includes(id);
+}
 
 // Аватар и фото — проверяем и при выдаче: в users.json могли остаться
 // значения, сохранённые до появления строгих проверок.
@@ -186,6 +203,7 @@ function publicProfile(rec) {
     entitlements: Object.keys(rec.entitlements || {}),
     ownedAvatarPacks: effectiveOwned(rec, "avatarPack"),
     ownedBoardSkins: effectiveOwned(rec, "boardSkin"),
+    ownedScenarios: ownedScenariosRec(rec),
     equippedAvatarPack: rec.equippedAvatarPack || "base",
     equippedBoardSkin: rec.equippedBoardSkin || "default",
   };
@@ -582,6 +600,6 @@ module.exports = {
   register, login, addPoints, publicProfile, getLeaderboard,
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
   createSession, loginWithToken, invalidateSession,
-  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, isPremium,
+  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, isPremium, ownsScenario,
   applyOrder, revokeOrder, claimAdReward, adStatus, adRewardBlock, accountShopInfo,
 };

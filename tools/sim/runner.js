@@ -46,6 +46,7 @@ const LOG_COUNTERS = [
   ["taxPaid", "tax", null],
   ["dividendSkipped", "dividend", "пропущены"],
   ["dividendBlocked", "dividend", "не проводится"],
+  ["scenarioNews", "news", "Сценарий ·"],
   ["passiveRent", "realestate", "пассивную ренту"],
   ["reSetBonus", "realestate", "за комплект"],
   ["reTax", "realestate", "налог на недвижимость"],
@@ -120,6 +121,9 @@ function runGame(env, cfg, gameIndex) {
     if (!res || !res.player) throw new Error("addPlayer: " + (res && res.error));
     return res.player;
   });
+  // Сценарий рынка (--set 'scenario="crisis2008"'): цены, колода и сценарные
+  // новости — как при старте партии; длительность задаёт --max-rounds.
+  if (typeof E.applyScenario === "function") E.applyScenario(room);
   room.maxRounds = cfg.maxRounds > 0 ? cfg.maxRounds : null;
   room.phase = "roll";
   const startCash = (room.settings && room.settings.startingCash) || players[0].cash;

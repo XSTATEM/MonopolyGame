@@ -368,6 +368,153 @@
     return deck;
   }
 
+  // ---------------------------------------------------------------------
+  // Сценарии рынка (settings.scenario). Сценарий накладывается на обычную
+  // партию при старте (applyScenario): стартовые цены и долгосрочные тренды
+  // (start), своя добавка к колоде новостей (deck), уклон тренда отраслей на
+  // отрезке событий (bias: drift за событие к обычному блужданию) и сценарные
+  // новости, которые разыгрываются на заданном событии вдобавок к карте колоды
+  // (script: {event, card} или {event, warn} — слух на событие раньше).
+  // Победа — как обычно: самый богатый к концу лимита (turnsPerPlayer своих
+  // ходов) или последний неразорившийся. free:false — сценарий продаётся
+  // (server/products.js, unlocks.scenarios); без магазина открыты все.
+  // Числа подобраны так, чтобы сценарные события попадали в партию и вдвоём:
+  // 40 своих ходов при 2 игроках — 20 событий.
+  // ---------------------------------------------------------------------
+  const SCENARIOS = [
+    { id: "dotcom", title: "Пузырь доткомов", year: "2000", free: true, turnsPerPlayer: 40,
+      intro: "Интернет-компании дорожают каждый день. Все знают, что пузырь лопнет, — вопрос когда.",
+      goal: "Заработайте на росте и успейте выйти из интернета и технологий до краха.",
+      start: { "Технологии": 1.5, "Интернет и медиа": 1.6 },
+      bias: [
+        { sector: "Технологии", from: 1, to: 5, drift: 0.03 }, { sector: "Интернет и медиа", from: 1, to: 5, drift: 0.04 },
+        { sector: "Технологии", from: 7, to: 12, drift: -0.03 }, { sector: "Интернет и медиа", from: 7, to: 12, drift: -0.04 },
+      ],
+      deck: [
+        { type: "sector", sector: "Интернет и медиа", title: "IPO стартапа на пике ажиотажа", percent: 14 },
+        { type: "sector", sector: "Технологии", title: "Новая интернет-мания", percent: 12 },
+        { type: "sector", sector: "Интернет и медиа", title: "Стартап не нашёл модель дохода", percent: -12 },
+      ],
+      script: [
+        { event: 5, warn: "Аналитики предупреждают: оценки интернет-компаний оторвались от прибыли." },
+        { event: 6, card: { type: "sector", sector: "Интернет и медиа", title: "Лопнул пузырь доткомов", percent: -35 } },
+        { event: 6, card: { type: "sector", sector: "Технологии", title: "Распродажа техакций", percent: -25 } },
+        { event: 9, card: { type: "global", title: "Рецессия после краха", percent: -8 } },
+        { event: 12, card: { type: "sector", sector: "Потребительские товары", title: "Деньги уходят в «старую экономику»", percent: 12 } },
+      ] },
+    { id: "crisis2008", title: "Кризис 2008", year: "2008", free: false, turnsPerPlayer: 40,
+      intro: "Банки на пике прибылей, но ипотечный рынок трещит по швам.",
+      goal: "Переживите обвал — и купите дёшево на дне.",
+      start: { "Финансы и сырьё": 1.3, "Промышленность и транспорт": 1.1 },
+      bias: [
+        { sector: "Финансы и сырьё", from: 3, to: 9, drift: -0.03 },
+        { all: true, from: 10, to: 16, drift: 0.02 },
+      ],
+      deck: [
+        { type: "sector", sector: "Финансы и сырьё", title: "Ипотечные бумаги дешевеют", percent: -10 },
+        { type: "global", title: "Банки сокращают кредиты", percent: -6 },
+      ],
+      script: [
+        { event: 4, warn: "Ипотечные облигации дешевеют, банки сокращают кредиты." },
+        { event: 5, card: { type: "sector", sector: "Финансы и сырьё", title: "Банкротство инвестбанка", percent: -30 } },
+        { event: 6, card: { type: "global", title: "Паника на рынках", percent: -20 } },
+        { event: 9, card: { type: "global", title: "Спасательный пакет правительства", percent: 12 } },
+        { event: 9, card: { type: "sector", sector: "Финансы и сырьё", title: "Банки получили помощь государства", percent: 15 } },
+        { event: 12, card: { type: "global", title: "Ставка у нуля — рынок оживает", percent: 8 } },
+      ] },
+    { id: "rumarket", title: "Российский рынок", year: "2024", free: false, turnsPerPlayer: 40,
+      intro: "Ставка ЦБ, дивиденды и курс рубля — рынок живёт новостями.",
+      goal: "Ловите дивидендные истории и не попадайте под удары по отдельным компаниям.",
+      start: { YDEX: 1.2, SBER: 1.1, GAZP: 0.9 },
+      bias: [],
+      deck: [
+        { type: "company", ticker: "VKCO", title: "VK запустил новый сервис", percent: 15 },
+        { type: "company", ticker: "MTSS", title: "МТС повысила дивиденды", percent: 10 },
+        { type: "company", ticker: "MGNT", title: "Магнит закрывает магазины", percent: -12 },
+        { type: "global", title: "Новый пакет санкций", percent: -8 },
+        { type: "global", title: "Ставка ЦБ снижена", percent: 8 },
+      ],
+      script: [
+        { event: 3, card: { type: "company", ticker: "SBER", title: "Рекордные дивиденды Сбербанка", percent: 20 } },
+        { event: 4, warn: "Инфляция ускоряется — ЦБ готов поднять ставку." },
+        { event: 5, card: { type: "global", title: "Ключевая ставка — 21%", percent: -10 } },
+        { event: 7, card: { type: "sector", sector: "Потребительские товары", title: "Девальвация рубля: импорт дорожает", percent: -12 } },
+        { event: 7, card: { type: "sector", sector: "Финансы и сырьё", title: "Девальвация рубля: экспортёры в плюсе", percent: 12 } },
+        { event: 9, card: { type: "company", ticker: "AFLT", title: "Ограничения на авиаперевозки", percent: -25 } },
+        { event: 11, card: { type: "company", ticker: "YDEX", title: "Редомициляция завершена", percent: 25 } },
+        { event: 13, card: { type: "company", ticker: "GAZP", title: "Газпром отменил дивиденды", percent: -20 } },
+      ] },
+    { id: "commodity", title: "Сырьевой суперцикл", year: "2007", free: false, turnsPerPlayer: 40,
+      intro: "Сырьё дорожает год за годом — кажется, что так будет всегда.",
+      goal: "Поймайте суперцикл и продайте сырьё до разворота.",
+      start: { "Финансы и сырьё": 0.9 },
+      bias: [
+        { sector: "Финансы и сырьё", from: 1, to: 9, drift: 0.035 },
+        { sector: "Промышленность и транспорт", from: 3, to: 9, drift: -0.02 },
+        { sector: "Финансы и сырьё", from: 11, to: 16, drift: -0.04 },
+      ],
+      deck: [
+        { type: "sector", sector: "Финансы и сырьё", title: "Спрос на металлы растёт", percent: 12 },
+        { type: "sector", sector: "Промышленность и транспорт", title: "Дорогое топливо бьёт по перевозчикам", percent: -10 },
+      ],
+      script: [
+        { event: 4, card: { type: "sector", sector: "Финансы и сырьё", title: "Нефть по $150", percent: 20 } },
+        { event: 5, card: { type: "sector", sector: "Промышленность и транспорт", title: "Топливо дорожает — перевозчики в минусе", percent: -15 } },
+        { event: 7, card: { type: "company", ticker: "GAZP", title: "Новый экспортный контракт", percent: 25 } },
+        { event: 10, warn: "Спрос в Китае замедляется, склады сырья переполнены." },
+        { event: 11, card: { type: "sector", sector: "Финансы и сырьё", title: "Коллапс сырьевых цен", percent: -30 } },
+        { event: 12, card: { type: "sector", sector: "Промышленность и транспорт", title: "Дешёвое топливо", percent: 15 } },
+      ] },
+  ];
+  function scenarioById(id) { return SCENARIOS.find((x) => x.id === id) || null; }
+  // Публичное описание для клиента (без сценарных новостей — они сюрприз).
+  function scenarioInfo(sc) {
+    return sc ? { id: sc.id, title: sc.title, year: sc.year, free: !!sc.free, turnsPerPlayer: sc.turnsPerPlayer, intro: sc.intro, goal: sc.goal } : null;
+  }
+  // Применить сценарий из настроек к комнате один раз, перед стартом партии
+  // (из applyGameLength): цены и тренды, колода, длительность.
+  function applyScenario(room) {
+    if (!room || room.tutorial || room.scenario || !room.settings) return;
+    const sc = scenarioById(room.settings.scenario);
+    if (!sc) return;
+    const multOf = (c) => {
+      const st = sc.start || {};
+      return st[c.ticker] != null ? st[c.ticker] : st[c.sector] != null ? st[c.sector] : 1;
+    };
+    COMPANIES.forEach((c) => {
+      const comp = room.companies[c.ticker];
+      if (!comp) return;
+      const m = multOf(c);
+      comp.price = TIER_PRICE[c.tier] * m;
+      comp.prevPrice = comp.price;
+      comp.trendFactor = m; // обычный возврат к тренду тянет к сценарной цене, а не к цене тира
+      comp.priceHistory = [{ t: 0, p: Math.round(comp.price) }];
+    });
+    room.deckData = buildDeck().concat((sc.deck || []).map((c) => Object.assign({}, c)));
+    room.deckOrder = shuffle(room.deckData.map((_, i) => i));
+    room.deckPos = 0;
+    room.settings.maxTurnsPerPlayer = sc.turnsPerPlayer;
+    room.scenario = { id: sc.id };
+    addLog(room, `🎬 Сценарий «${sc.title}»: ${sc.intro} Цель: ${sc.goal}`, "header");
+  }
+  // Сценарные новости и слухи на этом событии (вызывается из marketEvent).
+  function runScenarioScript(room) {
+    const sc = room.scenario && scenarioById(room.scenario.id);
+    if (!sc) return;
+    (sc.script || []).filter((e) => e.event === room.eventCount).forEach((e) => {
+      if (e.warn) addLog(room, `📌 Слухи: ${e.warn}`, "news");
+      if (e.card) applyNewsCard(room, e.card, "📌 Сценарий");
+    });
+  }
+  // Уклон долгосрочного тренда компании на этом событии по сценарию.
+  function scenarioDrift(room, c) {
+    const sc = room.scenario && scenarioById(room.scenario.id);
+    if (!sc) return 0;
+    const ev = room.eventCount;
+    return (sc.bias || []).reduce((sum, b) =>
+      sum + (ev >= b.from && ev <= b.to && (b.all || b.sector === c.sector || b.ticker === c.ticker) ? b.drift : 0), 0);
+  }
+
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -853,6 +1000,7 @@
   // при своём maxRounds. Учебную партию (room.tutorial) не трогаем.
   function applyGameLength(room) {
     if (!room || room.tutorial) return room ? room.maxRounds || null : null;
+    applyScenario(room); // сценарий задаёт свою длительность — до расчёта раундов
     const t = room.settings ? room.settings.maxTurnsPerPlayer : undefined;
     if (t == null || !Number.isFinite(Number(t))) return room.maxRounds || null;
     room.maxRounds = roundsForTurnsPerPlayer(t, activePlayers(room).length, room.settings.eventIntervalTurns || EVENT_INTERVAL_TURNS);
@@ -964,51 +1112,28 @@
   // Компании, которые ещё торгуются: поглощённые при слиянии (merged) из игры выходят.
   function liveCompanies(room) { return COMPANIES.filter((c) => !room.companies[c.ticker].merged); }
 
-  function marketEvent(room) {
-    const eventBeforeThis = room.eventCount;
-    room.eventCount++;
-    room.roundNumber = (room.roundNumber || 1) + 1;
-    room.dividendMultiplier = 1;
-    // Страховка (endTurn уже решает это сам): событие не разыгрывает карту,
-    // пока чей-то инсайд по ней не решён, — иначе блок инсайда показал бы
-    // следующую карту, а «Переложить в конец» двинул бы невиданную.
-    room.pendingInsider = null;
-    addLog(room, `— Биржевое событие #${room.eventCount} —`, "header");
-
-    const roll = 1 + Math.floor(Math.random() * 6);
-    let volPct = 0;
-    if (roll <= 2) volPct = -5; else if (roll >= 5) volPct = 5;
-    COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, volPct));
-    addLog(room, `Кубик волатильности: ${roll} → база ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям (фактически сильнее у волатильных тикеров)`, "vol");
-
-    processLoans(room);
-    processRealEstate(room);
-    processReputationRecovery(room);
-
-    if (room.deckPos >= room.deckOrder.length) {
-      room.deckOrder = shuffle(room.deckOrder);
-      room.deckPos = 0;
-      addLog(room, "Колода новостей закончилась — переshuffle.", "deck");
-    }
-    const idx = room.deckOrder[room.deckPos++];
-    const card = room.deckData[idx];
-    room.frozen = false;
-
+  // Розыгрыш карты новостей: карта колоды на событии или сценарная новость
+  // (prefix — «📌 Сценарий» в ленте). Карта точечной новости с ticker бьёт по
+  // этой компании, без него — по случайной из живых.
+  function applyNewsCard(room, card, prefix) {
+    const pre = prefix ? prefix + " · " : "";
     if (card.type === "global") {
       COMPANIES.forEach((c) => { applyPriceDelta(room, c.ticker, card.percent); nudgeTrend(room, c.ticker, card.percent); });
-      addLog(room, `📰 [Глобальная] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}% всем компаниям`, "news");
+      addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Глобальная] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}% всем компаниям`, "news");
     } else if (card.type === "sector") {
       COMPANIES.filter((c) => c.sector === card.sector).forEach((c) => { applyPriceDelta(room, c.ticker, card.percent); nudgeTrend(room, c.ticker, card.percent); });
-      addLog(room, `📰 [Отраслевая, ${card.sector}] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%`, "news");
+      addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Отраслевая, ${card.sector}] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%`, "news");
     } else if (card.type === "company") {
       const live = liveCompanies(room);
-      const c = live[Math.floor(Math.random() * live.length)];
+      const fixed = card.ticker ? live.find((x) => x.ticker === card.ticker) : null;
+      if (card.ticker && !fixed) return; // компанию поглотили при слиянии — новость не о ком
+      const c = fixed || live[Math.floor(Math.random() * live.length)];
       applyPriceDelta(room, c.ticker, card.percent);
       nudgeTrend(room, c.ticker, card.percent);
       if (card.skipDividend) room.companies[c.ticker].skipDividendUntil = room.eventCount + 1;
-      addLog(room, `📰 [Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%${card.skipDividend ? " (дивиденды пропущены на 1 ход)" : ""}`, "news");
+      addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%${card.skipDividend ? " (дивиденды пропущены на 1 ход)" : ""}`, "news");
     } else if (card.type === "special") {
-      addLog(room, `🃏 [Особая] ${card.title}: ${card.desc}`, "news");
+      addLog(room, `🃏 ${pre}[Особая] ${card.title}: ${card.desc}`, "news");
       if (card.key === "freeze") {
         room.frozen = true;
       } else if (card.key === "buyback") {
@@ -1039,6 +1164,42 @@
         });
       }
     }
+  }
+
+  function marketEvent(room) {
+    const eventBeforeThis = room.eventCount;
+    room.eventCount++;
+    room.roundNumber = (room.roundNumber || 1) + 1;
+    room.dividendMultiplier = 1;
+    // Страховка (endTurn уже решает это сам): событие не разыгрывает карту,
+    // пока чей-то инсайд по ней не решён, — иначе блок инсайда показал бы
+    // следующую карту, а «Переложить в конец» двинул бы невиданную.
+    room.pendingInsider = null;
+    addLog(room, `— Биржевое событие #${room.eventCount} —`, "header");
+
+    const roll = 1 + Math.floor(Math.random() * 6);
+    let volPct = 0;
+    if (roll <= 2) volPct = -5; else if (roll >= 5) volPct = 5;
+    COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, volPct));
+    addLog(room, `Кубик волатильности: ${roll} → база ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям (фактически сильнее у волатильных тикеров)`, "vol");
+
+    processLoans(room);
+    processRealEstate(room);
+    processReputationRecovery(room);
+
+    if (room.deckPos >= room.deckOrder.length) {
+      room.deckOrder = shuffle(room.deckOrder);
+      room.deckPos = 0;
+      addLog(room, "Колода новостей закончилась — переshuffle.", "deck");
+    }
+    const idx = room.deckOrder[room.deckPos++];
+    const card = room.deckData[idx];
+    room.frozen = false;
+
+    // Сценарий (applyScenario): сценарные новости этого события и слухи — до
+    // карты колоды, чтобы выпавшая «Заморозка цен» не отменила сценарный крах.
+    runScenarioScript(room);
+    applyNewsCard(room, card);
 
     // У каждой компании — свой фоновый долгосрочный тренд (trendFactor), который
     // блуждает независимо от разовых карт/кубика: часть компаний на дистанции
@@ -1050,7 +1211,7 @@
       liveCompanies(room).forEach((c) => {
         const comp = room.companies[c.ticker];
         if (comp.trendFactor == null) comp.trendFactor = 1;
-        const drift = -0.015 + Math.random() * 0.035; // в среднем ~+0.25% за событие
+        const drift = -0.015 + Math.random() * 0.035 + scenarioDrift(room, c); // в среднем ~+0.25% за событие; сценарий добавляет уклон
         comp.trendFactor = clamp(comp.trendFactor + drift, 0.3, 4);
       });
     }
@@ -1293,7 +1454,23 @@
       next.maxTurnsPerPlayer = turns;
       room.maxRounds = null;
     }
+    // Сценарий рынка: id из SCENARIOS или "" — классическая партия. Право
+    // выбрать платный сценарий проверяет сервер (server.js) до вызова движка.
+    let scenarioChanged = false;
+    if (patch.scenario !== undefined) {
+      const sid = patch.scenario ? String(patch.scenario) : "";
+      if (sid && !scenarioById(sid)) return { error: "Неизвестный сценарий." };
+      scenarioChanged = (next.scenario || "") !== sid;
+      if (sid) next.scenario = sid; else delete next.scenario;
+      // Длительность задаёт сценарий — сразу видна в лобби.
+      const chosen = scenarioById(sid);
+      if (chosen && scenarioChanged) { next.maxTurnsPerPlayer = chosen.turnsPerPlayer; room.maxRounds = null; }
+    }
     room.settings = next;
+    if (scenarioChanged && room.players.length) {
+      const sc = scenarioById(next.scenario);
+      addLog(room, sc ? `🎬 Хост выбрал сценарий «${sc.title}» (${plural(sc.turnsPerPlayer, "ход", "хода", "ходов")} у каждого).` : "🎬 Хост выбрал классическую партию.", "header");
+    }
     if (turns != null && turns !== prevTurns && room.players.length) {
       const what = !turns ? "без лимита — до банкротства всех соперников"
         : turns === DEFAULT_MAX_TURNS_PER_PLAYER ? `до банкротства (обычно ≈100 ходов у каждого), но не дольше ${plural(turns, "хода", "ходов", "ходов")} у каждого`
@@ -2775,6 +2952,7 @@
         // комната, лимит только в maxRounds. Ключ есть всегда: по нему клиент
         // отличает этот сервер от прежнего (у того — только maxRounds).
         maxTurnsPerPlayer: room.settings?.maxTurnsPerPlayer ?? null,
+        scenario: room.settings?.scenario || "",
       },
       roundNumber: room.roundNumber || 1,
       maxRounds: room.maxRounds || null,
@@ -2913,6 +3091,7 @@
 
   return {
     TIER_PRICE, TIER_VOL, VOL_LABEL, TIER_FORCED_PAYMENT_PCT, TIER_DIVIDEND_MULT, TIER_DIVIDEND_SKIP_CHANCE, COMPANIES, BOARD,
+    SCENARIOS, scenarioById, scenarioInfo, applyScenario, applyNewsCard,
     REPUTATION_START, CITIES, MAX_RE_LEVEL, REAL_ESTATE_POS,
     companyByTicker, cityById, isRealEstateCell, cityIdFromCell, buildDeck, shuffle, fmt,
     realEstatePrice, realEstateRent, realEstateRentDue, realEstateUpgradeCost,

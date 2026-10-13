@@ -1489,6 +1489,80 @@ test("длительность: реванш пересчитывает раун
 });
 
 // ---------------------------------------------------------------------
+// Сценарии рынка (engine.js, SCENARIOS / applyScenario / runScenarioScript)
+// ---------------------------------------------------------------------
+function scenarioGame(id, names) {
+  const r = lobby(names || ["A", "B"]);
+  const res = E.updateRoomSettings(r, r.hostPlayerId, { scenario: id });
+  assert.ok(!res.error, "updateRoomSettings: " + res.error);
+  const st = E.startGame(r, r.hostPlayerId);
+  assert.ok(!st.error, "startGame: " + st.error);
+  return r;
+}
+// Довести комнату до события номер n (предыдущие события — как есть).
+function eventsUntil(r, n) { while (r.eventCount < n) E.marketEvent(r); }
+test("сценарий: стартовые цены, тренд, колода, длительность и запись в ленте", () => {
+  const base = E.freshRoom("X").deckData.length;
+  const r = scenarioGame("dotcom");
+  assert.equal(r.scenario.id, "dotcom");
+  assert.equal(r.settings.maxTurnsPerPlayer, 40, "длительность задаёт сценарий");
+  assert.ok(r.maxRounds > 0, "лимит раундов посчитан");
+  assert.equal(Math.round(r.companies.AAPL.price), 60000, "Технологии ×1.5");
+  assert.equal(Math.round(r.companies.NFLX.price), 64000, "Интернет и медиа ×1.6");
+  assert.equal(Math.round(r.companies.KO.price), 20000, "остальные — цена тира");
+  assert.equal(r.companies.AAPL.trendFactor, 1.5, "возврат к тренду тянет к сценарной цене");
+  assert.equal(r.deckData.length, base + 3, "три сценарные карты в колоде");
+  assert.ok(r.log.some((e) => e.text.includes("Сценарий «Пузырь доткомов»")), "вступление в ленте");
+  assert.equal(E.buildStatePayload(r, r.players[0].id).settings.scenario, "dotcom");
+  return r;
+});
+test("сценарий: слух за событие до краха, сценарная новость на своём событии", () => {
+  const r = scenarioGame("crisis2008");
+  eventsUntil(r, 4);
+  assert.ok(r.log.some((e) => e.text.startsWith("📌 Слухи:")), "слух на 4-м событии");
+  const before = r.companies.SBER.price;
+  fixRandom(0.5); // кубик волатильности 4 → 0%
+  E.marketEvent(r); // 5-е
+  assert.equal(r.eventCount, 5);
+  assert.ok(r.log.some((e) => e.text.includes("Сценарий · [Отраслевая, Финансы и сырьё] Банкротство инвестбанка")), "новость в ленте");
+  assert.ok(r.companies.SBER.price < before * 0.85, `финансы упали: ${before} → ${r.companies.SBER.price}`);
+  return r;
+});
+test("сценарий: точечная новость бьёт по своей компании", () => {
+  const r = scenarioGame("rumarket");
+  eventsUntil(r, 2);
+  const before = r.companies.SBER.price;
+  fixRandom(0.5);
+  E.marketEvent(r); // 3-е: дивиденды Сбербанка +20%
+  assert.ok(r.log.some((e) => e.text.includes("Сценарий · [Точечная] Сбербанк (SBER) — Рекордные дивиденды")), "новость про Сбербанк");
+  assert.ok(r.companies.SBER.price > before * 1.1, `SBER вырос: ${before} → ${r.companies.SBER.price}`);
+  return r;
+});
+test("сценарий: неизвестный — ошибка, пустой — классика, реванш сохраняет сценарий", () => {
+  const r = lobby(["A", "B"]);
+  assert.ok(E.updateRoomSettings(r, r.hostPlayerId, { scenario: "nope" }).error, "неизвестный сценарий");
+  assert.ok(!E.updateRoomSettings(r, r.hostPlayerId, { scenario: "commodity" }).error);
+  assert.equal(r.settings.scenario, "commodity");
+  assert.ok(!E.updateRoomSettings(r, r.hostPlayerId, { scenario: "" }).error);
+  assert.equal(r.settings.scenario, undefined, "классика снимает сценарий");
+  const g = scenarioGame("commodity");
+  g.phase = "ended";
+  const fresh = E.newGameKeepPlayers(g);
+  assert.equal(fresh.phase, "roll");
+  assert.equal(fresh.scenario && fresh.scenario.id, "commodity", "реванш — тот же сценарий");
+  assert.equal(Math.round(fresh.companies.SBER.price), Math.round(20000 * 0.9), "цены сценария заново");
+  return [r, fresh];
+});
+test("сценарий: обучение и обычная партия без сценария не меняются", () => {
+  const { room } = Tut.buildRoom(E, "Инвестор");
+  assert.ok(!room.scenario && !room.settings.scenario, "в обучении нет сценария");
+  const g = game(["A", "B"]);
+  assert.ok(!g.scenario);
+  assert.equal(Math.round(g.companies.AAPL.price), 40000);
+  return [room, g];
+});
+
+// ---------------------------------------------------------------------
 // Прогон
 // ---------------------------------------------------------------------
 let failed = 0;

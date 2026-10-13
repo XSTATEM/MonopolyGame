@@ -455,6 +455,26 @@ body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
 .room-empty{flex-direction:column;align-items:center;gap:10px;text-align:center;padding:22px 12px;border:1px dashed var(--line-strong);
   border-radius:var(--r-md);color:var(--text-2);}
 .room-empty-icon{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--surface-3);}
+/* Сценарии рынка: карточки выбора (scenarioPickerHtml), метка в строке статуса, плашка в сводке события */
+.scn-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:8px;}
+.scn-card{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-height:84px;padding:10px 12px;text-align:left;
+  border-radius:var(--r-md);background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);box-shadow:none;font-weight:600;}
+.scn-card:hover{filter:none;border-color:var(--text-3);}
+.scn-card.on{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
+  background:color-mix(in srgb, var(--primary) 10%, var(--surface-2));}
+.scn-card.locked{background:var(--surface);}
+.scn-card.locked .scn-intro{opacity:.75;}
+.scn-head{display:flex;align-items:center;gap:6px;}
+.scn-head b{font-size:14px;line-height:1.2;flex:1 1 auto;min-width:0;}
+.scn-year{flex:none;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 6px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--text-2);}
+.scn-lock, .scn-check{flex:none;display:inline-flex;color:var(--text-3);}
+.scn-check{color:var(--primary);}
+.scn-intro{font-size:12px;line-height:1.35;color:var(--text-2);font-weight:500;}
+.scn-badge .hint-q{margin-left:4px;width:18px;height:18px;}
+.scn-badge .hint-q .ico{width:13px;height:13px;}
+.event-scenario{display:flex;flex-direction:column;gap:4px;padding:10px 12px;margin:0 0 12px;border-radius:var(--r-md);
+  background:var(--warn-bg);color:var(--text);font-size:13.5px;font-weight:600;border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);}
+
 /* Лобби: код комнаты крупно, рядом «Копировать» и «Пригласить» */
 .lobby-code{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:12px 14px;margin:0 0 14px;border-radius:var(--r-md);
   background:var(--surface-2);border:1px solid var(--line);}

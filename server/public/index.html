@@ -222,6 +222,7 @@
         <div class="muted" id="shopAdStatus"></div>
       </section>
       <section id="shopPointsSection" aria-labelledby="shopPointsTitle" hidden><h2 id="shopPointsTitle">Очки</h2><div class="shop-grid" id="shopPoints"></div></section>
+      <section id="shopScenariosSection" aria-labelledby="shopScenariosTitle" hidden><h2 id="shopScenariosTitle">Сценарии</h2><div class="shop-grid" id="shopScenarios"></div></section>
       <section id="shopSetsSection" aria-labelledby="shopSetsTitle" hidden><h2 id="shopSetsTitle">Наборы</h2><div class="shop-grid" id="shopSets"></div></section>
       <div class="shop-email" id="shopEmailRow" hidden>
         <label for="shopEmail">Email для чека</label>
@@ -413,6 +414,8 @@
       <button class="secondary" id="btnAddOfflineBot"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-bot"/></svg> Бот</button>
     </div>
     <div class="err" id="offlineErr"></div>
+    <div class="influence-group" style="margin:22px 0 8px;">Сценарий <button type="button" class="hint-q" data-hint-key="scn-offline" data-hint="Сценарий меняет стартовые цены и подкидывает исторические новости по ходу партии. Длительность задаёт сценарий: 40 ходов у каждого, затем побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></div>
+    <div id="offlineScenarioBox"></div>
     <div class="influence-group" style="margin:22px 0 4px;">Правила партии</div>
     <div class="settings-grid">
       <div>
@@ -926,6 +929,7 @@ function renderOnlineGate(){
 document.getElementById("btnGoOffline").onclick = ()=>{
   offlinePlayerNames = [];
   renderOfflinePlayersBox();
+  renderOfflineScenarios();
   showOnly("offlineSetup");
 };
 document.getElementById("btnBackFromOffline").onclick = ()=> showOnly("mainMenu");
@@ -1257,6 +1261,7 @@ function handleAccountSessionExpired(){
   renderSkinsScreen();
   renderOnlineGate();
   if(window.Shop) Shop.onAccountChanged();
+  if(typeof refreshScenarioPickers === "function") refreshScenarioPickers();
   openAccountModal("login");
   const errEl = document.getElementById("accModalErr");
   if(errEl) errEl.textContent = "Сессия истекла — войдите заново.";
@@ -1395,6 +1400,7 @@ function doAccountLogout(){
   renderOnlineGate();
   updateAccountCornerBtn();
   if(window.Shop) Shop.onAccountChanged();
+  if(typeof refreshScenarioPickers === "function") refreshScenarioPickers();
   closeAccountModal();
 }
 document.getElementById("profileGateLoginBtn").onclick = ()=> openAccountModal("login");
@@ -1605,7 +1611,8 @@ function onAccountAuthed(data, password){
   renderProfileScreen();
   renderSkinsScreen();
   renderOnlineGate();
-  if(window.Shop) Shop.onAccountChanged(); // магазин: покупки этого аккаунта, ожидающий заказ
+  if(window.Shop) Shop.onAccountChanged();
+  if(typeof refreshScenarioPickers === "function") refreshScenarioPickers(); // магазин: покупки этого аккаунта, ожидающий заказ
   runPendingMenuJoin(); // вход ради кода комнаты из главного меню — сразу подключаем
   closeAccountModal();
 }
@@ -2289,6 +2296,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
     errEl.textContent = "Плата за отказ — три числа через «/», например 60/45/30.";
     return;
   }
+  if(offlineScenario && scenarioLocked(GameEngine.scenarioById(offlineScenario))){ errEl.textContent = "Этот сценарий нужно купить в магазине."; return; }
   if(loadOfflineSave() && !confirm("Начать новую партию? Сохранённая офлайн-партия будет заменена.")) return;
   errEl.textContent = "";
   teardownOnline(); // висящее онлайн-подключение не должно перехватить офлайн-партию
@@ -2307,6 +2315,8 @@ document.getElementById("btnStartOffline").onclick = ()=>{
     // Длительность — свои ходы у каждого (0 — без лимита); раунды движок
     // посчитает ниже по числу игроков, как startGame онлайн.
     maxTurnsPerPlayer: Number(document.getElementById("offlineMaxRounds").value) || 0,
+    // Сценарий рынка (или "" — классика); длительность тогда задаёт он.
+    scenario: offlineScenario,
   });
 
   offlinePlayerNames.forEach(p=>{ GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar, 0, "default", !!p.isBot); });
@@ -2900,6 +2910,9 @@ function openMarketEventModal(msg, prev){
   const entries = (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag !== "header" && e.tag !== "turn");
   const card = document.getElementById("marketEventModalCard");
   if(!card) return;
+  // Сценарные новости и слухи (engine.js, runScenarioScript) — плашкой сверху.
+  const scenarioNews = entries.filter(e=> /^📌/.test(String(e.text||"")));
+  const scenarioNewsHtml = scenarioNews.length ? `<div class="event-scenario">${scenarioNews.map(e=>`<div>${escapeHtml(String(e.text).replace(/^📌\s*/, ""))}</div>`).join("")}</div>` : "";
   // Однотипные записи (бонусы к репутации, налоги на недвижимость) — одной строкой.
   const groups = [];
   const byKey = {};
@@ -2952,6 +2965,7 @@ function openMarketEventModal(msg, prev){
   card.innerHTML = `
     <div class="market-event-body">
       <div class="eyebrow">${byLimit ? "Последний раунд завершён" : "Раунд завершён"}</div>
+      ${scenarioNewsHtml}
       <h2>${ico("bolt")} Биржевое событие №${msg.eventCount}${hintBtn("event", "Каждое событие разыгрывается карта новостей, кубик волатильности сдвигает цены, банк начисляет проценты по кредитам, города приносят ренту.")}</h2>
       ${finaleHtml}
       ${moversHtml}
@@ -3016,10 +3030,13 @@ function renderLobby(s){
     if(lenHint) lenHint.setAttribute("data-hint", escapeHtml(len.hint));
     const enough = onlineCount >= 2, btn = document.getElementById("btnStartLobby");
     btn.disabled = !enough; btn.textContent = enough ? "Начать игру" : "Нужно минимум 2 игрока в сети";
+    renderLobbyScenarios(st);
   } else if(s.hostPlayerId === s.you){
     const enough = onlineCount >= 2;
     startArea.innerHTML = `
-      <div class="settings-grid">
+      <div class="influence-group" style="margin:0 0 8px;">Сценарий</div>
+      <div id="lobbyScenarioBox"></div>
+      <div class="settings-grid" style="margin-top:12px;">
         <div>
           <label>Стартовый капитал</label>
           <input type="number" id="lobbyStartingCash" value="${stCash}" min="10000" step="10000" style="width:100%;">
@@ -3063,12 +3080,14 @@ function renderLobby(s){
         tierForcedPaymentPct: fpOk ? tierForcedPaymentPct : undefined,
       }});
     };
+    renderLobbyScenarios(st);
     document.getElementById("lobbyStartingCash").onchange = sendSettings;
     document.getElementById("lobbyTurnSalary").onchange = sendSettings;
     document.getElementById("lobbyEventInterval").onchange = sendSettings;
     document.getElementById("lobbyForcedPayment").onchange = sendSettings;
   } else {
-    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">${escapeHtml(len.label)}<br>Ждите, пока хост начнёт игру…</div>`;
+    const gsc = st.scenario ? GameEngine.scenarioById(st.scenario) : null;
+    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">${gsc ? `Сценарий «${escapeHtml(gsc.title)}» · ` : ""}${escapeHtml(len.label)}<br>Ждите, пока хост начнёт игру…</div>`;
   }
 
   const chatLog = document.getElementById("lobbyChatLog");
@@ -3082,6 +3101,69 @@ function renderLobby(s){
 // движок считает при старте: ⌈ходов × игроков / ходов в раунде⌉. Пресеты —
 // те же, что в форме офлайн-партии (#offlineMaxRounds).
 // ---------------------------------------------------------------------
+// Сценарии рынка (engine.js, SCENARIOS): карточки выбора в офлайн-форме и в
+// лобби. Платный сценарий закрыт, пока магазин включён, а сценарий не куплен
+// (accountUser.ownedScenarios, users.js); без магазина открыты все. Нажатие на
+// закрытый ведёт ко входу или к товару в магазине (tm_scn_<id>).
+let offlineScenario = "";
+function scenarioLocked(sc){
+  if(!sc || sc.free) return false;
+  if(!(window.Shop && Shop.enabled())) return false;
+  return !(accountUser && Array.isArray(accountUser.ownedScenarios) && accountUser.ownedScenarios.includes(sc.id));
+}
+function scenarioPickerHtml(selected, action){
+  const list = [{ id: "", title: "Классика", year: "", intro: "Обычная партия: свои правила и длительность.", free: true }].concat(GameEngine.SCENARIOS || []);
+  return `<div class="scn-grid" role="radiogroup" aria-label="Сценарий">${list.map(sc=>{
+    const on = (selected || "") === sc.id;
+    const locked = scenarioLocked(sc);
+    return `<button type="button" class="scn-card${on?" on":""}${locked?" locked":""}" role="radio" aria-checked="${on}" data-scenario="${sc.id}" onclick="${action}('${sc.id}')"${locked?` aria-label="${escapeHtml(sc.title)} — нужно купить"`:""}>
+      <span class="scn-head"><b>${escapeHtml(sc.title)}</b>${sc.year?`<span class="scn-year">${sc.year}</span>`:""}${locked?`<span class="scn-lock">${ico("lock","ico-sm")}</span>`:on?`<span class="scn-check">${ico("check","ico-sm")}</span>`:""}</span>
+      <span class="scn-intro">${escapeHtml(sc.intro)}</span>
+    </button>`;
+  }).join("")}</div>`;
+}
+// true — сценарий можно выбрать; закрытый ведёт ко входу или в магазин.
+function scenarioGate(id){
+  const sc = GameEngine.scenarioById(id);
+  if(!scenarioLocked(sc)) return true;
+  if(!accountUser){ openAccountModal("login"); return false; }
+  if(window.Shop) Shop.open("tm_scn_" + id);
+  return false;
+}
+function renderOfflineScenarios(){
+  const box = document.getElementById("offlineScenarioBox");
+  if(!box) return;
+  if(offlineScenario && scenarioLocked(GameEngine.scenarioById(offlineScenario))) offlineScenario = "";
+  box.innerHTML = scenarioPickerHtml(offlineScenario, "pickOfflineScenario");
+  // Длительность сценария фиксирована — поле длительности её и показывает.
+  const sel = document.getElementById("offlineMaxRounds");
+  const sc = GameEngine.scenarioById(offlineScenario);
+  if(sc){ if(!sel.dataset.prev) sel.dataset.prev = sel.value; sel.value = String(sc.turnsPerPlayer); }
+  else if(sel.dataset.prev){ sel.value = sel.dataset.prev; delete sel.dataset.prev; }
+  sel.disabled = !!sc;
+  if(window.UIKit) UIKit.sync(sel);
+}
+function pickOfflineScenario(id){
+  if(id && !scenarioGate(id)) return;
+  offlineScenario = id;
+  renderOfflineScenarios();
+}
+function renderLobbyScenarios(st){
+  const box = document.getElementById("lobbyScenarioBox");
+  if(box) box.innerHTML = scenarioPickerHtml(st.scenario || "", "pickLobbyScenario");
+  const sel = document.getElementById("lobbyMaxRounds");
+  if(sel){ sel.disabled = !!st.scenario; if(window.UIKit) UIKit.sync(sel); }
+}
+function pickLobbyScenario(id){
+  if(id && !scenarioGate(id)) return;
+  send({type:"updateRoomSettings", settings:{ scenario: id }});
+}
+// Покупка или вход поменяли доступ к сценариям — перерисовать открытый выбор.
+function refreshScenarioPickers(){
+  if(document.getElementById("offlineSetup").style.display !== "none") renderOfflineScenarios();
+  if(latest && latest.phase === "lobby" && latest.hostPlayerId === latest.you) renderLobbyScenarios(latest.settings || {});
+}
+
 const GAME_LENGTH_PRESETS = [
   { turns: 40, label: "Короткая · 40 ходов у каждого" },
   { turns: 70, label: "Средняя · 70 ходов у каждого" },
@@ -4390,6 +4472,8 @@ function statusRowHtml(s){
     : `Раунд ${round}`;
   const roomText = s.tutorial ? "Обучение" : mode === "online" ? `Комната ${escapeHtml(roomCode)}` : "Офлайн";
   const extras = [];
+  const scn = s.settings && s.settings.scenario ? GameEngine.scenarioById(s.settings.scenario) : null;
+  if(scn) extras.push(`<span class="rep-badge scn-badge">${ico("news","ico-sm")} ${escapeHtml(scn.title)}${hintBtn("scenario", `<b>${escapeHtml(scn.title)}</b> (${scn.year}). ${escapeHtml(scn.intro)} Цель: ${escapeHtml(scn.goal)}`)}</span>`);
   if(s.frozen) extras.push(`<span class="rep-badge">${ico("snow","ico-sm")} Цены заморожены</span>`);
   if((s.dividendMultiplier||1) > 1) extras.push(`<span class="rep-badge rep-mid">${ico("coins","ico-sm")} Выплаты ×${s.dividendMultiplier}</span>`);
   // Партия с лимитом: последние FINAL_ROUNDS раунда — метка финала первой в

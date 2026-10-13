@@ -1184,7 +1184,7 @@ function init(helpers) {
 }
 
 module.exports = {
-  init, handleCatalog, createOrder, handleOrderStatus, handleYookassaWebhook, verify, handleEntitlements,
+  init, handleCatalog, createOrder, handleOrderStatus, handleYookassaWebhook, verify, handleEntitlements, shopEnabled,
   // для ads.js
   envFlag, envInt, envStr, normPlatform, fail, bearerAccount, adTxSeen, noteAdTx,
   // чистые функции и фоновые задачи — для тестов

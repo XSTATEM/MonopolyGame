@@ -174,7 +174,15 @@
     if(ent && ent.entitlements && typeof ent.entitlements === "object") Object.keys(ent.entitlements).forEach((id)=> set.add(id));
     return set;
   }
-  function owns(p){ return !!p && p.kind === "non-consumable" && ownedIds().has(p.id); }
+  // Товар сценариев считается купленным и тогда, когда все его сценарии уже
+  // открыты другими покупками (набор «Все сценарии» после трёх по отдельности).
+  function ownsScenarios(p){
+    const ids = (p && p.unlocks && p.unlocks.scenarios) || [];
+    const own = accountUser && Array.isArray(accountUser.ownedScenarios) ? accountUser.ownedScenarios : [];
+    return ids.length > 0 && ids.every((id)=> own.includes(id));
+  }
+  function isScenarioProduct(p){ return !!(p && p.unlocks && p.unlocks.scenarios && p.unlocks.scenarios.length); }
+  function owns(p){ return !!p && p.kind === "non-consumable" && (ownedIds().has(p.id) || ownsScenarios(p)); }
 
   // --- Данные аккаунта для магазина (видео за сутки, история покупок) ---------
   function loadEntitlements(){
@@ -215,7 +223,7 @@
   function highlighted(id){ return !!highlight && highlight.id === id && Date.now() < highlight.until; }
   function cardHtml(p){
     const owned = owns(p);
-    const icon = p.kind === "consumable" ? ico("coins", "ico-sm") : ico("palette", "ico-sm");
+    const icon = p.kind === "consumable" ? ico("coins", "ico-sm") : isScenarioProduct(p) ? ico("news", "ico-sm") : ico("palette", "ico-sm");
     return `<div class="shop-card${owned ? " owned" : ""}${highlighted(p.id) ? " shop-focus" : ""}" id="shopItem-${escapeHtml(p.id)}">
       <div class="shop-card-title">${icon}<span>${escapeHtml(p.title || p.id)}</span></div>
       ${p.subtitle ? `<div class="shop-card-sub">${escapeHtml(p.subtitle)}</div>` : ""}
@@ -379,7 +387,10 @@
     byId("shopPointsSection").hidden = !points.length;
     byId("shopPointsSection").classList.toggle("shop-focus", highlighted("points"));
     byId("shopPoints").innerHTML = points.map(cardHtml).join("");
-    const sets = list.filter((p)=> p.kind === "non-consumable" && !p.premium);
+    const scenarios = list.filter((p)=> p.kind === "non-consumable" && isScenarioProduct(p));
+    byId("shopScenariosSection").hidden = !scenarios.length;
+    byId("shopScenarios").innerHTML = scenarios.map(cardHtml).join("");
+    const sets = list.filter((p)=> p.kind === "non-consumable" && !p.premium && !isScenarioProduct(p));
     byId("shopSetsSection").hidden = !sets.length;
     byId("shopSets").innerHTML = sets.map(cardHtml).join("");
 

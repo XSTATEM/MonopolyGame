@@ -299,7 +299,7 @@ const PASSIVE_RU = {
   loanAutoRepaid: "кредиты закрыты автоплатежами", shortWon: "шорт сыграл", shortLost: "шорт сгорел", antitrust: "конфискации антимонопольщиков",
   overpricedForced: "завышенные цены выкупа", fullOwnership: "полные поглощения (100%)", bankBuyback: "выкуп банком 10%",
   taxPaid: "уплаты налога (карта)", dividendSkipped: "пропуски выплаты (тир)", dividendBlocked: "выплата заблокирована картой",
-  passiveRent: "начисления пассивной ренты", reSetBonus: "бонусы за комплект городов", reTax: "уплаты налога на недвижимость",
+  scenarioNews: "сценарные новости", passiveRent: "начисления пассивной ренты", reSetBonus: "бонусы за комплект городов", reTax: "уплаты налога на недвижимость",
   reTaxMissed: "неуплаты налога на недвижимость", cleanHandsBonus: "бонусы «чистых рук»", extraTurn: "дополнительные ходы",
   deckReshuffle: "перетасовки колоды", cardGlobal: "карты: глобальные", cardSector: "карты: отраслевые", cardCompany: "карты: точечные", cardSpecial: "карты: особые",
 };
