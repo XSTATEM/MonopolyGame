@@ -1501,6 +1501,12 @@ function scenarioGame(id, names) {
 }
 // Довести комнату до события номер n (предыдущие события — как есть).
 function eventsUntil(r, n) { while (r.eventCount < n) E.marketEvent(r); }
+// Следующая карта колоды — пустая: проверке сценарной новости не мешает
+// случайная карта (заморозка, отраслевой рост, рецессия).
+function quietNextCard(r) {
+  if (r.deckPos >= r.deckOrder.length) { r.deckPos = 0; }
+  r.deckData[r.deckOrder[r.deckPos]] = { type: "global", title: "Тихий день", percent: 0 };
+}
 test("сценарий: стартовые цены, тренд, колода, длительность и запись в ленте", () => {
   const base = E.freshRoom("X").deckData.length;
   const r = scenarioGame("dotcom");
@@ -1522,6 +1528,7 @@ test("сценарий: слух за событие до краха, сцена
   assert.ok(r.log.some((e) => e.text.startsWith("📌 Слухи:")), "слух на 4-м событии");
   const before = r.companies.SBER.price;
   fixRandom(0.5); // кубик волатильности 4 → 0%
+  quietNextCard(r);
   E.marketEvent(r); // 5-е
   assert.equal(r.eventCount, 5);
   assert.ok(r.log.some((e) => e.text.includes("Сценарий · [Отраслевая, Финансы и сырьё] Банкротство инвестбанка")), "новость в ленте");
@@ -1533,6 +1540,7 @@ test("сценарий: точечная новость бьёт по своей
   eventsUntil(r, 2);
   const before = r.companies.SBER.price;
   fixRandom(0.5);
+  quietNextCard(r);
   E.marketEvent(r); // 3-е: дивиденды Сбербанка +20%
   assert.ok(r.log.some((e) => e.text.includes("Сценарий · [Точечная] Сбербанк (SBER) — Рекордные дивиденды")), "новость про Сбербанк");
   assert.ok(r.companies.SBER.price > before * 1.1, `SBER вырос: ${before} → ${r.companies.SBER.price}`);
@@ -1560,6 +1568,92 @@ test("сценарий: обучение и обычная партия без �
   assert.ok(!g.scenario);
   assert.equal(Math.round(g.companies.AAPL.price), 40000);
   return [room, g];
+});
+
+// ---------------------------------------------------------------------
+// Разбор партии (analyzeGame) и сильные боты (botLevel "strong")
+// ---------------------------------------------------------------------
+test("разбор: отказ при деньгах на покупку — ошибка с платой и упущенным ростом", () => {
+  fixRandom(0.99); // без случайного пропуска выплаты
+  const { r, A, ticker } = rollOnHeld(["A", "B"], 20);
+  const px = r.companies[ticker].price;
+  const res = E.dividendFromRoll(r, A.id);
+  assert.ok(!res.error, res.error);
+  const rec = r.journal.find((e) => e.k === "refuse" && e.p === A.id);
+  assert.ok(rec && rec.paid > 0 && rec.afford >= 5 && rec.free === 80, "отказ в журнале: " + JSON.stringify(rec));
+  assert.equal(r.pstats[A.id].feeOut, rec.paid, "плата за отказ в суммах");
+  r.companies[ticker].price = px * 2; // компания удвоилась к концу партии
+  const a = E.analyzeGame(r, A.id);
+  const m = a.mistakes[0];
+  assert.ok(m && m.title === "Отказ от Apple", "главная ошибка — отказ: " + JSON.stringify(a.mistakes));
+  assert.equal(m.cost, rec.paid + Math.round(0.10 * px), "плата + рост 10% доли");
+  assert.ok(a.costs.some((c) => c.label === "Плата за отказ" && c.amount === rec.paid && c.count === 1), "расходы");
+  const b = E.analyzeGame(r, P(r, "B").id);
+  assert.ok(b.income.some((x) => x.label === "Плата за отказ от соперников" && x.amount === rec.paid), "доход держателя");
+  return r;
+});
+test("разбор: удачная покупка и ранняя продажа, график капитала по событиям", () => {
+  const r = game(["A", "B"]);
+  const A = P(r, "A");
+  r.rolledThisTurn = true;
+  r.pendingRoll = { playerId: A.id, row: 1, col: 1, ticker: "NVDA", realEstateId: null };
+  const buyPx = r.companies.NVDA.price;
+  assert.ok(!E.buyFromRoll(r, A.id, 20).error);
+  E.endTurn(r, A.id);
+  E.marketEvent(r);
+  E.marketEvent(r);
+  r.companies.NVDA.price = buyPx * 2.5; // события случайны — цену к продаже задаём сами
+  r.turnIndex = 0; r.rolledThisTurn = false;
+  assert.ok(!E.sellBank(r, A.id, "NVDA", 20).error, "продажа всей доли");
+  r.companies.NVDA.price *= 1.5; // после продажи компания ещё выросла
+  const a = E.analyzeGame(r, A.id);
+  assert.ok(a.best.some((x) => x.title === "Покупка 20% NVIDIA"), "покупка — удача: " + JSON.stringify(a.best));
+  assert.ok(a.mistakes.some((x) => x.title === "Ранняя продажа NVIDIA"), "ранняя продажа: " + JSON.stringify(a.mistakes));
+  assert.deepEqual(a.chart.me.map((pt) => pt[0]), [0, 1, 2], "капитал: старт и два события");
+  assert.equal(a.chart.me[0][1], r.settings.startingCash, "график от стартового капитала");
+  assert.equal(a.chart.me[2][1], Math.round(E.netWorth(r, A)), "последняя точка — капитал сейчас");
+  assert.equal(a.chart.rivalName, "B");
+  return r;
+});
+test("разбор: журнал не уходит клиентам и не пишется в обучении", () => {
+  const r = game(["A", "B"]);
+  r.rolledThisTurn = true;
+  r.pendingRoll = { playerId: P(r, "A").id, row: 1, col: 1, ticker: "AAPL", realEstateId: null };
+  E.buyFromRoll(r, P(r, "A").id, 5);
+  const payload = JSON.stringify(E.buildStatePayload(r, P(r, "B").id));
+  assert.ok(r.journal.length === 1 && !/"journal"|"pstats"|"nwHist"/.test(payload), "журнал только на сервере");
+  const t = game(["A", "B"]);
+  t.tutorial = true;
+  t.rolledThisTurn = true;
+  t.pendingRoll = { playerId: P(t, "A").id, row: 1, col: 1, ticker: "AAPL", realEstateId: null };
+  E.buyFromRoll(t, P(t, "A").id, 5);
+  E.marketEvent(t);
+  assert.equal(t.journal.length, 0, "обучение без журнала");
+  assert.deepEqual(t.nwHist, {}, "обучение без истории капитала");
+  return [r, t];
+});
+test("сильные боты: покупают максимум доступного, настройка переживает реванш", () => {
+  const r = game(["A", "B"], true);
+  const A = P(r, "A");
+  r.rolledThisTurn = true;
+  r.pendingRoll = { playerId: A.id, row: 1, col: 1, ticker: "KO", realEstateId: null };
+  fixRandom(0.5);
+  const normal = E.botBuyPct(r, A, "KO", A.cash);
+  assert.ok(!E.updateRoomSettings(r, r.hostPlayerId, { botLevel: "strong" }).error || r.phase !== "lobby");
+  r.settings.botLevel = "strong";
+  const strong = E.botBuyPct(r, A, "KO", A.cash);
+  assert.equal(strong, 25, "сильный берёт лимит броска");
+  assert.ok(normal < strong, `обычный осторожнее (${normal}%)`);
+  assert.equal(E.botBuyPct(r, A, "KO", 15000), 0, "резерв $15 000 не тратится");
+  assert.equal(E.buildStatePayload(r, A.id).settings.botLevel, "strong");
+  r.phase = "ended";
+  assert.equal(E.newGameKeepPlayers(r).settings.botLevel, "strong", "реванш с теми же ботами");
+  const l = lobby(["A", "B"]);
+  E.updateRoomSettings(l, l.hostPlayerId, { botLevel: "strong" });
+  assert.equal(l.settings.botLevel, "strong");
+  E.updateRoomSettings(l, l.hostPlayerId, { botLevel: "" });
+  assert.equal(l.settings.botLevel, undefined, "обычные — без ключа");
+  return r;
 });
 
 // ---------------------------------------------------------------------

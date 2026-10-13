@@ -167,7 +167,15 @@ function ownsSkin(rec, kind, id) {
 // Сценарии рынка (engine.js, SCENARIOS): бесплатные — всем, платные — по
 // покупке (unlocks.scenarios в entitlements). Как и скины наборов, не хранятся
 // отдельно, а вычисляются: возврат снимает их удалением записи entitlements.
-function ownedScenariosRec(rec) {
+// Подписка «Трейдер»: срок в rec.traderUntil (мс). Продлевается покупкой
+// tm_trader_30 (applyOrder), без автопродления.
+const DAY_MS = 86400e3;
+function traderUntilRec(rec) { return Math.max(0, Math.round(Number(rec && rec.traderUntil) || 0)); }
+function traderActiveRec(rec, now) { return traderUntilRec(rec) > (now || Date.now()); }
+// Сценарии, доступные для игры. permanent — только купленные навсегда, без
+// подписки: по ним решается, продавать ли сценарий (ownsProduct).
+function ownedScenariosRec(rec, permanent) {
+  if (!permanent && traderActiveRec(rec)) return Engine.SCENARIOS.map((sc) => sc.id);
   const own = new Set();
   for (const pid of Object.keys((rec && rec.entitlements) || {})) {
     const product = Products.byId(pid);
@@ -204,6 +212,9 @@ function publicProfile(rec) {
     ownedAvatarPacks: effectiveOwned(rec, "avatarPack"),
     ownedBoardSkins: effectiveOwned(rec, "boardSkin"),
     ownedScenarios: ownedScenariosRec(rec),
+    boughtScenarios: ownedScenariosRec(rec, true),
+    trader: { active: traderActiveRec(rec), until: traderUntilRec(rec) },
+    analysisFreeToday: analysisFreeTodayRec(rec),
     equippedAvatarPack: rec.equippedAvatarPack || "base",
     equippedBoardSkin: rec.equippedBoardSkin || "default",
   };
@@ -468,9 +479,37 @@ function ownsProduct(key, product) {
   if (!ids.length) return false;
   const rec = users[key];
   if (!rec) return false;
-  const own = ownedScenariosRec(rec);
+  const own = ownedScenariosRec(rec, true);
   return ids.every((id) => own.includes(id));
 }
+function traderActive(username) {
+  const key = usernameKey(username);
+  return Object.prototype.hasOwnProperty.call(users, key) && traderActiveRec(users[key]);
+}
+// Разбор партии: с подпиской — без ограничений, без неё — один в сутки (по
+// Москве). Повторное открытие разбора той же партии (gameKey) лимит не тратит.
+const GAME_KEY_RE = /^[A-Za-z0-9:._-]{1,80}$/;
+function claimAnalysisKey(key, gameKey) {
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  if (!rec) return { error: "Аккаунт не найден.", code: "session" };
+  gameKey = String(gameKey || "");
+  if (!GAME_KEY_RE.test(gameKey)) return { error: "Неизвестная партия.", code: "bad_game" };
+  if (traderActiveRec(rec)) return { ok: true, trader: true };
+  const day = mskDay(Date.now());
+  const a = rec.analysis && typeof rec.analysis === "object" ? rec.analysis : {};
+  if (a.day === day && a.game === gameKey) return { ok: true, again: true };
+  if (a.day === day) return { error: "Бесплатный разбор на сегодня уже был. Без ограничений — с подпиской «Трейдер».", code: "analysis_limit" };
+  rec.analysis = { day, game: gameKey };
+  saveUsers();
+  return { ok: true, profile: publicProfile(rec) };
+}
+// POST /api/analysis/claim — офлайн-партия: сам разбор считает клиент.
+function claimAnalysis(username, password, token, gameKey) {
+  const auth = authenticate(username, password, token);
+  if (auth.error) return auth;
+  return claimAnalysisKey(usernameKey(username), gameKey);
+}
+function analysisFreeTodayRec(rec) { return !(rec.analysis && rec.analysis.day === mskDay(Date.now())); }
 function isPremium(key) {
   return isPremiumRec(users[key]);
 }
@@ -487,6 +526,10 @@ function applyOrder(order) {
   const at = order.grantedAt || Date.now();
   const points = Math.max(0, Math.round(product.points || 0));
   creditPoints(rec, points); // долг после прежнего возврата гасится первым
+  // Подписка «Трейдер»: срок продлевается от более позднего — конца текущей
+  // подписки или момента оплаты.
+  const traderDays = Products.traderDaysOf(product);
+  if (traderDays) rec.traderUntil = Math.max(at, traderUntilRec(rec)) + traderDays * DAY_MS;
   if (product.kind === "non-consumable") {
     if (!rec.entitlements || typeof rec.entitlements !== "object") rec.entitlements = {};
     // Уже есть по другому заказу (две оплаты наперегонки) — запись не трогаем:
@@ -513,6 +556,9 @@ function revokeOrder(order) {
     rec.pointsDebt = Math.max(0, Math.round(rec.pointsDebt || 0)) + entry.debt;
     rec.points = 0;
   }
+  const refunded = Products.byId(entry.productId);
+  const traderDays = Products.traderDaysOf(refunded);
+  if (traderDays) rec.traderUntil = Math.max(0, traderUntilRec(rec) - traderDays * DAY_MS);
   const ent = rec.entitlements && rec.entitlements[entry.productId];
   if (ent && ent.orderId === order.id) {
     delete rec.entitlements[entry.productId];
@@ -611,6 +657,6 @@ module.exports = {
   register, login, addPoints, publicProfile, getLeaderboard,
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
   createSession, loginWithToken, invalidateSession,
-  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, ownsProduct, isPremium, ownsScenario,
+  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, ownsProduct, isPremium, ownsScenario, traderActive, claimAnalysis, claimAnalysisKey,
   applyOrder, revokeOrder, claimAdReward, adStatus, adRewardBlock, accountShopInfo,
 };

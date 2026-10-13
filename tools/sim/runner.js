@@ -119,6 +119,7 @@ function runGame(env, cfg, gameIndex) {
   const players = seats.map((prof, i) => {
     const res = E.addPlayer(room, `P${i + 1}-${prof}`.slice(0, 20), "", "", 0, "default", true);
     if (!res || !res.player) throw new Error("addPlayer: " + (res && res.error));
+    if (PROFILES[prof].botLevel) res.player.botLevel = PROFILES[prof].botLevel;
     return res.player;
   });
   // Сценарий рынка (--set 'scenario="crisis2008"'): цены, колода и сценарные

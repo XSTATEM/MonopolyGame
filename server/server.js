@@ -336,6 +336,23 @@ function handleMessage(ws, raw) {
       }
       return run(conn, engine.updateRoomSettings(room, conn.playerId, msg.settings));
     }
+    case "requestAnalysis": {
+      // Разбор партии (engine.analyzeGame) — только своему игроку и после
+      // конца партии. С магазином: подписка «Трейдер» или один бесплатный в
+      // сутки; повторное открытие той же партии лимит не тратит.
+      if (room.phase !== "ended") return sendError(conn, "Разбор доступен после конца партии.");
+      if (Payments.shopEnabled()) {
+        if (!conn.accountUsername) return sendTo(conn.ws, { type: "analysis", error: "Войдите в аккаунт, чтобы открыть разбор.", code: "session" });
+        if (!room.analysisOpened || typeof room.analysisOpened !== "object") room.analysisOpened = {};
+        if (!room.analysisOpened[conn.playerId]) {
+          const claim = users.claimAnalysisKey(users.usernameKey(conn.accountUsername), `${room.code}:${room.createdAt || 0}`);
+          if (claim.error) return sendTo(conn.ws, { type: "analysis", error: claim.error, code: claim.code });
+          room.analysisOpened[conn.playerId] = true;
+          roomsDirty = true;
+        }
+      }
+      return sendTo(conn.ws, { type: "analysis", analysis: engine.analyzeGame(room, conn.playerId) });
+    }
     case "deleteRoom": return handleDeleteRoom(conn);
     case "chat": return run(conn, engine.sendChatMessage(room, conn.playerId, msg.text));
     case "forceEvent": {
@@ -765,6 +782,10 @@ const server = http.createServer((req, res) => {
   }
   if (reqPath === "/api/profile/photo" && req.method === "POST") {
     return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl, b.token), AUTH);
+  }
+  // Разбор офлайн-партии: сам разбор считает клиент, сервер ведёт лимит.
+  if (reqPath === "/api/analysis/claim" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => Payments.shopEnabled() ? users.claimAnalysis(b.username, b.password, b.token, b.game) : { ok: true, open: true }, AUTH);
   }
   if (reqPath === "/api/skins/buy" && req.method === "POST") {
     return handleApiPost(req, res, (b) => users.buySkin(b.username, b.password, b.skinId, b.kind, b.token), AUTH);

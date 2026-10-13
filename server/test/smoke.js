@@ -187,6 +187,20 @@ async function main() {
   check(test && test.hostName === "alice" && test.roundNumber >= 1, "room list has host and round: " + JSON.stringify(test));
   sec2.send(JSON.stringify({ type: "join", room: "secret", sessionToken: r1.body.sessionToken }));
   check(!!(await waitMsg(sec2, (m) => m.type === "joined")), "private room joinable by code");
+
+  // --- разбор партии: только после конца, своему игроку ---------------------
+  await sleep(200);
+  sec2.send(JSON.stringify({ type: "requestAnalysis" }));
+  const early = await waitMsg(sec2, (m) => m.type === "error");
+  check(early && /после конца партии/.test(early.message), "analysis refused before the game ends");
+  sec1.send(JSON.stringify({ type: "startGame" }));
+  await sleep(300);
+  sec1.send(JSON.stringify({ type: "declareBankruptcy" }));
+  await sleep(300);
+  sec2.send(JSON.stringify({ type: "requestAnalysis" }));
+  const an = await waitMsg(sec2, (m) => m.type === "analysis");
+  check(an && an.analysis && an.analysis.won === true && an.analysis.place === 1 && an.analysis.name === "alice" && Array.isArray(an.analysis.chart.me),
+    "analysis sent to the winner after the game: " + JSON.stringify(an && (an.analysis ? { won: an.analysis.won, place: an.analysis.place } : an)));
   sec1.terminate(); sec2.terminate();
 
   // --- лимит неудачных входов (HTTP) ----------------------------------------

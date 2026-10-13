@@ -216,6 +216,7 @@
       <p class="muted shop-notice" id="shopNotice" hidden></p>
       <div class="shop-providers" id="shopProviders" role="radiogroup" aria-label="Способ оплаты" hidden></div>
       <section class="shop-premium theme-dark" id="shopPremium" aria-labelledby="shopPremiumTitle" hidden></section>
+      <section class="shop-premium shop-trader theme-dark" id="shopTrader" aria-labelledby="shopTraderTitle" hidden></section>
       <section id="shopScenariosSection" aria-labelledby="shopScenariosTitle" hidden><h2 id="shopScenariosTitle">Сценарии</h2><div class="shop-grid" id="shopScenarios"></div></section>
       <section id="shopFree" aria-labelledby="shopFreeTitle" hidden>
         <h2 id="shopFreeTitle">Бесплатные очки</h2>
@@ -413,6 +414,7 @@
       <button class="secondary" id="btnAddOfflinePlayer"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-plus"/></svg> Игрок</button>
       <button class="secondary" id="btnAddOfflineBot"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-bot"/></svg> Бот</button>
     </div>
+    <div id="offlineBotLevelBox" hidden></div>
     <div class="err" id="offlineErr"></div>
     <div class="influence-group" style="margin:22px 0 8px;">Сценарий <button type="button" class="hint-q" data-hint-key="scn-offline" data-hint="Сценарий меняет стартовые цены и подкидывает исторические новости по ходу партии. Длительность задаёт сценарий: 40 ходов у каждого, затем побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></div>
     <div id="offlineScenarioBox"></div>
@@ -563,6 +565,10 @@
 
 <div class="market-event-overlay" id="marketEventOverlay" onclick="if(event.target===this) closeMarketEventModal();">
   <div class="market-event-modal" id="marketEventModalCard" role="dialog" aria-modal="true" aria-label="Биржевое событие" tabindex="-1"></div>
+</div>
+
+<div class="market-event-overlay analysis-overlay" id="analysisOverlay" onclick="if(event.target===this) closeAnalysis();">
+  <div class="market-event-modal analysis-modal" id="analysisCard" role="dialog" aria-modal="true" aria-label="Разбор партии" tabindex="-1"></div>
 </div>
 </div>
 
@@ -852,6 +858,7 @@ function showOnly(id){
     const shown = (oid)=>{ const el = document.getElementById(oid); return !!el && !!el.style.display && el.style.display !== "none"; };
     if(shown("companyModalOverlay")) closeCompanyModal();
     if(shown("marketEventOverlay")) closeMarketEventModal();
+    if(shown("analysisOverlay")) closeAnalysis();
   }
   if(id === "mainMenu") renderContinueOffline();
   const tc = document.querySelector('meta[name="theme-color"]');
@@ -2108,6 +2115,8 @@ function connectOnline(room, auth, opts){
         showOnly("app");
         render();
       }
+    } else if(msg.type === "analysis"){
+      onAnalysisMessage(msg);
     } else if(msg.type === "insiderCard"){
       pendingInsiderCard = msg.card;
       rerenderControlPanel();
@@ -2240,7 +2249,33 @@ function renderOfflinePlayersBox(){
       <span class="chip-name">${escapeHtml(p.name)}${p.isBot?' <span class="muted" style="font-weight:600;">· бот</span>':""}</span>
       <button type="button" aria-label="Убрать ${escapeHtml(p.name)}" onclick="removeOfflinePlayer(${i})">${ico("trash","ico-sm")}</button>
     </div>`).join("") || `<div class="sheet-note" style="padding:6px 2px;">Добавьте игроков или ботов</div>`;
+  const lvl = document.getElementById("offlineBotLevelBox");
+  const hasBots = offlinePlayerNames.some(p=> p.isBot);
+  if(lvl){ lvl.hidden = !hasBots; lvl.innerHTML = hasBots ? botLevelHtml() : ""; }
 }
+// Сила ботов офлайн-партии (engine.js, botLevel "strong"). С магазином сильные
+// боты — в подписке «Трейдер»; без магазина открыты всем.
+let offlineBotLevel = "";
+function botLevelHtml(){
+  const locked = paidFeaturesLocked();
+  if(offlineBotLevel === "strong" && locked) offlineBotLevel = "";
+  const strong = offlineBotLevel === "strong";
+  return `<div class="influence-group" style="margin:16px 0 8px;">Боты ${hintBtn("bot-level", "Сильные боты покупают на все свободные деньги и не упускают города. Против трёх обычных ботов сильный выигрывает почти вдвое чаще." + (window.Shop && Shop.enabled() ? " Входят в подписку «Трейдер»." : ""))}</div>
+    <div class="seg" role="radiogroup" aria-label="Сила ботов">
+      <button type="button" role="radio" aria-checked="${!strong}" aria-selected="${!strong}" onclick="pickBotLevel('')">Обычные</button>
+      <button type="button" role="radio" aria-checked="${strong}" aria-selected="${strong}" onclick="pickBotLevel('strong')"${locked ? ' aria-label="Сильные — в подписке «Трейдер»"' : ""}>${locked ? ico("lock", "ico-sm") + " " : ""}Сильные</button>
+    </div>`;
+}
+function pickBotLevel(level){
+  if(level === "strong" && paidFeaturesLocked()){
+    if(!accountUser){ openAccountModal("login"); return; }
+    if(window.Shop) Shop.open("tm_trader_30");
+    return;
+  }
+  offlineBotLevel = level === "strong" ? "strong" : "";
+  renderOfflinePlayersBox();
+}
+
 function addOfflineBot(){
   if(offlinePlayerNames.length >= 6){ document.getElementById("offlineErr").textContent = "Максимум 6 игроков."; return; }
   let n = 1;
@@ -2297,6 +2332,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
     return;
   }
   if(offlineScenario && scenarioLocked(GameEngine.scenarioById(offlineScenario))){ errEl.textContent = "Этот сценарий нужно купить в магазине."; return; }
+  if(offlineBotLevel === "strong" && paidFeaturesLocked()) offlineBotLevel = "";
   if(loadOfflineSave() && !confirm("Начать новую партию? Сохранённая офлайн-партия будет заменена.")) return;
   errEl.textContent = "";
   teardownOnline(); // висящее онлайн-подключение не должно перехватить офлайн-партию
@@ -2317,6 +2353,7 @@ document.getElementById("btnStartOffline").onclick = ()=>{
     maxTurnsPerPlayer: Number(document.getElementById("offlineMaxRounds").value) || 0,
     // Сценарий рынка (или "" — классика); длительность тогда задаёт он.
     scenario: offlineScenario,
+    botLevel: offlineBotLevel,
   });
 
   offlinePlayerNames.forEach(p=>{ GameEngine.addPlayer(localRoom, p.name, p.gender, p.avatar, 0, "default", !!p.isBot); });
@@ -3177,7 +3214,7 @@ function pickLobbyScenario(id){
 }
 // Покупка или вход поменяли доступ к сценариям — перерисовать открытый выбор.
 function refreshScenarioPickers(){
-  if(document.getElementById("offlineSetup").style.display !== "none") renderOfflineScenarios();
+  if(document.getElementById("offlineSetup").style.display !== "none"){ renderOfflineScenarios(); renderOfflinePlayersBox(); }
   if(latest && latest.phase === "lobby" && latest.hostPlayerId === latest.you) renderLobbyScenarios(latest.settings || {});
 }
 
@@ -4906,8 +4943,10 @@ function gameEndPopupHtml(s){
         ? `<div class="sheet-note">${noPointsNote}</div>`
         : `<div class="sheet-note">Только у победителя</div>`}
     </div>` : ""}
-    ${s.tutorial ? "" /* реванша у учебной партии нет (localDispatch откажет) — дальше карточка тренера */
-      : `<button type="button" class="block" style="min-height:52px;" onclick="send({type:'newGame'})">${ico("refresh")} Новая партия</button>`}
+    ${s.tutorial ? "" /* реванша и разбора у учебной партии нет (localDispatch откажет) — дальше карточка тренера */
+      : `<button type="button" class="secondary block end-analysis-btn" onclick="openAnalysis()">${ico("chart")} Разбор партии</button>
+      ${analysisNote(s) ? `<div class="muted end-analysis-note">${analysisNote(s)}</div>` : ""}
+      <button type="button" class="block" style="min-height:52px;" onclick="send({type:'newGame'})">${ico("refresh")} Новая партия</button>`}
   </div>`;
 }
 // Состав капитала строки итогов — из gameResult.ranking (engine.js checkEndGame).
@@ -4923,6 +4962,176 @@ function endCapitalParts(s, r){
   const realEstate = (s.realEstate || []).reduce((sum, x)=> sum + (x.ownerId === r.id ? (+x.price || 0) : 0), 0);
   const loan = +p.loanPrincipal || 0;
   return { cash: p.cash, stocks: Math.max(0, r.netWorth - p.cash - realEstate + loan), realEstate, loan };
+}
+
+// ---------------------------------------------------------------------
+// Разбор партии (engine.js, analyzeGame): ошибки и удачные решения в деньгах,
+// график капитала, расходы и доходы, совет. Офлайн разбор считает клиент,
+// онлайн — сервер (requestAnalysis). С магазином: подписка «Трейдер» — без
+// ограничений, без неё — один разбор в сутки (POST /api/analysis/claim; без
+// аккаунта — в этом браузере). Без магазина разбор открыт всегда.
+// ---------------------------------------------------------------------
+const LS_ANALYSIS_FREE = "tm_analysis_free";
+let analysisWanted = false;   // окно ждёт ответа сервера; закрыли — ответ не показываем
+let analysisWho = null;       // офлайн: {players:[{id,name}], pid} — чей разбор
+const analysisOpenedGames = new Set(); // онлайн: партии, разбор которых уже открыт
+function traderActive(){ const t = accountUser && accountUser.trader; return !!(t && t.active && t.until > Date.now()); }
+// Платное (сильные боты, разбор без лимита) закрыто: магазин включён, подписки нет.
+function paidFeaturesLocked(){ return !!(window.Shop && Shop.enabled()) && !traderActive(); }
+function mskDayNow(){ return new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); }
+function analysisGameKey(s){ return mode === "offline" ? "off-" + ((localRoom && localRoom.createdAt) || 0) : `${s.room}:${s.gameId || 0}`; }
+// Подпись под кнопкой разбора на экране итогов.
+function analysisNote(s){
+  if(!paidFeaturesLocked()) return "";
+  if(mode === "offline" ? !!(localRoom && localRoom.analysisOpened) : analysisOpenedGames.has(analysisGameKey(s))) return "";
+  let used = false;
+  if(accountUser) used = accountUser.analysisFreeToday === false;
+  else { try { const m = JSON.parse(localStorage.getItem(LS_ANALYSIS_FREE) || "null"); used = !!m && m.day === mskDayNow(); } catch(e){} }
+  return used ? "Бесплатный разбор на сегодня уже был — без ограничений с «Трейдером»" : "Бесплатно раз в день";
+}
+async function openAnalysis(){
+  if(analysisWanted) return;
+  if(mode === "online"){
+    if(!latest || latest.phase !== "ended") return;
+    analysisWanted = true;
+    showAnalysisCard(`<div class="analysis-loading">${ico("chart")} Готовим разбор…</div>`);
+    if(!send({type:"requestAnalysis"})) closeAnalysis();
+    return;
+  }
+  if(mode !== "offline" || !localRoom || localRoom.phase !== "ended" || localRoom.tutorial) return;
+  if(paidFeaturesLocked() && !localRoom.analysisOpened){
+    const game = analysisGameKey();
+    if(accountUser){
+      analysisWanted = true;
+      showAnalysisCard(`<div class="analysis-loading">${ico("chart")} Готовим разбор…</div>`);
+      let d;
+      try { d = await accountApiPost("/api/analysis/claim", { game }); } catch(e){ d = { error: "Нет связи с сервером — попробуйте ещё раз." }; }
+      if(!analysisWanted) return;
+      analysisWanted = false;
+      if(d.error){ showAnalysisError(d.error, d.code); return; }
+      if(d.profile && accountUser) accountUser = d.profile;
+    } else {
+      let memo = null;
+      try { memo = JSON.parse(localStorage.getItem(LS_ANALYSIS_FREE) || "null"); } catch(e){}
+      if(memo && memo.day === mskDayNow() && memo.game !== game){
+        showAnalysisError("Бесплатный разбор на сегодня уже был. Без ограничений — с подпиской «Трейдер».", "analysis_limit");
+        return;
+      }
+      try { localStorage.setItem(LS_ANALYSIS_FREE, JSON.stringify({ day: mskDayNow(), game })); } catch(e){}
+    }
+    localRoom.analysisOpened = true;
+  }
+  // Хот-сит: разбор того, чей стол на экране; людей несколько — переключатель.
+  const humans = localRoom.players.filter(p=> !p.isBot);
+  const pick = humans.find(p=> p.id === viewAs) || humans[0] || localRoom.players[0];
+  analysisWho = { players: (humans.length ? humans : [pick]).map(p=> ({ id: p.id, name: p.name })), pid: pick.id };
+  renderAnalysis(GameEngine.analyzeGame(localRoom, pick.id));
+}
+function pickAnalysisPlayer(id){
+  if(mode !== "offline" || !localRoom || !analysisWho) return;
+  analysisWho.pid = id;
+  renderAnalysis(GameEngine.analyzeGame(localRoom, id));
+}
+// Ответ сервера на requestAnalysis.
+function onAnalysisMessage(msg){
+  if(!analysisWanted) return;
+  analysisWanted = false;
+  if(msg.error){ showAnalysisError(msg.error, msg.code); return; }
+  if(latest) analysisOpenedGames.add(analysisGameKey(latest));
+  analysisWho = null;
+  renderAnalysis(msg.analysis);
+  if(paidFeaturesLocked()) refreshAccountUser(); // лимит потрачен — подпись на итогах
+}
+function openTraderShop(){
+  closeAnalysis();
+  if(window.Shop) Shop.open("tm_trader_30");
+}
+function analysisChartHtml(a){
+  const me = (a.chart && a.chart.me) || [], rv = (a.chart && a.chart.rival) || [];
+  if(me.length < 2) return "";
+  const W = 320, H = 120, L = 8, R = 8, T = 10, B = 10;
+  const maxEv = Math.max(1, ...me.map(p=> p[0]), ...rv.map(p=> p[0]));
+  const vals = me.concat(rv).map(p=> p[1]).concat([a.startNW]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if(hi - lo < 1){ hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const x = (ev)=> (L + (W - L - R) * ev / maxEv).toFixed(1);
+  const y = (v)=> (T + (H - T - B) * (1 - (v - lo) / (hi - lo))).toFixed(1);
+  const path = (pts)=> pts.map((p, i)=> `${i ? "L" : "M"}${x(p[0])},${y(p[1])}`).join("");
+  // Капитал на событии ev — последняя точка не позже него.
+  const at = (ev)=>{ let v = me[0][1]; for(const p of me){ if(p[0] <= ev) v = p[1]; else break; } return v; };
+  const marks = [].concat(
+    (a.mistakes || []).map((m, i)=> ({ ev: m.ev, cls: "bad", n: i + 1 })),
+    (a.best || []).map((m, i)=> ({ ev: m.ev, cls: "good", n: i + 1 })))
+    .map(m=> `<g class="an-mark ${m.cls}"><circle cx="${x(m.ev)}" cy="${y(at(m.ev))}" r="7"/><text x="${x(m.ev)}" y="${(+y(at(m.ev)) + 3.5).toFixed(1)}">${m.n}</text></g>`).join("");
+  return `<figure class="an-chart">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="График капитала: от ${fmt(a.startNW)} до ${fmt(a.finalNW)}, пик ${fmt(a.peak.v)}">
+      <line class="an-base" x1="${L}" x2="${W - R}" y1="${y(a.startNW)}" y2="${y(a.startNW)}"/>
+      ${rv.length > 1 ? `<path class="an-rival" d="${path(rv)}"/>` : ""}
+      <path class="an-me" d="${path(me)}"/>
+      ${marks}
+    </svg>
+    <div class="an-axis-row" aria-hidden="true"><span>старт</span><span>событие ${maxEv}</span></div>
+    <figcaption><span><i class="an-key me"></i>Вы</span>${rv.length > 1 ? `<span><i class="an-key rival"></i>${escapeHtml(a.chart.rivalName)}</span>` : ""}<span><i class="an-key base"></i>старт ${fmt(a.startNW)}</span></figcaption>
+  </figure>`;
+}
+function renderAnalysis(a){
+  if(!a){ showAnalysisError("Разбор этой партии недоступен."); return; }
+  const change = a.finalNW - a.startNW;
+  const pct = a.startNW > 0 ? Math.round(change / a.startNW * 100) : 0;
+  const head = a.won ? "Победа" : a.bankrupt ? "Банкротство" : `${a.place} место из ${a.players}`;
+  const who = analysisWho && analysisWho.players.length > 1
+    ? `<div class="chip-row analysis-who" role="radiogroup" aria-label="Чей разбор">${analysisWho.players.map(p=> `<button type="button" class="chip${p.id === analysisWho.pid ? " on" : ""}" role="radio" aria-checked="${p.id === analysisWho.pid}" onclick="pickAnalysisPlayer(${p.id})">${escapeHtml(p.name)}</button>`).join("")}</div>` : "";
+  const item = (x, i, bad)=> `<li class="an-item ${bad ? "bad" : "good"}">
+      <span class="an-num">${i + 1}</span>
+      <div class="an-text"><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.text)}</span></div>
+      <span class="an-amt">${bad ? "−" : "+"}${fmt(bad ? x.cost : x.gain)}</span>
+    </li>`;
+  const list = (title, arr, bad, empty)=> `<section class="an-sec"><h3>${title}</h3>${arr && arr.length
+    ? `<ol class="an-list">${arr.map((x, i)=> item(x, i, bad)).join("")}</ol>` : `<div class="sheet-note">${empty}</div>`}</section>`;
+  const money = (title, rows)=> rows && rows.length ? `<section class="an-sec"><h3>${title}</h3><div class="mini-card an-money">${rows.map(r=>
+      `<div class="cap-summary"><span>${escapeHtml(r.label)}${r.count > 1 ? ` · ${r.count} ${pluralRu(r.count, "раз", "раза", "раз")}` : ""}</span><b>${fmt(r.amount)}</b></div>`).join("")}</div></section>` : "";
+  const promo = window.Shop && Shop.enabled() && !traderActive()
+    ? `<div class="an-promo">${ico("chart", "ico-sm")}<span>Разбор каждой партии и сильные боты — в подписке «Трейдер».</span><button type="button" class="secondary" onclick="openTraderShop()">Подробнее</button></div>` : "";
+  showAnalysisCard(`
+    <div class="eyebrow">Разбор партии</div>
+    <h2>${ico(a.won ? "trophy" : "chart")} ${head}</h2>
+    ${who}
+    <div class="an-summary">
+      <div><span>Капитал</span><b>${fmt(a.finalNW)}</b><em class="${change >= 0 ? "up" : "down"}">${change >= 0 ? "+" : "−"}${fmt(Math.abs(change))} (${pct > 0 ? "+" : ""}${pct}%)</em></div>
+      <div><span>Пик</span><b>${fmt(a.peak.v)}</b><em>${a.peak.ev ? `событие ${a.peak.ev}` : "на старте"}</em></div>
+    </div>
+    ${analysisChartHtml(a)}
+    ${list("Ошибки, которые стоили дороже всего", a.mistakes, true, "Заметных ошибок нет.")}
+    ${list("Лучшие решения", a.best, false, "Крупных удачных решений нет.")}
+    ${money("Куда ушли деньги", a.costs)}
+    ${money("Что заплатили вам", a.income)}
+    ${a.tips && a.tips.length ? `<section class="an-sec"><h3>${a.tips.length > 1 ? "Советы" : "Совет"}</h3>${a.tips.map(t=> `<p class="an-tip">${ico("info", "ico-sm")}<span>${escapeHtml(t)}</span></p>`).join("")}</section>` : ""}
+    ${promo}`);
+}
+function showAnalysisError(text, code){
+  const cta = code === "analysis_limit" && window.Shop && Shop.enabled()
+    ? `<button type="button" class="secondary block" onclick="openTraderShop()">${ico("chart")} Подписка «Трейдер»</button>`
+    : code === "session" ? `<button type="button" class="secondary block" onclick="closeAnalysis();openAccountModal('login')">Войти</button>` : "";
+  showAnalysisCard(`<div class="eyebrow">Разбор партии</div><h2>${ico("lock")} Разбор недоступен</h2><p class="an-error">${escapeHtml(text)}</p>${cta}`);
+}
+function showAnalysisCard(bodyHtml){
+  const card = document.getElementById("analysisCard");
+  const ov = document.getElementById("analysisOverlay");
+  if(!card || !ov) return;
+  card.innerHTML = `<div class="market-event-body analysis-body">${bodyHtml}</div>
+    <button type="button" class="market-event-close-btn" onclick="closeAnalysis()">Закрыть</button>`;
+  if(ov.style.display !== "flex"){
+    ov.style.display = "flex";
+    modalFocusIn("analysisOverlay", "analysisCard");
+  }
+}
+function closeAnalysis(){
+  analysisWanted = false;
+  const ov = document.getElementById("analysisOverlay");
+  if(!ov || ov.style.display === "none" || !ov.style.display) return;
+  ov.style.display = "none";
+  modalFocusOut("analysisOverlay");
 }
 
 function rollPopupHtml(s){
@@ -5147,7 +5356,7 @@ let lastForcedPriceAlertKey = null;
 let lastForcedPriceAlertViewer = null;
 function stageSheetCovered(){
   const shown = (id)=>{ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== "none"; };
-  return activeTab !== "turn" || shown("companyModalOverlay") || shown("marketEventOverlay");
+  return activeTab !== "turn" || shown("companyModalOverlay") || shown("marketEventOverlay") || shown("analysisOverlay");
 }
 // keepEventSummary — устройство передали автоматически: сводку биржевого
 // события ещё не прочли, её не закрываем — стол открывается под ней, и лист
@@ -5381,7 +5590,7 @@ function refreshOpenModal(){
 // поле перерисовывается на каждое состояние, поэтому элемент ищем и по позиции.
 let modalReturnFocus = {};
 function anyModalOpen(){
-  return ["companyModalOverlay","marketEventOverlay"].some(id=>{ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== "none"; });
+  return ["companyModalOverlay","marketEventOverlay","analysisOverlay"].some(id=>{ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== "none"; });
 }
 function syncModalInert(){
   const main = document.querySelector("#app > main");
@@ -5856,6 +6065,7 @@ function handleBackNavigation(){
   // Открыт вопрос «Выйти из обучения?» — «Назад» значит «Продолжить обучение».
   // Только за столом: на экране правил вопрос скрыт, и «Назад» возвращает в игру.
   if(inGame && window.Tutorial && Tutorial.confirmOpen()){ Tutorial.closeConfirm(); return true; }
+  if(inGame && visible("analysisOverlay")){ closeAnalysis(); return true; }
   if(inGame && visible("marketEventOverlay")){ closeMarketEventModal(); return true; }
   if(inGame && visible("companyModalOverlay")){ closeCompanyModal(); return true; }
   if(visible("accountModalOverlay")){ closeAccountModal(); return true; }

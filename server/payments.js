@@ -680,6 +680,7 @@ function catalogFor(platform) {
     subtitle: p.subtitle,
     points: p.points || 0,
     premium: !!p.premium,
+    traderDays: Products.traderDaysOf(p),
     unlocks: Products.unlocksOf(p),
     price: rubPrice ? { value: Products.rubValue(p), currency: "RUB", text: Products.rubText(p) } : null,
     storeIds: { rustore: Products.storeId(p, "rustore"), googleplay: Products.storeId(p, "googleplay") },
@@ -692,6 +693,7 @@ function catalogFor(platform) {
     receipts: providers.includes("yookassa") && !!CFG.yookassa.receipts,
     products,
     premiumBenefits: Products.PREMIUM_BENEFITS.slice(),
+    traderBenefits: Products.TRADER_BENEFITS.slice(),
     ads,
     legal: Object.assign({}, CFG.legal),
   };

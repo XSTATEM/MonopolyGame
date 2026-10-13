@@ -176,12 +176,17 @@
   }
   // Товар сценариев считается купленным и тогда, когда все его сценарии уже
   // открыты другими покупками (набор «Все сценарии» после трёх по отдельности).
+  // Купленные навсегда (boughtScenarios), без открытых подпиской «Трейдер»:
+  // сценарий можно купить навсегда и при активной подписке.
   function ownsScenarios(p){
     const ids = (p && p.unlocks && p.unlocks.scenarios) || [];
-    const own = accountUser && Array.isArray(accountUser.ownedScenarios) ? accountUser.ownedScenarios : [];
+    const own = accountUser && Array.isArray(accountUser.boughtScenarios) ? accountUser.boughtScenarios : [];
     return ids.length > 0 && ids.every((id)=> own.includes(id));
   }
   function isScenarioProduct(p){ return !!(p && p.unlocks && p.unlocks.scenarios && p.unlocks.scenarios.length); }
+  function isTraderProduct(p){ return !!(p && p.traderDays > 0); }
+  function traderInfo(){ const t = accountUser && accountUser.trader; return t && t.active && t.until > Date.now() ? t : null; }
+  function dateRu(ms){ try { return new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }); } catch(e){ return ""; } }
   function owns(p){ return !!p && p.kind === "non-consumable" && (ownedIds().has(p.id) || ownsScenarios(p)); }
 
   // --- Данные аккаунта для магазина (видео за сутки, история покупок) ---------
@@ -201,7 +206,8 @@
       const sp = storePrices[storeIdOf(p, prov)];
       return sp && sp.priceText ? "Купить · " + sp.priceText : "Купить";
     }
-    return p.price && p.price.text ? "Купить за " + p.price.text : "Купить";
+    const verb = isTraderProduct(p) && traderInfo() ? "Продлить" : "Купить";
+    return p.price && p.price.text ? verb + " за " + p.price.text : verb;
   }
   function buyButtonHtml(p, cls){
     if(owns(p)) return `<button type="button" class="secondary" disabled>Куплено</button>`;
@@ -230,6 +236,18 @@
       ${previewHtml(p)}
       ${buyButtonHtml(p)}
     </div>`;
+  }
+  // Подписка «Трейдер»: польза и контент на 30 дней, без автопродления.
+  function traderHtml(p){
+    const benefits = Array.isArray(catalog.traderBenefits) ? catalog.traderBenefits : [];
+    const t = traderInfo();
+    return `<div class="shop-premium-head">
+        <span class="shop-premium-icon shop-trader-icon">${ico("chart")}</span>
+        <div><h2 id="shopTraderTitle">Подписка «Трейдер»</h2><div class="shop-premium-sub">${p.traderDays} дней · без автопродления</div></div>
+      </div>
+      ${benefits.length ? `<ul class="shop-premium-list">${benefits.map((b)=> `<li>${ico("check", "ico-sm")}<span>${escapeHtml(b)}</span></li>`).join("")}</ul>` : `<p class="shop-premium-text">${escapeHtml(p.subtitle || "")}</p>`}
+      ${t ? `<div class="shop-premium-active shop-trader-active">${ico("check", "ico-sm")} Активна до ${escapeHtml(dateRu(t.until))}</div>` : ""}
+      ${buyButtonHtml(p, "shop-premium-buy")}`;
   }
   function premiumHtml(p){
     const benefits = Array.isArray(catalog.premiumBenefits) ? catalog.premiumBenefits : [];
@@ -383,7 +401,13 @@
       free.hidden = true;
     }
 
-    const points = list.filter((p)=> p.kind === "consumable");
+    const trader = list.find(isTraderProduct);
+    const traderBox = byId("shopTrader");
+    traderBox.hidden = !trader;
+    traderBox.innerHTML = trader ? traderHtml(trader) : "";
+    traderBox.classList.toggle("shop-focus", !!trader && highlighted(trader.id));
+
+    const points = list.filter((p)=> p.kind === "consumable" && !isTraderProduct(p));
     byId("shopPointsSection").hidden = !points.length;
     byId("shopPointsSection").classList.toggle("shop-focus", highlighted("points"));
     byId("shopPoints").innerHTML = points.map(cardHtml).join("");
@@ -446,7 +470,8 @@
   }
   function focusProduct(id){
     // id товара, "tm_premium" — карточка Премиума, "points" — раздел очков («Пополнить» в скинах).
-    const el = id === "tm_premium" ? byId("shopPremium") : id === "points" ? byId("shopPointsSection") : byId("shopItem-" + id);
+    const el = id === "tm_premium" ? byId("shopPremium") : id === "points" ? byId("shopPointsSection")
+      : isTraderProduct(productById(id)) ? byId("shopTrader") : byId("shopItem-" + id);
     if(!el || el.hidden) return;
     const reduced = document.body.classList.contains("reduce-motion")
       || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -585,6 +610,7 @@
   function grantText(p){
     if(!p) return "";
     if(p.premium) return "Премиум активен" + (p.points ? ` · +${pointsLabel(p.points)}` : "");
+    if(isTraderProduct(p)){ const t = traderInfo(); return t ? `«Трейдер» активен до ${dateRu(t.until)}` : "«Трейдер» активен"; }
     if(p.kind === "consumable") return "+" + pointsLabel(p.points || 0);
     return `${p.title} — в разделе «Скины»`;
   }

@@ -1793,3 +1793,53 @@ body.reduce-motion .coach-ring.pulse{animation:none;}
   .coach-dim, .coach-dim-fill, .coach-hole, .coach-ring, .coach-card, .coach-mini{transition:none;}
   .coach-ring.pulse{animation:none;}
 }
+
+/* Разбор партии (index.html, renderAnalysis): сводка, график капитала с
+   отметками решений, ошибки и удачи, расходы, совет. */
+.analysis-overlay{z-index:62;}
+.analysis-body h2 .ico{color:var(--stage-accent);}
+.analysis-loading{display:flex;align-items:center;justify-content:center;gap:10px;min-height:120px;color:var(--text-2);font-weight:600;}
+.analysis-who{margin:6px 0 10px;}
+.an-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 12px;}
+.an-summary > div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);}
+.an-summary span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);}
+.an-summary b{font-family:var(--font-mono, ui-monospace, monospace);font-size:18px;color:var(--text);font-variant-numeric:tabular-nums;}
+.an-summary em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--text-2);}
+.an-summary em.up{color:var(--up);} .an-summary em.down{color:var(--down);}
+.an-chart{margin:0 0 14px;padding:10px 10px 8px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);}
+.an-chart svg{display:block;width:100%;height:auto;max-height:200px;overflow:visible;}
+.an-axis-row{display:flex;justify-content:space-between;margin-top:2px;font-size:11px;font-weight:600;color:var(--text-3);}
+.an-chart .an-me{fill:none;stroke:var(--stage-accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;}
+.an-chart .an-rival{fill:none;stroke:var(--text-3);stroke-width:1.6;stroke-dasharray:4 4;stroke-linejoin:round;}
+.an-chart .an-base{stroke:var(--line-strong);stroke-width:1;stroke-dasharray:2 4;}
+.an-mark circle{stroke:var(--surface-2);stroke-width:2;}
+.an-mark.bad circle{fill:var(--down);} .an-mark.good circle{fill:var(--up);}
+.an-mark text{font-size:9px;font-weight:800;fill:#fff;text-anchor:middle;}
+.an-chart figcaption{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:12px;color:var(--text-2);}
+.an-chart figcaption span{display:inline-flex;align-items:center;gap:6px;}
+.an-key{display:inline-block;width:16px;height:0;border-top:2.5px solid var(--stage-accent);}
+.an-key.rival{border-top:1.6px dashed var(--text-3);}
+.an-key.base{border-top:1px dashed var(--line-strong);}
+.analysis-body .an-sec{background:transparent;border:none;border-radius:0;padding:0;box-shadow:none;margin:0 0 16px;}
+.an-sec h3{margin:0 0 8px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);}
+.an-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.an-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:10px 12px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);}
+.an-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;margin-top:1px;}
+.an-item.bad .an-num{background:var(--down);} .an-item.good .an-num{background:var(--up);}
+.an-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.an-text b{font-size:14px;color:var(--text);}
+.an-text span{font-size:13px;line-height:1.4;color:var(--text-2);}
+.an-amt{font-family:var(--font-mono, ui-monospace, monospace);font-weight:800;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.an-item.bad .an-amt{color:var(--down);} .an-item.good .an-amt{color:var(--up);}
+.an-money{padding:4px 14px;}
+.an-tip{display:flex;gap:8px;align-items:flex-start;margin:0 0 6px;font-size:13.5px;line-height:1.45;color:var(--text);}
+.an-tip .ico{flex:none;margin-top:2px;color:var(--stage-accent);}
+.an-promo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px;border-radius:var(--r-md);background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);font-size:13.5px;font-weight:600;}
+.an-promo > span{flex:1 1 180px;min-width:0;}
+.an-promo .ico{color:var(--warn);}
+.an-promo button{min-height:40px;}
+.an-error{font-size:14px;color:var(--text-2);margin:8px 0 14px;}
+.end-analysis-btn{min-height:48px;margin-top:14px;}
+.end-analysis-note{font-size:12.5px;margin:6px 0 10px;}
+.shop-trader-icon{background:var(--accent);color:var(--on-accent);}
+.shop-trader-active{margin-bottom:10px;}
