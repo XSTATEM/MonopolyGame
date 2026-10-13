@@ -503,7 +503,7 @@
     if (!sc) return;
     (sc.script || []).filter((e) => e.event === room.eventCount).forEach((e) => {
       if (e.warn) addLog(room, `📌 Слухи: ${e.warn}`, "news");
-      if (e.card) applyNewsCard(room, e.card, "📌 Сценарий");
+      if (e.card) applyNewsCard(room, e.card, "Сценарий");
     });
   }
   // Уклон долгосрочного тренда компании на этом событии по сценарию.
@@ -1113,7 +1113,7 @@
   function liveCompanies(room) { return COMPANIES.filter((c) => !room.companies[c.ticker].merged); }
 
   // Розыгрыш карты новостей: карта колоды на событии или сценарная новость
-  // (prefix — «📌 Сценарий» в ленте). Карта точечной новости с ticker бьёт по
+  // (prefix «Сценарий» — в ленте «📌 Сценарий · …»). Карта точечной новости с ticker бьёт по
   // этой компании, без него — по случайной из живых.
   function applyNewsCard(room, card, prefix) {
     const pre = prefix ? prefix + " · " : "";

@@ -758,7 +758,7 @@ async function createOrder(b) {
   if (!providersFor(platform).includes(provider)) return fail("provider_disabled");
   const product = Products.byId(String(b.productId || ""));
   if (!product || !product.enabled) return fail("unknown_product");
-  if (product.kind === "non-consumable" && users.hasEntitlement(key, product.id)) return fail("already_owned");
+  if (product.kind === "non-consumable" && users.ownsProduct(key, product)) return fail("already_owned");
   const now = Date.now();
   if (provider === "rustore" || provider === "googleplay") {
     const same = reusableStoreOrder(key, provider, platform, product.id, now);
@@ -984,7 +984,7 @@ async function verify(b) {
     if (provider === "rustore" && po && po.user === key && Date.now() - (po.lastCheckAt || 0) >= RS_RECHECK_MS) await rustoreRecheck(po, Date.now());
     return alreadyGranted(prev, key);
   }
-  if (product.kind === "non-consumable" && users.hasEntitlement(key, product.id)) {
+  if (product.kind === "non-consumable" && users.ownsProduct(key, product)) {
     console.warn(`Магазин: ${provider}-покупка ${tokenTag} (${product.id}) — товар уже есть на аккаунте, не выдаю. RuStore: вернуть деньги вручную; Google вернёт сам через 3 дня.`);
     return fail("already_owned");
   }
@@ -1047,7 +1047,7 @@ async function verify(b) {
     console.warn(`Магазин: покупка Google ${tokenTag} уже потреблена не нами — не выдаю.`);
     return fail("invalid_purchase");
   }
-  if (product.kind === "non-consumable" && users.hasEntitlement(key, product.id)) return fail("already_owned");
+  if (product.kind === "non-consumable" && users.ownsProduct(key, product)) return fail("already_owned");
   if (!order || !pickOrder(order.id, key, provider, product)) {
     order = newOrder({ user: key, productId: product.id, provider, platform, note: b.orderId ? null : "досылка покупки" });
     saveOrders();

@@ -216,13 +216,13 @@
       <p class="muted shop-notice" id="shopNotice" hidden></p>
       <div class="shop-providers" id="shopProviders" role="radiogroup" aria-label="Способ оплаты" hidden></div>
       <section class="shop-premium theme-dark" id="shopPremium" aria-labelledby="shopPremiumTitle" hidden></section>
+      <section id="shopScenariosSection" aria-labelledby="shopScenariosTitle" hidden><h2 id="shopScenariosTitle">Сценарии</h2><div class="shop-grid" id="shopScenarios"></div></section>
       <section id="shopFree" aria-labelledby="shopFreeTitle" hidden>
         <h2 id="shopFreeTitle">Бесплатные очки</h2>
         <button type="button" id="btnRewardedAd"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-play"/></svg> <span id="btnRewardedAdLabel">Смотреть видео · +10 очков</span></button>
         <div class="muted" id="shopAdStatus"></div>
       </section>
       <section id="shopPointsSection" aria-labelledby="shopPointsTitle" hidden><h2 id="shopPointsTitle">Очки</h2><div class="shop-grid" id="shopPoints"></div></section>
-      <section id="shopScenariosSection" aria-labelledby="shopScenariosTitle" hidden><h2 id="shopScenariosTitle">Сценарии</h2><div class="shop-grid" id="shopScenarios"></div></section>
       <section id="shopSetsSection" aria-labelledby="shopSetsTitle" hidden><h2 id="shopSetsTitle">Наборы</h2><div class="shop-grid" id="shopSets"></div></section>
       <div class="shop-email" id="shopEmailRow" hidden>
         <label for="shopEmail">Email для чека</label>
@@ -2905,18 +2905,35 @@ function detectFinale(prev, msg){
 function eventSummaryEnabled(){
   try { return localStorage.getItem("tm_event_summary") !== "0"; } catch(e){ return true; }
 }
+// Строка плашки сценария: «📌 Сценарий · [Отраслевая, Технологии] Распродажа: -25%»
+// → «Распродажа: −25%» и отрасль мелко; «📌 Слухи: …» — с меткой «Слухи».
+function scenarioNewsLineHtml(text){
+  const t = text.replace(/^📌\s*/, "").replace(/^Сценарий · /, "");
+  const rumor = t.match(/^Слухи:\s*(.+)$/);
+  if(rumor) return `<div class="scn-line rumor"><b>Слухи</b> ${escapeHtml(rumor[1])}</div>`;
+  const m = t.match(/^\[([^\]]+)\]\s*(.+)$/);
+  const kind = m ? m[1] : "", body = (m ? m[2] : t).replace(/(:\s*)-(\d)/, "$1−$2");
+  const where = /^Отраслевая, /.test(kind) ? kind.replace(/^Отраслевая, /, "") : "";
+  return `<div class="scn-line">${escapeHtml(body)}${where ? ` <span class="scn-where">${escapeHtml(where)}</span>` : ""}</div>`;
+}
 function openMarketEventModal(msg, prev){
   const tagLabel = `Событие ${msg.eventCount}`;
   const entries = (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag !== "header" && e.tag !== "turn");
   const card = document.getElementById("marketEventModalCard");
   if(!card) return;
-  // Сценарные новости и слухи (engine.js, runScenarioScript) — плашкой сверху.
-  const scenarioNews = entries.filter(e=> /^📌/.test(String(e.text||"")));
-  const scenarioNewsHtml = scenarioNews.length ? `<div class="event-scenario">${scenarioNews.map(e=>`<div>${escapeHtml(String(e.text).replace(/^📌\s*/, ""))}</div>`).join("")}</div>` : "";
+  // Сценарные новости и слухи (engine.js, runScenarioScript) — плашкой сверху,
+  // а не строкой в общем списке.
+  const isScenarioEntry = (e)=> /^📌/.test(String(e.text||""));
+  const scenarioNews = entries.filter(isScenarioEntry);
+  const evScn = scenarioNews.length && msg.settings && msg.settings.scenario ? GameEngine.scenarioById(msg.settings.scenario) : null;
+  const scenarioNewsHtml = scenarioNews.length ? `<div class="event-scenario">
+      ${evScn ? `<div class="event-scenario-title">${ico("news","ico-sm")} Сценарий «${escapeHtml(evScn.title)}»</div>` : ""}
+      ${scenarioNews.map(e=> scenarioNewsLineHtml(String(e.text))).join("")}
+    </div>` : "";
   // Однотипные записи (бонусы к репутации, налоги на недвижимость) — одной строкой.
   const groups = [];
   const byKey = {};
-  entries.forEach(e=>{
+  entries.filter(e=> !isScenarioEntry(e)).forEach(e=>{
     const text = String(e.text||"");
     const key = /бонус к репутации/.test(text) ? "rep" : /налог на недвижимость/.test(text) ? "retax" : null;
     if(key){

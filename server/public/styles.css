@@ -474,6 +474,10 @@ body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
 .scn-badge .hint-q .ico{width:13px;height:13px;}
 .event-scenario{display:flex;flex-direction:column;gap:4px;padding:10px 12px;margin:0 0 12px;border-radius:var(--r-md);
   background:var(--warn-bg);color:var(--text);font-size:13.5px;font-weight:600;border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);}
+.event-scenario-title{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);}
+.event-scenario .scn-line{line-height:1.35;}
+.event-scenario .scn-line.rumor b{font-weight:700;color:var(--warn);margin-right:2px;}
+.event-scenario .scn-where{font-size:12px;font-weight:500;color:var(--text-2);white-space:nowrap;}
 
 /* Лобби: код комнаты крупно, рядом «Копировать» и «Пригласить» */
 .lobby-code{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:12px 14px;margin:0 0 14px;border-radius:var(--r-md);

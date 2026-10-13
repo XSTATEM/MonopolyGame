@@ -524,7 +524,9 @@ async function main() {
   check(cat.enabled === true && cat.mock === true && JSON.stringify(cat.providers) === '["mock"]' && cat.receipts === false, "каталог: enabled, mock");
   const p300 = cat.products && cat.products.find((p) => p.id === "tm_points_300");
   check(p300 && p300.price && p300.price.value === "99.00" && p300.price.text === "99 ₽" && p300.storeIds.rustore === "tm_points_300", "цена tm_points_300 в каталоге");
-  check(cat.products.length === 5 && !cat.products.some((p) => p.id === "tm_points_4500"), "выключенный tm_points_4500 не в каталоге");
+  check(cat.products.length === 9 && !cat.products.some((p) => p.id === "tm_points_4500"), "выключенный tm_points_4500 не в каталоге");
+  const scnAll = cat.products.find((p) => p.id === "tm_scn_all");
+  check(scnAll && scnAll.price.text === "349 ₽" && JSON.stringify(scnAll.unlocks.scenarios) === '["crisis2008","rumarket","commodity"]', "каталог: набор «Все сценарии»");
   check(cat.ads && cat.ads.enabled === false, "на сайте рекламы нет");
   check(Array.isArray(cat.premiumBenefits) && cat.premiumBenefits.length === 5 && JSON.stringify(cat.legal) === "{}", "преимущества Премиума; legal пуст без SHOP_*");
   const catD = (await get("/api/shop/catalog?platform=direct")).body;
@@ -576,6 +578,16 @@ async function main() {
   const set = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_set_wallstreet", provider: "mock", platform: "direct" }));
   check(set.status === 200 && set.body.user.ownedBoardSkins.includes("wallstreet") && set.body.user.ownedAvatarPacks.includes("wallstreet") && !set.body.user.premium && !set.body.user.ownedBoardSkins.includes("gold"), "набор «Уолл-стрит» открывает только свои скины");
 
+  // Сценарии: бесплатный открыт всем, платный — после покупки; набор открывает
+  // все, и купить отдельный сценарий поверх набора уже нельзя.
+  check(JSON.stringify(set.body.user.ownedScenarios) === '["dotcom"]', "без покупок открыт только бесплатный сценарий");
+  const sc1 = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_crisis2008", provider: "mock", platform: "web" }));
+  check(sc1.status === 200 && JSON.stringify(sc1.body.user.ownedScenarios) === '["dotcom","crisis2008"]', "сценарий «Кризис 2008» открыт");
+  const scAll = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_all", provider: "mock", platform: "web" }));
+  check(scAll.status === 200 && JSON.stringify(scAll.body.user.ownedScenarios) === '["dotcom","crisis2008","rumarket","commodity"]', "набор открывает все сценарии");
+  const scAgain = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_rumarket", provider: "mock", platform: "web" }));
+  check(scAgain.status === 400 && scAgain.body.code === "already_owned", "сценарий из набора повторно не продаётся");
+
   // Видео: у Bob лимит 2 (без Премиума), у Old — 4.
   const adStart = () => post("/api/ads/start", Object.assign(acc("Bob", bobTok), { provider: "yandex", adUnit: "demo-rewarded-yandex", platform: "direct" }));
   const s1 = await adStart();
@@ -614,7 +626,7 @@ async function main() {
   const v3 = await post("/api/shop/verify", Object.assign(acc("Old", oldTok), { provider: "mock", productId: "tm_points_700", purchaseToken: "tok-1" }));
   check(v3.body.alreadyGranted === true && v3.body.user.points === 1600, "повтор verify после перезапуска — без выдачи");
   const ordersFile = JSON.parse(fs.readFileSync(path.join(DATA, "orders.json"), "utf8"));
-  check(ordersFile.v === 1 && Object.keys(ordersFile.grants).length === 4 && !fs.existsSync(path.join(DATA, "orders.json.tmp")), "orders.json: 4 выдачи, без обрывков записи");
+  check(ordersFile.v === 1 && Object.keys(ordersFile.grants).length === 6 && !fs.existsSync(path.join(DATA, "orders.json.tmp")), "orders.json: 6 выдач (с двумя сценариями), без обрывков записи");
 
   await restart(Object.assign({}, MOCK_ENV, { NODE_ENV: "production" }));
   const catProd = (await get("/api/shop/catalog?platform=direct")).body;

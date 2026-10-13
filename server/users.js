@@ -460,6 +460,17 @@ function hasEntitlement(key, productId) {
   const rec = users[key];
   return !!(rec && rec.entitlements && rec.entitlements[productId]);
 }
+// Покупать незачем: товар уже есть или все его сценарии открыты другой
+// покупкой (отдельный сценарий после набора «Все сценарии» и наоборот).
+function ownsProduct(key, product) {
+  if (hasEntitlement(key, product.id)) return true;
+  const ids = Products.unlocksOf(product).scenarios;
+  if (!ids.length) return false;
+  const rec = users[key];
+  if (!rec) return false;
+  const own = ownedScenariosRec(rec);
+  return ids.every((id) => own.includes(id));
+}
 function isPremium(key) {
   return isPremiumRec(users[key]);
 }
@@ -600,6 +611,6 @@ module.exports = {
   register, login, addPoints, publicProfile, getLeaderboard,
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
   createSession, loginWithToken, invalidateSession,
-  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, isPremium, ownsScenario,
+  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, ownsProduct, isPremium, ownsScenario,
   applyOrder, revokeOrder, claimAdReward, adStatus, adRewardBlock, accountShopInfo,
 };
