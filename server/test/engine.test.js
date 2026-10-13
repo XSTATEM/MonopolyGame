@@ -25,8 +25,11 @@ const realRandom = Math.random;
 function fixRandom(v) { Math.random = () => v; }
 
 // --- заготовки комнат ----------------------------------------------------
+// Большинство сценариев ниже проверяют прежние правила (плата за отказ) —
+// по ним доигрываются старые комнаты. Правила 2 — в своём разделе (v2game).
 function lobby(names, bots) {
   const r = E.freshRoom("T");
+  r.rulesV = 1;
   names.forEach((n) => E.addPlayer(r, n, "", "", 0, "default", !!bots));
   return r;
 }
@@ -408,6 +411,7 @@ test("исключение: короткий обрыв цели во время
 
 test("исключение: бота — одним голосом, боты сами не голосуют", () => {
   const r = E.freshRoom("O");
+  r.rulesV = 1; // прежние правила
   E.addPlayer(r, "Me", "", "", 0, "default", false);
   E.addPlayer(r, "Bot1", "", "", 0, "default", true);
   E.addPlayer(r, "Bot2", "", "", 0, "default", true);
@@ -500,7 +504,7 @@ function botsUntil(r, id) {
   }
   assert.equal(E.currentPlayerId(r), id, "ход не вернулся к человеку");
 }
-test("обучение: клетки сценария, плата за отказ без пропуска, событие после хода Омеги", () => {
+test("обучение: клетки сценария, обязательная плата держателям, событие после хода Омеги", () => {
   const rooms = [];
   // Случайны только доли, которые покупают боты, и кубик волатильности.
   for (let trial = 0; trial < 25; trial++) {
@@ -517,17 +521,18 @@ test("обучение: клетки сценария, плата за отка�
     assert.ok(!E.buyFromRoll(r, meId, 10).error);
     assert.ok(!E.endTurn(r, meId).error);
     botsUntil(r, meId);
-    // Ход 2: Coca-Cola, 45% у двух ботов — плата за отказ списывается всегда и делится по долям.
+    // Ход 2: Coca-Cola, 45% у двух ботов — плата держателям списывается при
+    // попадании (правила 2) и делится по долям; дальше — «не покупать».
+    const cash0 = me.cash + 450, a0 = bot(0).cash, o0 = bot(1).cash; // +450 — зарплата за бросок
     assert.ok(!E.rollDice(r, meId).error);
     assert.deepEqual([r.pendingRoll.row, r.pendingRoll.col, r.pendingRoll.ticker], [9, 5, "KO"]);
     const meta = E.buildStatePayload(r, meId).pendingRollMeta;
-    assert.equal(meta.refuseSkipChance, 0, "в обучении подсказки о пропуске выплаты нет");
     assert.equal(meta.controllerId, null);
-    const cash0 = me.cash, a0 = bot(0).cash, o0 = bot(1).cash;
-    assert.ok(!E.dividendFromRoll(r, meId).error);
+    assert.ok(meta.fee && meta.fee.settled && meta.fee.reason === "paid", "плата прошла при броске");
     const fee = cash0 - me.cash;
-    assert.ok(fee > 1000, "плата за отказ не списана: " + fee);
+    assert.ok(fee > 1000 && fee === meta.fee.paid, "плата держателям не списана: " + fee);
     assert.ok(Math.abs((bot(0).cash - a0) - 2 * (bot(1).cash - o0)) < 1, "плата делится 30:15");
+    assert.ok(!E.skipRoll(r, meId).error, "«не покупать»");
     assert.ok(!E.endTurn(r, meId).error);
     botsUntil(r, meId);
     // Ход 3: Лас-Вегас, свободен.
@@ -549,9 +554,9 @@ test("обучение: клетки сценария, плата за отка�
     const st = E.buildStatePayload(r, meId);
     assert.equal(st.tutorial, true);
     assert.equal(st.companies.find((c) => c.ticker === "NVDA").controllerId, meId);
-    ["espionage", "negativeInfo", "insiderPeek", "shortDeposit"].forEach((k) => {
-      assert.ok(st.myMeasureCosts[k] > 0 && st.myMeasureCosts[k] < me.cash, `мера ${k}: ${st.myMeasureCosts[k]}`);
-    });
+    // Правила 2: меры бесплатны (с перезарядкой), шорт — по-прежнему залог.
+    ["espionage", "negativeInfo", "insiderPeek"].forEach((k) => assert.equal(st.myMeasureCosts[k], 0, `мера ${k} бесплатна`));
+    assert.ok(st.myMeasureCosts.shortDeposit > 0 && st.myMeasureCosts.shortDeposit < me.cash, "залог шорта");
     // Очереди исчерпаны, а наружу (в состояние для клиента) они не уходят вовсе.
     Object.values(r.scriptedRolls).forEach((q) => assert.equal(q.length, 0));
     assert.ok(!JSON.stringify(st).includes("scriptedRolls"));
@@ -656,6 +661,7 @@ test("контролёр: срок идёт с броска, без контро
 
 test("контролёр-человек молчит, бросающий — бот: после срока бот платит по тарифу", () => {
   const r = E.freshRoom("T");
+  r.rulesV = 1; // прежние правила
   E.addPlayer(r, "A", "", "", 0, "default", true);
   E.addPlayer(r, "B", "", "", 0, "default", false);
   assert.ok(!E.startGame(r, r.hostPlayerId).error);
@@ -1035,6 +1041,7 @@ test("кредит: бонус за частичное погашение не �
 
 test("новая комната: «до банкротства» со страховкой 150 ходов у каждого и плата за отказ [60, 45, 30] по кривой", () => {
   const r = E.freshRoom("T");
+  r.rulesV = 1; // прежние правила
   // Длительность — в своих ходах у каждого; раунды посчитает startGame.
   assert.equal(r.maxRounds, null);
   assert.equal(r.settings.maxTurnsPerPlayer, 150);
@@ -1171,6 +1178,7 @@ function engineWith(consts) {
 // Как rollOnHeld, но на заданной копии движка; ботом может быть только B.
 function rollOnHeldWith(X, names, heldPct, ticker, botB) {
   const r = X.freshRoom("T");
+  r.rulesV = 1; // прежние правила
   names.forEach((n) => X.addPlayer(r, n, "", "", 0, "default", !!botB && n === "B"));
   const res = X.startGame(r, r.hostPlayerId);
   assert.ok(!res.error, "startGame: " + res.error);
@@ -1587,9 +1595,9 @@ test("разбор: отказ при деньгах на покупку — о�
   const m = a.mistakes[0];
   assert.ok(m && m.title === "Отказ от Apple", "главная ошибка — отказ: " + JSON.stringify(a.mistakes));
   assert.equal(m.cost, rec.paid + Math.round(0.10 * px), "плата + рост 10% доли");
-  assert.ok(a.costs.some((c) => c.label === "Плата за отказ" && c.amount === rec.paid && c.count === 1), "расходы");
+  assert.ok(a.costs.some((c) => c.label === "Плата держателям" && c.amount === rec.paid && c.count === 1), "расходы");
   const b = E.analyzeGame(r, P(r, "B").id);
-  assert.ok(b.income.some((x) => x.label === "Плата за отказ от соперников" && x.amount === rec.paid), "доход держателя");
+  assert.ok(b.income.some((x) => x.label === "Плата держателям от соперников" && x.amount === rec.paid), "доход держателя");
   return r;
 });
 test("разбор: удачная покупка и ранняя продажа, график капитала по событиям", () => {
@@ -1666,6 +1674,190 @@ test("сильные боты: покупают максимум доступн�
   E.updateRoomSettings(l, l.hostPlayerId, { botLevel: "" });
   assert.equal(l.settings.botLevel, undefined, "обычные — без ключа");
   return r;
+});
+
+// ---------------------------------------------------------------------
+// Правила 2 (rulesV2): обязательная плата, покупка вне броска, дивиденды,
+// меры с перезарядкой, комиссия банка, сделки ботов
+// ---------------------------------------------------------------------
+function v2game(names, bots) {
+  const r = E.freshRoom("V");
+  assert.equal(r.rulesV, 2, "новая комната — правила 2");
+  names.forEach((n) => E.addPlayer(r, n, "", "", 0, "default", !!bots));
+  const res = E.startGame(r, r.hostPlayerId);
+  assert.ok(!res.error, "startGame: " + res.error);
+  r.turnOrder = r.players.map((p) => p.id);
+  r.turnIndex = 0;
+  r.settings.eventIntervalTurns = 100;
+  return r;
+}
+// Ходящий A бросает ровно на клетку компании ticker.
+function rollOnto(r, who, ticker) {
+  r.scriptedRolls = { [who.id]: [cellOf(ticker)] };
+  const res = E.rollDice(r, who.id);
+  assert.ok(!res.error, "rollDice: " + res.error);
+  assert.equal(r.pendingRoll.ticker, ticker);
+}
+test("правила 2: плата держателям списывается при попадании, покупка — сверх неё", () => {
+  const r = v2game(["A", "B", "C"]);
+  const A = P(r, "A"), B = P(r, "B"), C = P(r, "C");
+  B.holdings.AAPL = 20; C.holdings.AAPL = 10;
+  const a0 = A.cash, b0 = B.cash, c0 = C.cash;
+  rollOnto(r, A, "AAPL");
+  const fee = r.pendingRoll.fee;
+  assert.ok(fee.settled && fee.reason === "paid" && fee.paid > 0, "плата прошла: " + JSON.stringify(fee));
+  assert.equal(Math.round(a0 + 450 - A.cash), fee.paid, "списано с бросившего");
+  assert.ok(Math.abs((B.cash - b0) - 2 * (C.cash - c0)) < 1, "делится 20:10");
+  const meta = E.buildStatePayload(r, A.id).pendingRollMeta;
+  assert.equal(meta.rulesV, 2);
+  assert.ok(meta.fee.settled && meta.fee.paid === fee.paid);
+  const cash1 = A.cash;
+  assert.ok(!E.buyFromRoll(r, A.id, 5).error, "покупка после платы");
+  assert.ok(A.cash < cash1 && A.holdings.AAPL === 5, "покупка списала только цену доли");
+  return r;
+});
+test("правила 2: своя доля снижает плату на 10% за процент, с 10% — без платы", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings.AAPL = 30;
+  rollOnto(r, A, "AAPL");
+  const full = r.pendingRoll.fee.paid;
+  E.skipRoll(r, A.id); E.endTurn(r, A.id); E.rollDice(r, B.id); r.pendingRoll = null; E.endTurn(r, B.id);
+  A.holdings.AAPL = 5;
+  rollOnto(r, A, "AAPL");
+  const half = r.pendingRoll.fee.paid;
+  // Между бросками цена чуть сдвигается (фоновый шум) — сравниваем долю.
+  assert.ok(Math.abs(half / full - 0.5) < 0.02, `5% — скидка половина: ${half} при полной ${full}`);
+  assert.equal(E.buildStatePayload(r, A.id).pendingRollMeta.fee.discountPct, 50);
+  E.skipRoll(r, A.id); E.endTurn(r, A.id); E.rollDice(r, B.id); r.pendingRoll = null; E.endTurn(r, B.id);
+  A.holdings.AAPL = 10;
+  rollOnto(r, A, "AAPL");
+  assert.equal(r.pendingRoll.fee.reason, "own");
+  assert.equal(r.pendingRoll.fee.paid, 0);
+  return r;
+});
+test("правила 2: контролёр назначает цену до покупки, после оплаты можно купить", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings.AAPL = 60;
+  A.cash = 1e7;
+  rollOnto(r, A, "AAPL");
+  assert.equal(r.pendingRoll.fee.settled, false);
+  assert.ok(E.buyFromRoll(r, A.id, 5).error, "до оплаты купить нельзя");
+  assert.ok(E.skipRoll(r, A.id).error, "до оплаты пропустить нельзя");
+  const cap = E.buildStatePayload(r, B.id).pendingRollMeta.priceCap;
+  assert.ok(E.setForcedPrice(r, B.id, cap + 1).error, "выше потолка нельзя");
+  assert.ok(!E.setForcedPrice(r, B.id, 5000).error);
+  const b0 = B.cash;
+  assert.ok(!E.payForcedPrice(r, A.id).error);
+  assert.equal(Math.round(B.cash - b0), 5000);
+  assert.ok(r.pendingRoll && r.pendingRoll.fee.settled, "бросок продолжается");
+  assert.ok(E.setForcedPrice(r, B.id, 100).error, "второй раз цену не назначить");
+  assert.ok(!E.buyFromRoll(r, A.id, 5).error, "после оплаты — покупка");
+  assert.equal(r.pendingRoll, null);
+  return r;
+});
+test("правила 2: контролёр молчит — после срока тариф, бросок продолжается", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings.AAPL = 60;
+  A.cash = 1e7;
+  rollOnto(r, A, "AAPL");
+  assert.ok(E.dividendFromRoll(r, A.id).error, "до срока — ждать");
+  expireControllerWait(r);
+  const fee = E.buildStatePayload(r, A.id).pendingRollMeta.controllerFee;
+  const a0 = A.cash;
+  assert.ok(!E.dividendFromRoll(r, A.id).error);
+  assert.equal(Math.round(a0 - A.cash), fee, "тариф как в подсказке");
+  assert.ok(r.pendingRoll && r.pendingRoll.fee.settled);
+  assert.ok(!E.skipRoll(r, A.id).error, "«не покупать»");
+  return r;
+});
+test("правила 2: бот-контролёр назначает цену, бот-бросающий платит и решает о покупке", () => {
+  const r = v2game(["A", "B"], true);
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings.AAPL = 60;
+  A.cash = 1e7;
+  rollOnto(r, A, "AAPL");
+  let guard = 0;
+  while (r.pendingRoll && guard++ < 10) E.botStep(r);
+  assert.equal(r.pendingRoll, null, "бросок разыгран ботами");
+  assert.ok(r.log.some((e) => /назначил\(а\) цену выкупа доли AAPL/.test(e.text)), "цена назначена");
+  assert.ok(r.log.some((e) => /выплатил .* за пакет AAPL/.test(e.text)), "выкуп оплачен");
+  return r;
+});
+test("правила 2: покупка вне броска — раз в ход, до 3%, с наценкой 50%", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A");
+  const price = r.companies.KO.price;
+  const a0 = A.cash;
+  assert.ok(!E.buyDirect(r, A.id, "KO", 10).error);
+  assert.equal(A.holdings.KO, 3, "не больше 3%");
+  assert.ok(Math.abs((a0 - A.cash) - price * 0.03 * 1.5 * (1 + E.bankFeePct(A.reputation))) < 1, "наценка 50%");
+  assert.ok(r.companies.KO.price > price, "цена выросла");
+  assert.ok(E.buyDirect(r, A.id, "AAPL", 1).error, "второй раз за ход нельзя");
+  assert.ok(E.buyDirect(r, P(r, "B").id, "AAPL", 1).error, "не в свой ход нельзя");
+  assert.equal(E.buildStatePayload(r, A.id).directBuy.used, true);
+  const v1 = lobby(["A", "B"]);
+  E.startGame(v1, v1.hostPlayerId);
+  assert.ok(E.buyDirect(v1, E.currentPlayerId(v1), "KO", 1).error, "в старых правилах нет");
+  return r;
+});
+test("правила 2: дивиденды держателям, комиссия банка, меры с перезарядкой", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  A.holdings.AAPL = 20; A.holdings.KO = 10;
+  fixRandom(0.5);
+  r.deckData[r.deckOrder[r.deckPos]] = { type: "global", title: "Тихий день", percent: 0 };
+  const a0 = A.cash, b0 = B.cash;
+  E.marketEvent(r);
+  const expected = r.companies.AAPL.price * 0.2 * 0.05 + r.companies.KO.price * 0.1 * 0.05;
+  assert.ok(Math.abs((A.cash - a0) - expected) < 1, `дивиденды ${A.cash - a0} ≈ ${expected}`);
+  assert.equal(B.cash, b0, "без акций — без дивидендов");
+  assert.ok(r.log.some((e) => /Дивиденды держателям: A \+/.test(e.text)));
+  // Продажа банку: цена падает на 2% за 10%, комиссия 15%.
+  r.turnIndex = 0; r.rolledThisTurn = false;
+  const priceAfter = r.companies.AAPL.price * (1 + (-2 * 1) * E.TIER_VOL.A / 100);
+  const a1 = A.cash;
+  assert.ok(!E.sellBank(r, A.id, "AAPL", 10).error);
+  assert.ok(Math.abs((A.cash - a1) - Math.max(E.TIER_PRICE.A * 0.1, priceAfter) * 0.1 * 0.85) < 1, "комиссия 15%");
+  // Меры: бесплатно, раз в 3 события; PR компании — за деньги.
+  A.holdings.NVDA = 60;
+  const neg = E.ctrlNegativeInfo(r, A.id, "AAPL");
+  assert.ok(!neg.error, neg.error);
+  assert.ok(/за \$0/.test(r.log[r.log.length - 1].text), "негатив бесплатно");
+  r.companies.MSFT.lastNegInfoEvent = -100;
+  assert.ok(/через 3 события/.test(E.ctrlNegativeInfo(r, A.id, "MSFT").error || ""), "перезарядка 3 события");
+  assert.equal(E.buildStatePayload(r, A.id).myMeasureCooldowns.negativeInfo, 3);
+  const c0 = A.cash;
+  assert.ok(!E.ctrlPrCampaign(r, A.id, "NVDA").error);
+  assert.ok(c0 - A.cash > 0, "PR — платный");
+  r.eventCount += 3;
+  assert.equal(E.buildStatePayload(r, A.id).myMeasureCooldowns.negativeInfo, 0, "через 3 события снова можно");
+  return r;
+});
+test("правила 2: боты торгуют между собой; старая комната живёт по прежним правилам", () => {
+  const r = v2game(["A", "B"], true);
+  const A = P(r, "A"), B = P(r, "B");
+  A.holdings.AAPL = 8; B.holdings.AAPL = 45; B.cash = 1e6;
+  fixRandom(0.01); // план хода: покупка вне броска и сделка
+  let proposed = false, accepted = false, aBefore = 0;
+  for (let i = 0; i < 6 && !accepted; i++) {
+    const st = E.botStep(r);
+    if (st.type === "proposeTrade") { proposed = true; aBefore = A.holdings.AAPL; }
+    if (st.type === "respondTrade") accepted = B.holdings.AAPL > 45;
+  }
+  assert.ok(proposed, "бот предложил сделку");
+  const sold = aBefore - A.holdings.AAPL;
+  assert.ok(accepted && sold === 10 && B.holdings.AAPL === 45 + sold && B.holdings.AAPL > 50, `сделка за контроль: B ${B.holdings.AAPL}%, продано ${sold}%`);
+  // Сохранённая до обновления комната (без rulesV): отказ и плата за отказ — как раньше.
+  const old = game(["A", "B"]);
+  delete old.rulesV;
+  P(old, "B").holdings.AAPL = 20;
+  rollOnto(old, P(old, "A"), "AAPL");
+  assert.equal(old.pendingRoll.fee, undefined, "плата не списана при броске");
+  assert.ok(E.skipRoll(old, P(old, "A").id).error, "пропустить нельзя — нужно купить или отказаться");
+  return [r, old];
 });
 
 // ---------------------------------------------------------------------

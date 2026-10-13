@@ -85,31 +85,31 @@
   const FEE_CURVE_N_MAX = 6.5;
 
   // ---------------------------------------------------------------------
-  // Испытания правил 13.10 (tools/sim, --override). По умолчанию — как было.
+  // Правила 2 (13.10.2026, docs/RULES-TEST-2026-10-13.md). Действуют в комнатах
+  // с rulesV >= 2 — новые партии (freshRoom); начатые раньше и сохранённые
+  // доигрываются по прежним (rulesV нет). В симуляторе прежние правила —
+  // --override RULES_VERSION=1.
+  //  - Плата держателям обязательна: попали на компанию с чужими держателями —
+  //    платите сразу; покупка доли — уже сверх платы. Своя доля в компании
+  //    снижает плату на LANDING_FEE_DISCOUNT_PER_PCT за процент (от 10% — 0).
+  //    Контролёр (>50%) по-прежнему сам назначает цену выкупа.
+  //  - Покупка вне броска: раз в ход до DIRECT_BUY_MAX_PCT с наценкой.
+  //  - Дивиденды держателям на каждом событии — HOLDER_DIVIDEND_PCT цены.
+  //  - Меры влияния бесплатны, каждая раз в MEASURE_COOLDOWN событий (PR
+  //    компании и шорт — как раньше, за деньги).
+  //  - Продажа банку — с комиссией SELL_BANK_COMMISSION.
+  //  - Боты торгуют между собой (BOT_TRADE_CHANCE на ход).
   // ---------------------------------------------------------------------
-  // Плата держателям при ПОКУПКЕ доли на чужой компании. "refuse" — платит
-  // только отказавшийся (покупка 1% снимала плату целиком); "reduce" — каждый
-  // купленный процент снижает плату на FEE_REDUCE_PER_PCT, от 10% — без
-  // платы; "always" — плата всегда, как рента, покупка — сверх неё
-  // (ставку тогда умножает FEE_ALWAYS_MULT).
-  const FEE_RULE = "refuse";
-  const FEE_REDUCE_PER_PCT = 0.10;
-  const FEE_ALWAYS_MULT = 1;
-  // Покупка вне броска: раз в ход до DIRECT_BUY_MAX_PCT любой компании у
-  // банка с наценкой DIRECT_BUY_MARKUP.
-  const DIRECT_BUY = false;
-  const DIRECT_BUY_MAX_PCT = 5;
-  const DIRECT_BUY_MARKUP = 0.20;
-  const DIRECT_BUY_PER_EVENT = false; // true — раз в биржевое событие, а не раз в ход
-  // Дивиденды держателям: на каждом событии компания платит держателям эту
-  // долю своей цены (пропорционально пакету). Деньги — от банка.
-  const HOLDER_DIVIDEND_PCT = 0;
-  // Цена мер влияния. "networth" — доля капитала игрока, как было; "company"
-  // — в 2–3 раза дешевле, меры по компании — от её цены; "cooldown" —
-  // бесплатно, каждая мера раз в MEASURE_COOLDOWN событий.
-  const MEASURE_COST_MODE = "networth";
+  const RULES_VERSION = 2;
+  const LANDING_FEE_DISCOUNT_PER_PCT = 0.10;
+  const LANDING_FEE_MULT = 0.5;
+  const DIRECT_BUY_MAX_PCT = 3;
+  const DIRECT_BUY_MARKUP = 0.5;
+  const HOLDER_DIVIDEND_PCT = 0.05;
   const MEASURE_COOLDOWN = 3;
-  const MEASURE_SCALE = 0.4;
+  const SELL_BANK_COMMISSION = 0.15;
+  const BOT_TRADE_CHANCE = 0.25;
+  function rulesV2(room) { return !!room && (room.rulesV || 1) >= 2; }
   // Длительность партии по умолчанию — в своих ходах на игрока (решение владельца,
   // 2026-10-11: «до банкротства», ≈100 своих ходов у каждого). Это страховочный
   // лимит, а не цель: обычно партия кончается последним выжившим раньше
@@ -623,6 +623,7 @@
       journal: [],
       nwHist: {},
       pstats: {},
+      rulesV: RULES_VERSION,
       createdAt: Date.now(),
       kickVote: null, // {targetId, initiatorId, startedAt, voters:{playerId:true}}
       reactions: [], // {id, playerId, emoji, ts} — короткоживущие реакции за столом, чистятся по TTL на клиенте
@@ -761,29 +762,19 @@
   // копейки). Проценты и clamp-диапазоны подобраны так, чтобы в начале игры
   // (когда netWorth близок к стартовому капиталу) стоимость была близка к старым
   // фиксированным значениям, а к концу игры росла вместе с капиталом игрока.
-  // Мера по капиталу: доля netWorth в пределах; "company" — та же формула ×MEASURE_SCALE.
+  // Цена мер: в правилах 2 меры (кроме PR компании и шорта) бесплатны, но
+  // каждая доступна раз в MEASURE_COOLDOWN событий; в прежних — доля капитала.
   function nwMeasureCost(room, p, share, lo, hi) {
-    if (MEASURE_COST_MODE === "cooldown") return 0;
-    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
-    return clamp(Math.round(netWorth(room, p) * share * k), Math.round(lo * k), Math.round(hi * k));
+    if (rulesV2(room)) return 0;
+    return clamp(Math.round(netWorth(room, p) * share), lo, hi);
   }
   function espionageCost(room, p) { return nwMeasureCost(room, p, 0.05, 6000, 45000); }
-  // ticker — цель (режим "company": 5% её цены); без него — для самой дорогой.
-  function negativeInfoCost(room, p, ticker) {
-    if (MEASURE_COST_MODE === "company") {
-      const price = ticker && room.companies[ticker] ? room.companies[ticker].price : Math.max(...COMPANIES.map((c) => room.companies[c.ticker].price));
-      return Math.max(1000, Math.round(price * 0.05));
-    }
-    return nwMeasureCost(room, p, 0.06, 8000, 55000);
-  }
-  function prCampaignCost(room, ticker) {
-    if (MEASURE_COST_MODE === "cooldown") return 0;
-    return room.companies[ticker].price * (MEASURE_COST_MODE === "company" ? 0.025 : 0.05);
-  }
+  function negativeInfoCost(room, p) { return nwMeasureCost(room, p, 0.06, 8000, 55000); }
+  function prCampaignCost(room, ticker) { return room.companies[ticker].price * 0.05; }
   function insiderPeekCost(room, p) { return nwMeasureCost(room, p, 0.03, 4000, 28000); }
-  // Режим "cooldown": сколько событий ещё ждать до меры key (0 — можно).
+  // Правила 2: сколько событий ещё ждать до меры key (0 — можно).
   function measureCooldownLeft(room, p, key) {
-    if (MEASURE_COST_MODE !== "cooldown") return 0;
+    if (!rulesV2(room) || !p) return 0;
     const last = p.measureUsed && p.measureUsed[key];
     return last == null ? 0 : Math.max(0, last + MEASURE_COOLDOWN - (room.eventCount || 0));
   }
@@ -792,21 +783,19 @@
     return left ? `Мера будет доступна через ${plural(left, "событие", "события", "событий")}.` : null;
   }
   function noteMeasure(room, p, key) {
-    if (MEASURE_COST_MODE !== "cooldown") return;
+    if (!rulesV2(room)) return;
     (p.measureUsed || (p.measureUsed = {}))[key] = room.eventCount || 0;
   }
   function shortDepositCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.04), 4000, 32000); }
   function discreditCost(room, p, target) {
     const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
-    if (MEASURE_COST_MODE === "cooldown") return 0;
-    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
-    return clamp(Math.round((netWorth(room, p) * 0.05 + targetRep * 250) * k), Math.round(6000 * k), Math.round(80000 * k));
+    if (rulesV2(room)) return 0;
+    return clamp(Math.round(netWorth(room, p) * 0.05) + targetRep * 250, 6000, 80000);
   }
   function personalPrCostFor(room, p) {
-    if (MEASURE_COST_MODE === "cooldown") return 0;
-    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
+    if (rulesV2(room)) return 0;
     const uses = p.personalPrCount || 0;
-    return Math.round(Math.max(5000 + 3000 * uses, netWorth(room, p) * 0.03) * k);
+    return Math.max(5000 + 3000 * uses, Math.round(netWorth(room, p) * 0.03));
   }
   // Стоимость принудительного выкупа миноритариев зависит от чужих (обычно
   // скрытых от игрока) долей, поэтому итоговую сумму считаем на сервере и
@@ -1339,9 +1328,9 @@
     recordNetWorths(room);
   }
 
-  // Дивиденды держателям (HOLDER_DIVIDEND_PCT): от банка, по пакетам, одной строкой в ленте.
+  // Дивиденды держателям (правила 2, HOLDER_DIVIDEND_PCT): от банка, по пакетам, одной строкой в ленте.
   function payHolderDividends(room) {
-    if (!(HOLDER_DIVIDEND_PCT > 0)) return;
+    if (!rulesV2(room) || !(HOLDER_DIVIDEND_PCT > 0)) return;
     const parts = [];
     activePlayers(room).forEach((p) => {
       let sum = 0;
@@ -1880,6 +1869,11 @@
       // его решения о цене выкупа (ставит pendingRoll.controllerWaitSince).
       controllerWaitLeftMs(room, rollController(room, room.pendingRoll));
       addLog(room, `🎲 ${p.name}: бросок строка ${row}, столбец ${col} → ${companyByTicker(cell).name} (${cell}).${salaryNote}`, "roll");
+      // Правила 2: плата держателям — сразу и обязательно.
+      if (rulesV2(room)) {
+        chargeLandingFee(room, p);
+        if (p.bankrupt) afterRollAction(room);
+      }
     }
     return { ok: true };
   }
@@ -1892,31 +1886,11 @@
     return room.companies[ticker].price * (pct / 100) * (1 + bankFeePct(p.reputation));
   }
 
-  // Плата держателям при покупке на чужой компании (FEE_RULE): сумма — от той
-  // же ставки, что и плата за отказ (refuseRollAmount), со скидкой за купленные %.
-  // Карта «выплата не проводится» освобождает и от неё.
-  function holdersFeeOnBuy(room, payer, ticker, pct) {
-    const none = { amount: 0, owners: [], totalPct: 0 };
-    const factor = FEE_RULE === "always" ? FEE_ALWAYS_MULT : FEE_RULE === "reduce" ? Math.max(0, 1 - pct * FEE_REDUCE_PER_PCT) : 0;
-    if (!(factor > 0)) return none;
-    const c = room.companies[ticker];
-    if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) return none;
-    const owners = room.players.filter((o) => !o.bankrupt && o.id !== payer.id && (o.holdings[ticker] || 0) > 0);
-    if (!owners.length) return none;
-    const totalPct = owners.reduce((sum, o) => sum + o.holdings[ticker], 0);
-    return { amount: Math.round(refuseRollAmount(room, ticker, totalPct) * factor), owners, totalPct };
-  }
-  function payHoldersFeeOnBuy(room, payer, ticker, fee) {
-    if (!fee.amount) return;
-    payer.cash -= fee.amount;
-    fee.owners.forEach((o) => { const share = fee.amount * (o.holdings[ticker] / fee.totalPct); o.cash += share; stat(room, o.id, "feeIn", share); });
-    stat(room, payer.id, "feeOut", fee.amount);
-    addLog(room, `${payer.name} заплатил держателям ${ticker} ${fmt(fee.amount)} при покупке.`, "dividend");
-  }
   function buyFromRoll(room, playerId, pctRaw) {
     if (!room || room.phase !== "roll" || !room.pendingRoll) return { error: "Нет активного броска." };
     if (room.pendingRoll.playerId !== playerId) return { error: "Сейчас не ваш ход." };
     if (!room.pendingRoll.ticker) return { error: "На этой клетке нет акций — там недвижимость." };
+    if (rulesV2(room) && room.pendingRoll.fee && !room.pendingRoll.fee.settled) return { error: "Сначала оплатите выкуп контролёру — потом можно купить долю." };
     let pct = Math.round(Number(pctRaw));
     if (!Number.isFinite(pct) || pct <= 0) pct = 10;
     pct = Math.max(1, Math.min(25, pct));
@@ -1926,13 +1900,11 @@
     if (owned + pct > 100) return { error: "У банка недостаточно свободных акций этой компании." };
     const feePct = bankFeePct(p.reputation);
     const cost = rollBuyCost(room, p, ticker, pct);
-    const holdersFee = holdersFeeOnBuy(room, p, ticker, pct);
-    if (p.cash < cost + holdersFee.amount) return { error: holdersFee.amount ? `Недостаточно наличных: покупка ${fmt(cost)} и плата держателям ${fmt(holdersFee.amount)}.` : "Недостаточно наличных." };
+    if (p.cash < cost) return { error: "Недостаточно наличных." };
     p.cash -= cost;
     p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
     addCostBasis(p, ticker, pct, cost);
     jr(room, p.id, "buy", { t: ticker, pct, cost: Math.round(cost) });
-    payHoldersFeeOnBuy(room, p, ticker, holdersFee);
     applyPriceDelta(room, ticker, 2 * (pct / 10));
     addLog(room, `${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}${feePct > 0 ? ` (вкл. комиссию банка ${(feePct * 100).toFixed(1)}% из-за репутации)` : ""}. Новая цена: ${fmt(room.companies[ticker].price)}.`, "trade", [p.id]);
     checkFullOwnership(room, ticker);
@@ -1946,12 +1918,88 @@
   // полностью под контролем одного игрока (>50%, других держателей нет) —
   // нужен setForcedPrice/payForcedPrice; формула применяется, только если
   // контролёр не назначил цену за CONTROLLER_DECISION_MS (оплата по тарифу).
+  // Правила 2: обязательная плата держателям при попадании на компанию (та же
+  // ставка, что у прежней платы за отказ — refuseRollAmount). Своя доля
+  // снижает её на LANDING_FEE_DISCOUNT_PER_PCT за процент, от 10% — без платы.
+  // Карта «выплата не проводится» освобождает. Контролёр (>50%, единственный
+  // держатель) назначает цену сам (setForcedPrice) — до оплаты бросок ждёт, а
+  // после срока решения можно заплатить по тарифу (dividendFromRoll).
+  // roll.fee: {settled, paid, reason: none|own|card|paid|controller, discount, controllerId}.
+  function landingFeeDiscount(payer, ticker) {
+    return Math.max(0, 1 - (payer.holdings[ticker] || 0) * LANDING_FEE_DISCOUNT_PER_PCT);
+  }
+  function chargeLandingFee(room, payer) {
+    const roll = room.pendingRoll;
+    const ticker = roll.ticker;
+    const c = room.companies[ticker];
+    const owners = room.players.filter((o) => !o.bankrupt && o.id !== payer.id && (o.holdings[ticker] || 0) > 0);
+    const discount = landingFeeDiscount(payer, ticker);
+    if (!owners.length) { roll.fee = { settled: true, paid: 0, reason: "none", discount }; return; }
+    if (discount <= 0) {
+      roll.fee = { settled: true, paid: 0, reason: "own", discount };
+      addLog(room, `${payer.name}: своя доля в ${ticker} от ${Math.round(1 / LANDING_FEE_DISCOUNT_PER_PCT)}% — платить держателям не нужно.`, "dividend");
+      return;
+    }
+    if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) {
+      roll.fee = { settled: true, paid: 0, reason: "card", discount };
+      addLog(room, `По ${ticker} выплата временно не проводится (эффект карты новостей) — ${payer.name} не платит.`, "dividend");
+      return;
+    }
+    const controller = owners.length === 1 && owners[0].holdings[ticker] > 50 ? owners[0] : null;
+    if (controller) {
+      roll.fee = { settled: false, paid: 0, reason: "controller", discount, controllerId: controller.id };
+      controllerWaitLeftMs(room, controller);
+      return;
+    }
+    const totalPct = owners.reduce((sum, o) => sum + o.holdings[ticker], 0);
+    const amount = Math.round(refuseRollAmount(room, ticker, totalPct) * discount * LANDING_FEE_MULT);
+    payer.cash -= amount;
+    owners.forEach((o) => { const share = amount * (o.holdings[ticker] / totalPct); o.cash += share; stat(room, o.id, "feeIn", share); });
+    stat(room, payer.id, "feeOut", amount);
+    jr(room, payer.id, "fee", { t: ticker, paid: amount, own: payer.holdings[ticker] || 0 });
+    addLog(room, `${payer.name} заплатил(а) держателям ${ticker} ${fmt(amount)}${discount < 1 ? ` (скидка ${Math.round((1 - discount) * 100)}% за свою долю)` : ""}.`, "dividend");
+    roll.fee = { settled: true, paid: amount, reason: "paid", discount };
+    settleDebt(room, payer);
+  }
   // Что было у отказавшегося: цена компании, свободные % и сколько % он мог купить.
   function refuseInfo(room, p, ticker) {
     const free = Math.max(0, Math.floor(100 - totalOwnedPct(room, ticker)));
     const unit = rollBuyCost(room, p, ticker, 1);
     const afford = unit > 0 ? Math.max(0, Math.min(25, free, Math.floor(p.cash / unit))) : 0;
     return { t: ticker, px: Math.round(room.companies[ticker].price), free, afford };
+  }
+  // Правила 2, dividendFromRoll: контролёр не назначил цену за срок —
+  // оплата по тарифу (бросок продолжается: можно купить долю); плата уже
+  // прошла — «не покупать» (как skipRoll).
+  function settleOrDeclineV2(room, payer, ticker) {
+    const roll = room.pendingRoll;
+    const fee = roll.fee || { settled: true };
+    if (!fee.settled) {
+      const controller = room.players.find((x) => x.id === fee.controllerId);
+      if (!controller || controller.bankrupt || !((controller.holdings[ticker] || 0) > 50)) {
+        fee.settled = true; // контроль пропал (банкротство, продажа) — платить некому
+        return { ok: true };
+      }
+      const waitLeft = controllerWaitLeftMs(room, controller);
+      if (waitLeft > 0) return { error: `${controller.name} контролирует ${ticker} и сам(а) назначает цену выкупа. Если цены не будет ещё ${Math.ceil(waitLeft / 1000)} с — можно будет оплатить по тарифу.` };
+      const heldPct = controller.holdings[ticker];
+      const amount = Math.round(controllerDeadlineFee(room, ticker, heldPct) * (fee.discount == null ? 1 : fee.discount));
+      payer.cash -= amount;
+      controller.cash += amount;
+      stat(room, payer.id, "feeOut", amount);
+      stat(room, controller.id, "feeIn", amount);
+      jr(room, payer.id, "fee", { t: ticker, paid: amount, own: payer.holdings[ticker] || 0 });
+      addLog(room, `⏱️ ${controller.name} не назначил(а) цену выкупа ${ticker} за ${Math.round(CONTROLLER_DECISION_MS / 1000)} с — ${payer.name} заплатил(а) по тарифу ${fmt(amount)}.`, "dividend");
+      fee.settled = true;
+      fee.paid = amount;
+      settleDebt(room, payer);
+      if (payer.bankrupt) afterRollAction(room);
+      return { ok: true };
+    }
+    jr(room, payer.id, "refuse", Object.assign(refuseInfo(room, payer, ticker), { paid: 0 }));
+    addLog(room, `${payer.name} не стал(а) покупать ${ticker}.`, "turn");
+    afterRollAction(room);
+    return { ok: true };
   }
   function dividendFromRoll(room, playerId) {
     if (!room || room.phase !== "roll" || !room.pendingRoll) return { error: "Нет активного броска." };
@@ -1964,6 +2012,7 @@
     // который упирался в «цену назначает контролёр», можно было слать повторно,
     // пока не выпадет пропуск дивидендов, и не платить вовсе.
     if (room.pendingForcedPrice) return { error: "Цена выкупа уже назначена — оплатите её." };
+    if (rulesV2(room)) return settleOrDeclineV2(room, payer, ticker);
     const owners = room.players.filter((p) => !p.bankrupt && p.id !== payer.id && (p.holdings[ticker] || 0) > 0);
     const controller = owners.length === 1 && owners[0].holdings[ticker] > 50 ? owners[0] : null;
     const refuse = refuseInfo(room, payer, ticker);
@@ -2062,11 +2111,15 @@
     // назначить цену было невозможно, стоило ему держать хоть 1% этой же акции.
     const otherOwners = room.players.filter((p) => !p.bankrupt && p.id !== controllerId && p.id !== roll.playerId && (p.holdings[ticker] || 0) > 0);
     if (otherOwners.length > 0) return { error: "Пакет не полностью под вашим контролем — есть другие держатели." };
+    // Правила 2: цену назначают, пока плата за этот бросок не прошла; своя доля
+    // бросившего снижает и её (как обязательную плату).
+    if (rulesV2(room) && (!roll.fee || roll.fee.settled)) return { error: "Плата за этот бросок уже прошла." };
+    const disc = rulesV2(room) && roll.fee.discount != null ? roll.fee.discount : 1;
     const n = Number(amountRaw);
     if (!Number.isFinite(n) || n < 1) return { error: "Укажите сумму выкупа — положительное число." };
-    const fair = forcedFairPrice(room, ticker, heldPct);
-    const cap = forcedPriceCap(room, ticker, heldPct);
-    if (Math.round(n) > cap) return { error: `Цена выкупа не может быть больше ${fmt(cap)} (${FORCED_PRICE_CAP_MULT} справедливых цен).` };
+    const fair = forcedFairPrice(room, ticker, heldPct) * disc;
+    const cap = Math.max(1, Math.round(forcedPriceCap(room, ticker, heldPct) * disc));
+    if (Math.round(n) > cap) return { error: `Цена выкупа не может быть больше ${fmt(cap)}${disc < 1 ? "" : ` (${FORCED_PRICE_CAP_MULT} справедливых цен)`}.` };
     const amount = Math.min(MAX_DEAL_AMOUNT, Math.round(n));
     room.pendingForcedPrice = { ticker, controllerId, targetId: roll.playerId, amount };
     addLog(room, `💰 ${controller.name} назначил(а) цену выкупа доли ${ticker} для отказавшегося от покупки игрока: ${fmt(amount)}.`, "control");
@@ -2102,6 +2155,12 @@
     addLog(room, `${payer.name} выплатил ${fmt(pf.amount)} игроку ${owner ? owner.name : "?"} за пакет ${pf.ticker} по назначенной цене.`, "control");
     room.pendingForcedPrice = null;
     settleDebt(room, payer);
+    // Правила 2: выкуп — это плата за попадание; дальше можно купить долю.
+    if (rulesV2(room) && room.pendingRoll && room.pendingRoll.fee && !payer.bankrupt) {
+      room.pendingRoll.fee.settled = true;
+      room.pendingRoll.fee.paid = pf.amount;
+      return { ok: true };
+    }
     afterRollAction(room);
     return { ok: true };
   }
@@ -2110,7 +2169,10 @@
     if (!room || room.phase !== "roll" || !room.pendingRoll) return { error: "Нет активного броска." };
     if (room.pendingRoll.playerId !== playerId) return { error: "Сейчас не ваш ход." };
     const roll = room.pendingRoll;
-    if (roll.ticker) {
+    if (roll.ticker && rulesV2(room)) {
+      // Правила 2: плата держателям уже прошла при попадании — «не покупать».
+      if (roll.fee && !roll.fee.settled) return { error: "Сначала оплатите выкуп контролёру." };
+    } else if (roll.ticker) {
       const owners = room.players.filter((p) => !p.bankrupt && p.id !== playerId && (p.holdings[roll.ticker] || 0) > 0);
       if (owners.length > 0) return { error: "Эти акции уже частично выкуплены — нужно либо купить, либо заплатить владельцам." };
     } else if (roll.realEstateId) {
@@ -2199,10 +2261,16 @@
     return { error: "Покупка у банка возможна только по результату броска кубиков." };
   }
 
-  // Покупка вне броска (DIRECT_BUY): раз в ход до DIRECT_BUY_MAX_PCT любой
+  // Покупка вне броска (правила 2): раз в ход до DIRECT_BUY_MAX_PCT любой
   // компании у банка с наценкой. Как покупка по броску, двигает цену вверх.
+  function directBuyCost(room, p, ticker, pct) {
+    return room.companies[ticker].price * (pct / 100) * (1 + DIRECT_BUY_MARKUP) * (1 + bankFeePct(p.reputation));
+  }
+  function directBuyUsed(room, p) {
+    return !!(room.directBuyKeys && room.directBuyKeys[p.id] === `${room.eventCount}:${room.turn}:${p.id}`);
+  }
   function buyDirect(room, playerId, ticker, pctRaw) {
-    if (!DIRECT_BUY) return { error: "Покупка вне броска выключена." };
+    if (!rulesV2(room)) return { error: "Покупка вне броска есть только в новых партиях." };
     const err = requireOwnTurn(room, playerId);
     if (err) return { error: err };
     const p = room.players.find((x) => x.id === playerId);
@@ -2210,16 +2278,16 @@
     const c = room.companies[ticker];
     if (!c) return { error: "Неизвестная компания." };
     if (c.merged) return { error: "Компания поглощена при слиянии — её акций больше нет." };
-    const key = DIRECT_BUY_PER_EVENT ? `${room.eventCount}:${p.id}` : `${room.eventCount}:${room.turn}:${p.id}`;
+    const key = `${room.eventCount}:${room.turn}:${p.id}`;
     if (!room.directBuyKeys || typeof room.directBuyKeys !== "object") room.directBuyKeys = {};
-    if (room.directBuyKeys[p.id] === key) return { error: DIRECT_BUY_PER_EVENT ? "Покупка вне броска — раз в событие." : "Покупка вне броска — раз в ход." };
+    if (room.directBuyKeys[p.id] === key) return { error: "Покупка вне броска — раз в ход." };
     let pct = Math.round(Number(pctRaw));
     if (!Number.isFinite(pct) || pct <= 0) pct = DIRECT_BUY_MAX_PCT;
     pct = Math.max(1, Math.min(DIRECT_BUY_MAX_PCT, pct));
     const free = Math.floor(100 - totalOwnedPct(room, ticker));
     if (free < 1) return { error: "Свободных акций этой компании нет." };
     pct = Math.min(pct, free);
-    const cost = c.price * (pct / 100) * (1 + DIRECT_BUY_MARKUP) * (1 + bankFeePct(p.reputation));
+    const cost = directBuyCost(room, p, ticker, pct);
     if (p.cash < cost) return { error: "Недостаточно наличных." };
     p.cash -= cost;
     p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
@@ -2248,12 +2316,14 @@
     // (цена выросла) — тут же продал банку по выросшей цене» давало прибыль без
     // риска (+16 п.п. побед в симуляциях, BALANCE-REPORT.md, А2).
     applyPriceDelta(room, ticker, -2 * (pct / 10));
-    const proceeds = c.price * (pct / 100);
+    // Правила 2: банк берёт комиссию — выгоднее продать игроку сделкой.
+    const commission = rulesV2(room) ? SELL_BANK_COMMISSION : 0;
+    const proceeds = c.price * (pct / 100) * (1 - commission);
     removeCostBasisProportional(p, ticker, pct);
     p.holdings[ticker] -= pct;
     p.cash += proceeds;
     jr(room, p.id, "sell", { t: ticker, pct, got: Math.round(proceeds) });
-    addLog(room, `${p.name} продал ${pct}% ${ticker} банку за ${fmt(proceeds)}.`, "trade", [p.id]);
+    addLog(room, `${p.name} продал ${pct}% ${ticker} банку за ${fmt(proceeds)}${commission ? ` (комиссия банка ${Math.round(commission * 100)}%)` : ""}.`, "trade", [p.id]);
     return { ok: true };
   }
 
@@ -2395,6 +2465,8 @@
     }
     const pct = botChoosePct(cash, c.price, free);
     if (pct >= 1) return pct;
+    // Правила 2: плата уже прошла при попадании — покупать «вместо платы» незачем.
+    if (rulesV2(room)) return 0;
     const owners = room.players.filter((p) => p.id !== bot.id && !p.bankrupt && (p.holdings[ticker] || 0) > 0);
     if (!owners.length) return 0;
     const controlled = owners.length === 1 && owners[0].holdings[ticker] > 50;
@@ -2403,6 +2475,47 @@
     return cash >= rollBuyCost(room, bot, ticker, p5) ? p5 : 0;
   }
 
+  // Правила 2: бот покупает вне броска до DIRECT_BUY_MAX_PCT компании, где у
+  // него больше всего (к контролю), иначе самой дешёвой — если остаётся запас.
+  function botDirectBuy(room, bot) {
+    if (directBuyUsed(room, bot)) return null;
+    const reserve = isStrongBot(room, bot) ? 20000 : 30000;
+    const cands = liveCompanies(room).map((c) => c.ticker).filter((t) => {
+      const others = room.players.reduce((sum, p) => sum + (p.id !== bot.id ? (p.holdings[t] || 0) : 0), 0);
+      return 100 - totalOwnedPct(room, t) >= 1 && others < 50;
+    });
+    if (!cands.length) return null;
+    cands.sort((a, b) => (bot.holdings[b] || 0) - (bot.holdings[a] || 0) || room.companies[a].price - room.companies[b].price);
+    const t = cands[0];
+    const pct = Math.min(DIRECT_BUY_MAX_PCT, Math.floor(100 - totalOwnedPct(room, t)));
+    if (pct < 1 || bot.cash - directBuyCost(room, bot, t, pct) < reserve) return null;
+    const res = buyDirect(room, bot.id, t, pct);
+    return res.error ? null : { acted: true, type: "buyDirect", result: res };
+  }
+  // Правила 2: бот предлагает другому боту небольшой пакет (до 10%) там, где у
+  // того крупная доля; если сделка даёт покупателю контроль — на 25% дороже рынка.
+  function botProposeTrade(room, bot) {
+    const buyers = room.players.filter((p) => p.id !== bot.id && !p.bankrupt && isBotPlayer(p));
+    let best = null;
+    for (const t in bot.holdings) {
+      const mine = bot.holdings[t] || 0;
+      const c = room.companies[t];
+      if (mine < 1 || mine > 20 || !c || c.merged) continue;
+      for (const b of buyers) {
+        const theirs = b.holdings[t] || 0;
+        if (theirs < 20) continue;
+        const pct = Math.min(mine, 10);
+        const control = theirs <= 50 && theirs + pct > 50;
+        const price = Math.round(c.price * (pct / 100) * (control ? 1.25 : 1));
+        if (b.cash - price < 10000) continue;
+        const score = theirs + (control ? 100 : 0);
+        if (!best || score > best.score) best = { t, b, pct, price, score };
+      }
+    }
+    if (!best) return null;
+    const res = proposeTrade(room, bot.id, best.b.id, best.t, best.pct, best.price, null, 0);
+    return res.error ? null : { acted: true, type: "proposeTrade", result: res };
+  }
   function botStep(room) {
     if (!room || room.phase !== "roll") return { acted: false };
 
@@ -2421,7 +2534,22 @@
     // ещё есть выбор просто купить свежие акции у банка (свободные %) и он (будучи
     // ботом) собирается это сделать — даём ему сначала попробовать купить (шаг 4),
     // а не отбираем выбор принудительной ценой контролёра.
-    if (room.pendingRoll && room.pendingRoll.ticker && !room.pendingForcedPrice) {
+    // Правила 2: контролёр-бот назначает цену, пока плата за бросок не прошла
+    // (покупка доли от неё больше не освобождает).
+    if (rulesV2(room) && room.pendingRoll && room.pendingRoll.ticker && !room.pendingForcedPrice) {
+      const roll = room.pendingRoll;
+      const fee = roll.fee;
+      const controller = fee && !fee.settled ? room.players.find((p) => p.id === fee.controllerId) : null;
+      if (controller && isBotPlayer(controller) && !controller.bankrupt && (controller.holdings[roll.ticker] || 0) > 50) {
+        const heldPct = controller.holdings[roll.ticker];
+        const disc = fee.discount == null ? 1 : fee.discount;
+        const fair = forcedFairPrice(room, roll.ticker, heldPct) * disc;
+        const cap = Math.max(1, Math.round(forcedPriceCap(room, roll.ticker, heldPct) * disc));
+        const amount = Math.max(1, Math.min(cap, Math.round(fair * (1.5 + Math.random()))));
+        return { acted: true, type: "setForcedPrice", result: setForcedPrice(room, controller.id, amount) };
+      }
+    }
+    if (!rulesV2(room) && room.pendingRoll && room.pendingRoll.ticker && !room.pendingForcedPrice) {
       const roll = room.pendingRoll;
       const ticker = roll.ticker;
       // Строго та же проверка "единоличного контролёра", что и в dividendFromRoll/
@@ -2456,7 +2584,13 @@
       const canPay = (trade.price === 0 || to.cash >= trade.price) && (!trade.wantTicker || (to.holdings[trade.wantTicker] || 0) >= trade.wantPct);
       // Только сделки не в убыток себе: при «got >= paid * 0.9» человек продавал
       // боту акции на 11% дороже рынка (BALANCE-REPORT.md, А5).
-      const accept = canPay && got >= paid;
+      // Правила 2: за сделку, которая даёт контроль (>50%), бот готов доплатить
+      // до 30% сверх рынка, но держит запас наличных $10 000.
+      const heldNow = to.holdings[trade.ticker] || 0;
+      const gainsControl = heldNow <= 50 && heldNow + trade.pct > 50;
+      const accept = rulesV2(room)
+        ? canPay && got * (gainsControl ? 1.3 : 1) >= paid && to.cash - trade.price >= 10000
+        : canPay && got >= paid;
       return { acted: true, type: "respondTrade", result: respondTrade(room, to.id, trade.id, accept) };
     }
 
@@ -2468,6 +2602,26 @@
     // 4a) Спецдействия бота: с небольшой вероятностью использует дискредитацию,
     // сквиз-аут, шорт или расследование перед броском кубиков (если есть деньги
     // и есть смысл); шпионажа среди них нет — см. ниже.
+    // Правила 2: до броска бот может купить долю вне броска и предложить сделку
+    // другому боту — каждое решение раз в ход (ключ хода в cur.botTurnKey).
+    if (rulesV2(room) && !room.tutorial && !room.pendingRoll && !room.rolledThisTurn) {
+      const turnKey = `${room.eventCount}:${room.turn}`;
+      if (cur.botTurnKey !== turnKey) {
+        cur.botTurnKey = turnKey;
+        cur.botTurnPlan = { direct: Math.random() < (isStrongBot(room, cur) ? 0.6 : 0.3), trade: Math.random() < BOT_TRADE_CHANCE };
+      }
+      const plan = cur.botTurnPlan || {};
+      if (plan.direct) {
+        plan.direct = false;
+        const a = botDirectBuy(room, cur);
+        if (a) return a;
+      }
+      if (plan.trade) {
+        plan.trade = false;
+        const a = botProposeTrade(room, cur);
+        if (a) return a;
+      }
+    }
     // В обучении (room.tutorial) боты без «грязных» спецдействий — сценарий предсказуем.
     if (!room.tutorial && !room.pendingRoll && !room.rolledThisTurn && Math.random() < 0.15) {
       const myControlled = controlledTickers(room, cur.id);
@@ -2557,6 +2711,21 @@
       const ticker = roll.ticker;
       const free = 100 - totalOwnedPct(room, ticker);
       const c = room.companies[ticker];
+      if (rulesV2(room)) {
+        // Плата за попадание уже прошла, кроме случая с контролёром: цену
+        // назначит он (шаг 1 оплатит), а после срока — тариф (dividendFromRoll).
+        if (roll.fee && !roll.fee.settled) {
+          const div = dividendFromRoll(room, cur.id);
+          if (div.error) return { acted: false };
+          return { acted: true, type: "dividendFromRoll", result: div };
+        }
+        const pct2 = free >= 1 ? botBuyPct(room, cur, ticker, cur.cash) : 0;
+        if (pct2 >= 1) {
+          const buy = buyFromRoll(room, cur.id, pct2);
+          if (!buy.error) return { acted: true, type: "buyFromRoll", result: buy };
+        }
+        return { acted: true, type: "skipRoll", result: skipRoll(room, cur.id) };
+      }
       const pct = free >= 1 ? botBuyPct(room, cur, ticker, cur.cash) : 0;
       if (pct >= 1) {
         const buy = buyFromRoll(room, cur.id, pct);
@@ -2593,7 +2762,7 @@
     if (room.eventCount - target.lastNegInfoEvent < 2) return { error: "Эту компанию уже атаковали недавно — раз в 2 события." };
     const cd = measureCooldownError(room, p, "negativeInfo");
     if (cd) return { error: cd };
-    const cost = negativeInfoCost(room, p, ticker);
+    const cost = negativeInfoCost(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
     noteMeasure(room, p, "negativeInfo");
@@ -2611,12 +2780,9 @@
     if ((p.holdings[ticker] || 0) <= 50) return { error: "Нужен контрольный пакет (>50%) этой компании." };
     const c = room.companies[ticker];
     if (room.eventCount === c.lastPrEvent) return { error: "PR-кампания по этой компании уже проведена в это событие." };
-    const cd = measureCooldownError(room, p, "pr");
-    if (cd) return { error: cd };
     const cost = prCampaignCost(room, ticker);
     if (p.cash < cost) return { error: `Недостаточно наличных для PR-кампании (${fmt(cost)}).` };
     p.cash -= cost;
-    noteMeasure(room, p, "pr");
     c.lastPrEvent = room.eventCount;
     applyPriceDelta(room, ticker, 10);
     addLog(room, `📈 ${p.name} провёл PR-кампанию/байбэк ${ticker} за ${fmt(cost)}: +10%.`, "control");
@@ -3045,11 +3211,10 @@
   // капитала и репутации самой цели (богаче и репутабельнее — доступнее
   // качественное расследование). Раскрывает самый старый нераскрытый случай.
   function investigationCost(room, player) {
-    if (MEASURE_COST_MODE === "cooldown") return 0;
-    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
+    if (rulesV2(room)) return 0;
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
     const base = clamp(Math.round(netWorth(room, player) * 0.04), 5000, 50000);
-    return Math.round(Math.max(3000, base - rep * 40) * k);
+    return Math.max(3000, Math.round(base - rep * 40));
   }
   function investigationChance(room, player) {
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
@@ -3128,6 +3293,7 @@
   function controllerWaitLeftMs(room, controller) {
     const roll = room.pendingRoll;
     if (!roll || !roll.ticker || !controller || room.pendingForcedPrice) return null;
+    if (roll.fee && roll.fee.settled) return null; // правила 2: плата уже прошла
     if (!Number.isFinite(roll.controllerWaitSince)) roll.controllerWaitSince = Date.now();
     return Math.max(0, roll.controllerWaitSince + CONTROLLER_DECISION_MS - Date.now());
   }
@@ -3144,8 +3310,14 @@
       const controller = owners.length === 1 && owners[0].holdings[roll.ticker] > 50 ? owners[0] : null;
       const c = room.companies[roll.ticker];
       const tier = companyByTicker(roll.ticker).tier;
+      // Правила 2: плата за попадание (roll.fee) и её скидка за свою долю —
+      // контролёру с той же скидкой (тариф и потолок цены выкупа).
+      const v2 = rulesV2(room);
+      const disc = v2 && roll.fee && roll.fee.discount != null ? roll.fee.discount : 1;
       return {
         kind: "stock", ticker: roll.ticker, ownersCount: owners.length, totalOwnedPct: totalPct,
+        rulesV: v2 ? 2 : 1,
+        fee: v2 && roll.fee ? { settled: !!roll.fee.settled, paid: roll.fee.paid || 0, reason: roll.fee.reason || "", discountPct: Math.round((1 - disc) * 100) } : null,
         controllerId: controller ? controller.id : null, controllerName: controller ? controller.name : null,
         forcedPct: getForcedPaymentPct(room, tier),
         // Для кнопки «Отказаться»: точная сумма (как в dividendFromRoll), выплата
@@ -3160,13 +3332,13 @@
         // controllerDeadlineFee (с потолком цены выкупа), что спишет dividendFromRoll.
         controllerWaitLeftMs: controllerWaitLeftMs(room, controller),
         controllerWaitMs: CONTROLLER_DECISION_MS,
-        controllerFee: controller ? controllerDeadlineFee(room, roll.ticker, totalPct) : 0,
+        controllerFee: controller ? (v2 ? Math.round(controllerDeadlineFee(room, roll.ticker, totalPct) * disc) : controllerDeadlineFee(room, roll.ticker, totalPct)) : 0,
         // Для листа контролёра «Назначьте цену выкупа»: справедливая цена (от неё —
         // порог завышения ×FORCED_PRICE_EXCESSIVE_MULT) и потолок — те же
         // forcedFairPrice/forcedPriceCap, что проверит setForcedPrice. Клиент не
         // пересчитывает их из forcedPct × доли: кривая FEE_CURVE_* меняет обе суммы.
-        fairPrice: controller ? Math.round(forcedFairPrice(room, roll.ticker, totalPct)) : 0,
-        priceCap: controller ? forcedPriceCap(room, roll.ticker, totalPct) : 0,
+        fairPrice: controller ? Math.round(forcedFairPrice(room, roll.ticker, totalPct) * disc) : 0,
+        priceCap: controller ? Math.max(1, Math.round(forcedPriceCap(room, roll.ticker, totalPct) * disc)) : 0,
         // Кривая платы включена (FEE_CURVE_K > 0) — клиент поясняет правило одной
         // строкой у суммы; feeFactor — «эффективная доля» держателей (holdersFeeFactor).
         feeCurve: FEE_CURVE_K > 0,
@@ -3226,6 +3398,11 @@
           title: e.paid > 0 ? `Отказ от ${coName(e.t)}` : `Не купили ${coName(e.t)}`,
           text: e.paid > 0 ? `${round(e)}: заплатили ${fmt(e.paid)} за отказ, хотя ${pct}% были по карману.${grew}`
             : `${round(e)}: свободные ${pct}% стоили ${fmt((pct / 100) * e.px)}.${grew}` });
+      } else if (e.k === "fee" && e.paid >= thr) {
+        // Правила 2: обязательная плата при попадании — от неё защищает своя доля.
+        mistakes.push({ key: "fee:" + e.t, ev: e.ev, r: e.r, cost: e.paid,
+          title: `${coName(e.t)}: плата держателям`,
+          text: `${round(e)}: заплатили держателям ${fmt(e.paid)}. Своя доля от 10% в компании освобождает от этой платы.` });
       } else if (e.k === "forced" && e.paid >= thr) {
         mistakes.push({ key: "forced:" + e.t, ev: e.ev, r: e.r, cost: e.paid,
           title: `${coName(e.t)}: выкуп у контролёра`,
@@ -3295,14 +3472,15 @@
     const finalNW = Math.round(netWorth(room, me));
 
     const costs = [
-      { label: "Плата за отказ", amount: st.feeOut || 0, count: J.filter((e) => e.k === "refuse" && e.paid > 0).length },
+      { label: "Плата держателям", amount: st.feeOut || 0, count: J.filter((e) => (e.k === "refuse" && e.paid > 0) || e.k === "fee").length },
       { label: "Выкуп у контролёров", amount: st.forcedOut || 0, count: J.filter((e) => e.k === "forced").length },
       { label: "Рента за чужие города", amount: st.rentOut || 0 },
       { label: "Проценты по кредиту", amount: st.interest || 0 },
       { label: "Налог на недвижимость", amount: st.reTax || 0 },
     ].filter((x) => x.amount > 0);
     const income = [
-      { label: "Плата за отказ от соперников", amount: st.feeIn || 0 },
+      { label: "Плата держателям от соперников", amount: st.feeIn || 0 },
+      { label: "Дивиденды", amount: st.divIn || 0 },
       { label: "Выкуп ваших долей", amount: st.forcedIn || 0 },
       { label: "Рента с городов", amount: st.rentIn || 0 },
     ].filter((x) => x.amount > 0);
@@ -3317,7 +3495,9 @@
     }
     const skippedCities = J.filter((e) => e.k === "reSkip" && e.afford).length;
     const boughtCities = J.filter((e) => e.k === "reBuy").length;
-    if ((st.feeOut || 0) >= S * 0.15) tips.push(`Плата за отказ за партию — ${fmt(st.feeOut)}. Если доля по карману, купить хотя бы 5% обычно дешевле отказа.`);
+    if ((st.feeOut || 0) >= S * 0.15) tips.push(rulesV2(room)
+      ? `Плата держателям за партию — ${fmt(st.feeOut)}. Своя доля в компании снижает её на 10% за каждый процент, а с 10% платить не нужно.`
+      : `Плата за отказ за партию — ${fmt(st.feeOut)}. Если доля по карману, купить хотя бы 5% обычно дешевле отказа.`);
     if (!me.bankrupt && finalNW > 0 && me.cash > finalNW * 0.5) tips.push(`В конце партии ${Math.round((me.cash / finalNW) * 100)}% капитала лежало наличными. Деньги не растут, акции и города — растут.`);
     if (skippedCities >= 2 && !boughtCities) tips.push(`Вы пропустили ${skippedCities} ${plural(skippedCities, "свободный город", "свободных города", "свободных городов").replace(/^\d+ /, "")} при деньгах на покупку. Город приносит ренту при каждом попадании соперника.`);
     if ((st.interest || 0) >= S * 0.05) tips.push(`Проценты по кредиту — ${fmt(st.interest)}. Гасите кредит, когда есть свободные деньги.`);
@@ -3428,6 +3608,15 @@
         insiderPeek: insiderPeekCost(room, me),
         shortDeposit: shortDepositCost(room, me),
       } : null,
+      // Правила 2 (rulesV2): меры бесплатны с перезарядкой — сколько событий
+      // ждать каждой; покупка вне броска; комиссия банка при продаже.
+      rulesV: rulesV2(room) ? 2 : 1,
+      myMeasureCooldowns: me && rulesV2(room) ? Object.fromEntries(["negativeInfo", "insider", "espionage", "discredit", "personalPr", "investigate"].map((k) => [k, measureCooldownLeft(room, me, k)])) : null,
+      measureCooldown: rulesV2(room) ? MEASURE_COOLDOWN : 0,
+      directBuy: me && rulesV2(room) ? { used: directBuyUsed(room, me), maxPct: DIRECT_BUY_MAX_PCT, markupPct: Math.round(DIRECT_BUY_MARKUP * 100) } : null,
+      sellCommissionPct: rulesV2(room) ? Math.round(SELL_BANK_COMMISSION * 100) : 0,
+      holderDividendPct: rulesV2(room) ? HOLDER_DIVIDEND_PCT * 100 : 0,
+      landingFeeDiscountPct: rulesV2(room) ? Math.round(LANDING_FEE_DISCOUNT_PER_PCT * 100) : 0,
       myDiscreditCosts: me ? Object.fromEntries(room.players.filter((p) => p.id !== me.id && !p.bankrupt).map((p) => [p.id, discreditCost(room, me, p)])) : {},
       mySqueezeCosts: me ? Object.fromEntries(COMPANIES.filter((c) => (me.holdings[c.ticker] || 0) > 75).map((c) => [c.ticker, squeezeOutCost(room, me, c.ticker)])) : {},
       realEstate: CITIES.map((ct) => {
@@ -3513,7 +3702,7 @@
     settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
     addPlayer, setConnected, leaveLobby, newGameKeepPlayers, startGame, updateRoomSettings, setMaxRounds, deleteRoom, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
-    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, holdersFeeOnBuy, prCampaignCost,
+    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, directBuyCost, prCampaignCost, rulesV2, measureCooldownLeft,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort, ctrlPublicIPO, ctrlMergeCompanies,
     declareBankruptcy, forceEvent,
     adjustReputation, bankFeePct, loanTerms, takeLoan, repayLoan, processLoans,

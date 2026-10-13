@@ -448,6 +448,7 @@ function handleMessage(ws, raw) {
     case "endTurn": return run(conn, engine.endTurn(room, conn.playerId));
     case "buyBank": return run(conn, engine.buyBank());
     case "sellBank": return run(conn, engine.sellBank(room, conn.playerId, msg.ticker, msg.pct));
+    case "buyDirect": return run(conn, engine.buyDirect(room, conn.playerId, msg.ticker, msg.pct));
     case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price, msg.wantTicker, msg.wantPct));
     case "respondTrade": return run(conn, engine.respondTrade(room, conn.playerId, msg.id, msg.accept));
     case "declareBankruptcy": return run(conn, engine.declareBankruptcy(room, conn.playerId));

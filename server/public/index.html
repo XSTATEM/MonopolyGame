@@ -2613,6 +2613,7 @@ function localDispatch(obj){
     case "endTurn": result = GameEngine.endTurn(localRoom, viewAs); break;
     case "buyBank": result = GameEngine.buyBank(); break;
     case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
+    case "buyDirect": result = GameEngine.buyDirect(localRoom, viewAs, obj.ticker, obj.pct); break;
     case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price, obj.wantTicker, obj.wantPct); break;
     case "respondTrade": result = GameEngine.respondTrade(localRoom, viewAs, obj.id, obj.accept); break;
     case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
@@ -3527,6 +3528,15 @@ function revealLeftLabel(s, p, capital){
 }
 
 // Узкая инлайн-полоса под фильтрами: показывается только когда активен
+// Правила 2 (engine.js, measureCooldownLeft): меры бесплатны, каждая раз в
+// s.measureCooldown событий; в прежних — за деньги. Подпись и блокировка кнопки.
+function measureBtn(s, key, verb, cost){
+  if(s.rulesV !== 2) return { label: `${verb} · ${fmt(cost)}`, disabled: "" };
+  const left = (s.myMeasureCooldowns || {})[key] || 0;
+  return left > 0
+    ? { label: `${verb} · через ${left} ${pluralRu(left, "событие", "события", "событий")}`, disabled: "disabled" }
+    : { label: `${verb} · бесплатно`, disabled: "" };
+}
 // чип-фильтр по игроку — статус портфеля (скрыт/раскрыт) + кнопка шпионажа.
 function renderMarketPlayerBar(s){
   const bar = document.getElementById("marketPlayerBar");
@@ -3541,10 +3551,11 @@ function renderMarketPlayerBar(s){
   const statusHtml = target.holdingsHidden
     ? `<span class="muted">${ico("lock","ico-sm")} Портфель ${escapeHtml(target.name)} скрыт.</span>`
     : `<span class="rep-badge spy">${ico("eye","ico-sm")} ${revealLeftLabel(s, target, true)}</span>`;
-  bar.innerHTML = `${statusHtml}<button class="small" type="button" id="marketPlayerSpyBtn">${ico("search","ico-sm")} Шпионить · ${fmt(cost)}</button>`;
+  const spy = measureBtn(s, "espionage", "Шпионить", cost);
+  bar.innerHTML = `${statusHtml}<button class="small" type="button" id="marketPlayerSpyBtn">${ico("search","ico-sm")} ${spy.label}</button>`;
   const btn = document.getElementById("marketPlayerSpyBtn");
   if(btn){
-    btn.disabled = !canSpy;
+    btn.disabled = !canSpy || !!spy.disabled;
     btn.title = canSpy ? "" : "Шпионаж доступен только в ваш ход";
     btn.onclick = ()=> send({type:"ctrlEspionage", target: targetId});
   }
@@ -4333,7 +4344,7 @@ function renderControlPanel(s){
     const canAct = s.currentPlayerId === you;
     html += card("search", "Против вас действовали тайно", `случаев: ${incidents.length}`,
       "Шпионаж или дискредитация против вас, виновник не раскрыт. Расследование раскроет виновного по самому старому случаю.",
-      `<button type="button" class="block" onclick="send({type:'ctrlInvestigate'})" ${canAct?"":"disabled"}>Расследовать · ${fmt(prev.cost)} · шанс ${prev.chancePct}%</button>${invBadge}`, "alert");
+      (()=>{ const b = measureBtn(s, "investigate", "Расследовать", prev.cost); return `<button type="button" class="block" onclick="send({type:'ctrlInvestigate'})" ${canAct && !b.disabled?"":"disabled"}>${b.label} · шанс ${prev.chancePct}%</button>${invBadge}`; })(), "alert");
   } else if(invBadge){
     // Расследованный случай движок удаляет: если он был последним, карточка
     // со счётчиком исчезла бы вместе с итогом. Показываем только итог.
@@ -4355,6 +4366,7 @@ function renderControlPanel(s){
   const firstDiscreditCost = firstDiscreditTarget != null ? (discreditCosts[firstDiscreditTarget]||0) : 0;
   const noTargets = otherPlayers.length===0 ? "disabled" : "";
 
+  if(s.rulesV === 2) html += `<div class="influence-note">${ico("clock")}<span>Меры бесплатны, каждая — раз в ${s.measureCooldown || 3} ${pluralRu(s.measureCooldown || 3, "событие", "события", "событий")}. PR-кампания и шорт — за деньги.</span></div>`;
   // --- Контрольный пакет ---
   html += `<div class="influence-group">${ico("crown","ico-sm")} Контрольный пакет${myControlled.length?` · ${myControlled.map(c=>`${escapeHtml(c.name)} ${me.holdings[c.ticker]}%`).join(", ")}`:""}</div>`;
   if(myControlled.length === 0){
@@ -4379,11 +4391,13 @@ function renderControlPanel(s){
     html += card("megaphone", "PR-кампания", "+10% к цене", "Цена вашей компании +10%. Стоит 5% её цены, раз за событие.",
       `<div class="row-inline"><select id="prTarget" aria-label="Компания для PR" onchange="onPrTargetChange()">${ownOpts}</select>
         <button type="button" id="prBtn" onclick="doCtrlPrCampaign()">Провести · ${fmt(firstPrCost)}</button></div>${measureResultBadgeHtml("prCampaign")}`);
+    const negB = measureBtn(s, "negativeInfo", "Вбросить", measureCosts.negativeInfo);
+    const insB = measureBtn(s, "insider", "Подсмотреть", measureCosts.insiderPeek);
     html += card("trend-down", "Негативная информация", "−15% к цене", "Цена чужой компании −15%. На одну цель — раз в 2 события.",
       `<div class="row-inline"><select id="negTarget" aria-label="Компания-цель">${foreignOpts}</select>
-        <button type="button" onclick="doCtrlNegativeInfo()">Вбросить · ${fmt(measureCosts.negativeInfo)}</button></div>${measureResultBadgeHtml("negativeInfo")}`);
+        <button type="button" onclick="doCtrlNegativeInfo()" ${negB.disabled}>${negB.label}</button></div>${measureResultBadgeHtml("negativeInfo")}`);
     html += card("news", "Инсайд", "карта новостей", "Подсмотрите верхнюю карту новостей и решите: оставить её наверху или отложить в конец колоды. Раз за событие.",
-      `<button type="button" class="block" onclick="send({type:'ctrlInsiderPeek'})">Подсмотреть · ${fmt(measureCosts.insiderPeek)}</button>`);
+      `<button type="button" class="block" onclick="send({type:'ctrlInsiderPeek'})" ${insB.disabled}>${insB.label}</button>`);
     html += card("target", "Шорт", "×2 при падении", "Ставка на падение цены к следующему событию: цена ниже — залог возвращается вдвое, иначе сгорает.",
       `<div class="row-inline"><select id="shortTarget" aria-label="Компания для шорта">${shortOpts}</select>
         <button type="button" onclick="doCtrlShort()">Залог · ${fmt(measureCosts.shortDeposit)}</button></div>
@@ -4411,12 +4425,14 @@ function renderControlPanel(s){
 
   // --- Соперники ---
   html += `<div class="influence-group">${ico("users","ico-sm")} Соперники</div>`;
+  const spyB = measureBtn(s, "espionage", "Шпионить", measureCosts.espionage);
+  const disB = measureBtn(s, "discredit", "Атаковать", firstDiscreditCost);
   html += card("search", "Шпионаж", "на 2 события", "Раскрывает акции и недвижимость цели на 2 события. Шанс выше против игроков с низкой репутацией. Провал — вас поймают, репутация −8.",
     `<div class="row-inline"><select id="spyTarget" aria-label="Цель шпионажа" ${noTargets}>${targetOpts}</select>
-      <button type="button" onclick="doCtrlEspionage()" ${noTargets}>Шпионить · ${fmt(measureCosts.espionage)}</button></div>${measureResultBadgeHtml("espionage")}`);
-  html += card("alert", "Дискредитация", "−15 репутации", "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10. Чем выше репутация цели, тем дороже.",
+      <button type="button" onclick="doCtrlEspionage()" ${noTargets || spyB.disabled}>${spyB.label}</button></div>${measureResultBadgeHtml("espionage")}`);
+  html += card("alert", "Дискредитация", "−15 репутации", s.rulesV === 2 ? "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10." : "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10. Чем выше репутация цели, тем дороже.",
     `<div class="row-inline"><select id="discreditTarget" aria-label="Цель дискредитации" ${noTargets} onchange="onDiscreditTargetChange()">${targetOpts}</select>
-      <button type="button" id="discreditBtn" onclick="doCtrlDiscredit()" ${noTargets}>Атаковать · ${fmt(firstDiscreditCost)}</button></div>${measureResultBadgeHtml("discredit")}`);
+      <button type="button" id="discreditBtn" onclick="doCtrlDiscredit()" ${noTargets || disB.disabled}>${disB.label}</button></div>${measureResultBadgeHtml("discredit")}`);
   if(!s.frozen){
     const opponentFullyOwned = s.companies.filter(c => c.fullyOwned && c.controllerId && c.controllerId !== you);
     if(opponentFullyOwned.length > 0){
@@ -4439,11 +4455,12 @@ function renderControlPanel(s){
   // --- Своя репутация ---
   const pr = s.myPersonalPr || { cost: 5000, usedThisEvent: false };
   const myRep = me.reputation == null ? 50 : me.reputation;
-  const prDisabled = myRep >= 100 || pr.usedThisEvent;
+  const prB = measureBtn(s, "personalPr", "Провести", pr.cost);
+  const prDisabled = myRep >= 100 || pr.usedThisEvent || !!prB.disabled;
   const prNote = myRep >= 100 ? "Репутация максимальная" : pr.usedThisEvent ? "Снова после события" : "";
   html += `<div class="influence-group">${ico("star","ico-sm")} Репутация · ${myRep}</div>`;
   html += card("megaphone", "Личный PR", "+4 репутации", "+4 к репутации: ниже комиссия банка и выгоднее кредит. Раз за событие, каждая следующая кампания дороже.",
-    `<button type="button" class="block" onclick="send({type:'personalPr'})" ${prDisabled?"disabled":""}>Провести · ${fmt(pr.cost)}</button>
+    `<button type="button" class="block" onclick="send({type:'personalPr'})" ${prDisabled?"disabled":""}>${prB.label}</button>
       ${prNote ? `<div class="field-hint">${prNote}</div>` : ""}${measureResultBadgeHtml("personalPr")}`);
 
   el.innerHTML = html;
@@ -4660,11 +4677,14 @@ function stockActionsHtml(s, c, v){
       <button type="button" role="tab" aria-selected="${mode==="player"}" ${others.length?"":"disabled"} onclick="setTradeMode('${t}','player')">${ico("users","ico-sm")} Игроку</button>
     </div>`;
   if(mode === "bank"){
-    const hint = hintBtn("sell-bank", s.frozen
+    // Правила 2: банк берёт комиссию (engine.js, SELL_BANK_COMMISSION) — сумма на ползунке уже за её вычетом.
+    const comm = (s.sellCommissionPct || 0) / 100;
+    const commText = comm ? ` Банк берёт комиссию ${s.sellCommissionPct}% — игроку сделкой обычно выгоднее.` : "";
+    const hint = hintBtn("sell-bank", (s.frozen
       ? "Цены заморожены: до следующего события продажа банку цену не снижает."
-      : "Банк платит текущую цену. Продажа снижает цену компании на 2% за каждые 10%.");
+      : "Банк платит текущую цену. Продажа снижает цену компании на 2% за каждые 10%.") + commText);
     return `<div class="stock-actions">${seg}
-      ${pctSliderHtml("sellSlider_"+t, maxPct, startPct, c.price/100, "Доля", hint)}
+      ${pctSliderHtml("sellSlider_"+t, maxPct, startPct, c.price/100 * (1 - comm), comm ? `Доля · комиссия ${s.sellCommissionPct}%` : "Доля", hint)}
       <button type="button" class="secondary block" onclick="doSellStock('${t}', pctSliderVal('sellSlider_${t}'))"><span id="sellSlider_${t}_btn" data-verb="Продать">Продать ${startPct}%</span></button>
     </div>`;
   }
@@ -4758,7 +4778,7 @@ function onDiscreditTargetChange(){
   const btn = document.getElementById("discreditBtn");
   if(!sel || !btn || !latest) return;
   const cost = (latest.myDiscreditCosts || {})[sel.value] || 0;
-  btn.textContent = `Атаковать · ${fmt(cost)}`;
+  btn.textContent = measureBtn(latest, "discredit", "Атаковать", cost).label;
 }
 function onSqueezeTargetChange(){
   const sel = document.getElementById("squeezeTarget");
@@ -5388,7 +5408,11 @@ function rollPopupHtml(s){
   // Подсказка «?» у полосы держателей: как считается плата за отказ (кривая
   // engine.js FEE_CURVE_*) и шанс, что выплату пропустят (зависит от тира).
   const refuseRules = [];
-  if(meta.ownersCount > 0 && !meta.controllerId && !meta.refuseSkipped && meta.refuseAmount > 0){
+  const v2 = meta.rulesV === 2;
+  if(v2 && meta.ownersCount > 0){
+    refuseRules.push(`Попали на компанию с держателями — платите им сразу, это обязательно. Плата растёт быстрее их доли (сейчас ${meta.totalOwnedPct}%).`);
+    refuseRules.push(`Своя доля снижает плату на ${s.landingFeeDiscountPct || 10}% за каждый процент, с ${Math.round(100 / (s.landingFeeDiscountPct || 10))}% — не платите.`);
+  } else if(meta.ownersCount > 0 && !meta.controllerId && !meta.refuseSkipped && meta.refuseAmount > 0){
     refuseRules.push(`Не покупаете долю — платите держателям <b>${fmt(meta.refuseAmount)}</b>.`);
     if(meta.feeCurve) refuseRules.push(`Плата растёт быстрее их доли (сейчас ${meta.totalOwnedPct}%): чем больше компании раскуплено, тем дороже отказ.`);
     if(meta.refuseSkipChance) refuseRules.push(`Выплату могут пропустить: шанс ${Math.round(meta.refuseSkipChance*100)}%.`);
@@ -5411,7 +5435,38 @@ function rollPopupHtml(s){
     </div>`;
     primary = `<button type="button" class="grow" onclick="send({type:'buyFromRoll',pct:pctSliderVal('rpBuySlider')})"><span id="rpBuySlider_btn">Купить ${startPct}%</span></button>`;
   }
-  if(meta.ownersCount > 0){
+  if(v2){
+    // Правила 2 (engine.js, chargeLandingFee): плата держателям уже прошла при
+    // броске; с контролёром — сначала его цена выкупа (или тариф после срока),
+    // потом можно купить долю. Дальше — «Купить» или «Не покупать».
+    const fee = meta.fee || { settled: true, paid: 0, reason: "none" };
+    if(!fee.settled){
+      if(primary) primary = primary.replace('<button type="button" class="grow"', '<button type="button" class="grow" disabled title="Сначала оплатите выкуп контролёру"');
+      if(s.pendingForcedPrice && s.pendingForcedPrice.targetId === you){
+        secondary = `<button type="button" class="secondary has-sub" onclick="doPayForcedPrice()"><span>Оплатить выкуп</span><span class="btn-sub down">−${fmt(s.pendingForcedPrice.amount)}</span></button>`;
+        note = `<div class="sheet-box sheet-note">${ico("crown","ico-sm")} <b>${escapeHtml(meta.controllerName||"")}</b> назначил(а) цену выкупа. После оплаты можно купить долю.</div>`;
+      } else {
+        const ctrlP = s.players.find(p=>p.id===meta.controllerId);
+        const handTo = mode==="offline" && ctrlP && !ctrlP.isBot
+          ? `<button type="button" class="secondary small" style="margin-top:10px;" onclick="viewAs=${ctrlP.id};refreshLocal();">Передать устройство: ${escapeHtml(ctrlP.name)}</button>` : "";
+        const left = ctrlWaitLeftSec(s);
+        const ctrlName = `<b>${escapeHtml(meta.controllerName||"")}</b>`;
+        const ctrlHint = hintBtn("roll-ctrl", "У компании есть контролёр (больше 50%): плату за попадание он назначает сам. Если он не назначит её за 45 секунд, можно заплатить по обычному тарифу.");
+        note = `<div class="sheet-box sheet-note">${ico("crown","ico-sm")} ${left > 0
+          ? `${ctrlName} назначает цену выкупа · <b data-ctrl-wait>${left} с</b>`
+          : `${ctrlName} не назначил(а) цену — можно оплатить по тарифу`}${ctrlHint}${handTo}</div>`;
+        secondary = `<button type="button" class="secondary has-sub"${left > 0 ? " disabled" : ""} onclick="send({type:'dividendFromRoll'})"><span>Оплатить по тарифу</span><span class="btn-sub down">−${fmt(meta.controllerFee||0)}${left > 0 ? ` · через <span data-ctrl-wait>${left} с</span>` : " контролёру"}</span></button>`;
+      }
+    } else {
+      const feeLine = fee.reason === "paid" || (fee.reason === "controller" && fee.paid > 0)
+        ? `${ico("coins","ico-sm")}<span>${fee.reason === "controller" ? "Выкуп оплачен" : "Плата держателям"}: <b class="down">−${fmt(fee.paid)}</b>${fee.discountPct > 0 ? ` <span class="muted">· скидка ${fee.discountPct}% за вашу долю</span>` : ""}</span>`
+        : fee.reason === "own" ? `${ico("shield","ico-sm")}<span>Ваша доля от ${Math.round(100 / (s.landingFeeDiscountPct || 10))}% — платить держателям не нужно</span>`
+        : fee.reason === "card" ? `${ico("news","ico-sm")}<span>Выплата не проводится (новость) — платить не нужно</span>`
+        : "";
+      if(feeLine) note = `<div class="sheet-box sheet-note fee-line">${feeLine}</div>`;
+      secondary = `<button type="button" class="secondary" onclick="send({type:'skipRoll'})">Не покупать</button>`;
+    }
+  } else if(meta.ownersCount > 0){
     if(meta.controllerId){
       if(s.pendingForcedPrice && s.pendingForcedPrice.targetId === you){
         secondary = `<button type="button" class="secondary has-sub" onclick="doPayForcedPrice()"><span>Оплатить выкуп</span><span class="btn-sub down">−${fmt(s.pendingForcedPrice.amount)}</span></button>`;
@@ -5461,8 +5516,9 @@ function rollPopupHtml(s){
       <div class="sheet-price"><b>${fmt(c.price)}</b>${deltaPill(c.price, c.prevPrice)}</div>
     </div>
     ${barHtml}
+    ${v2 ? note : ""}
     ${buyHtml}
-    ${note}
+    ${v2 ? "" : note}
     <div class="sheet-actions">${secondary}${primary}</div>
   </div>`;
 }
@@ -5563,8 +5619,9 @@ function showForcedPriceSheet(keepEventSummary){
 }
 function updateForcedPriceAlert(s){
   const roll = s.pendingRoll, meta = s.pendingRollMeta;
+  // Правила 2: после оплаты (тариф, выкуп) назначать уже нечего — fee.settled.
   const need = s.phase === "roll" && !!roll && !!meta && meta.kind === "stock" && meta.controllerId === you
-    && meta.controllerId !== roll.playerId && !s.pendingForcedPrice;
+    && meta.controllerId !== roll.playerId && !s.pendingForcedPrice && !(meta.fee && meta.fee.settled);
   const key = need ? `forced-price-ctrl-${s.eventCount}-${s.turn}-${roll.playerId}-${roll.row}-${roll.col}` : null;
   const viewerChanged = lastForcedPriceAlertViewer !== null && lastForcedPriceAlertViewer !== you;
   lastForcedPriceAlertViewer = you;
@@ -5655,7 +5712,8 @@ function renderStage(s){
   if(s.phase === "roll"){
     // Контролёр пакета (>50%) должен назначить цену выкупа — показываем ему
     // это даже если сейчас не его ход, иначе он никогда не увидит запрос.
-    if(s.pendingRoll && s.pendingRollMeta && s.pendingRollMeta.kind==="stock" && s.pendingRollMeta.controllerId===you && !s.pendingForcedPrice){
+    if(s.pendingRoll && s.pendingRollMeta && s.pendingRollMeta.kind==="stock" && s.pendingRollMeta.controllerId===you && !s.pendingForcedPrice
+      && !(s.pendingRollMeta.fee && s.pendingRollMeta.fee.settled)){
       cornerAction.innerHTML = "";
       showPopup(forcedPriceWaitingPopupHtml(s), false, `fp:${s.pendingRoll.playerId}-${s.pendingRoll.row}-${s.pendingRoll.col}`);
       syncCtrlWaitTimer(s);
@@ -6121,13 +6179,29 @@ function refreshCompanyModal(){
     }
   } else {
     const nCells = GameEngine.BOARD.flat().filter(x=>x===c.ticker).length;
-    actionsHtml += `<div class="sheet-note">${nCells} ${pluralRu(nCells, "клетка", "клетки", "клеток")} на поле${hintBtn("company-cells", "Купить долю у банка можно, когда фишка попадёт на одну из клеток этой компании.")}</div>`;
+    const db = s.directBuy; // правила 2 (engine.js, buyDirect): раз в ход, с наценкой
+    const free = Math.floor(100 - c.owned);
+    actionsHtml += `<div class="sheet-note">${nCells} ${pluralRu(nCells, "клетка", "клетки", "клеток")} на поле${hintBtn("company-cells", db
+      ? `Купить долю у банка можно, когда фишка попадёт на клетку этой компании, или вне броска: раз в ход до ${db.maxPct}% с наценкой ${db.markupPct}%.`
+      : "Купить долю у банка можно, когда фишка попадёт на одну из клеток этой компании.")}</div>`;
+    if(db && s.currentPlayerId === you && free >= 1 && !c.merged){
+      if(db.used){
+        actionsHtml += `<div class="sheet-note">${ico("clock","ico-sm")} Покупка вне броска уже была в этот ход</div>`;
+      } else {
+        const dMax = Math.min(db.maxPct, free);
+        const dUnit = c.price/100 * (1 + db.markupPct/100) * (1 + (s.bankFeePct||0));
+        actionsHtml += `<div class="sheet-box">
+          ${pctSliderHtml("cmDirectSlider", dMax, dMax, dUnit, `Вне броска · наценка ${db.markupPct}%`)}
+          <button type="button" class="block" onclick="send({type:'buyDirect',ticker:'${c.ticker}',pct:pctSliderVal('cmDirectSlider')});"><span id="cmDirectSlider_btn" data-verb="Купить">Купить ${dMax}%</span></button>
+        </div>`;
+      }
+    }
   }
   // Заморозка цен продажу не запрещает (движок её принимает) — см. stockActionsHtml.
   if(myHolding > 0 && s.currentPlayerId === you){
     const sellMax = Math.min(25, myHolding);
     actionsHtml += `<div class="sheet-box">
-      ${pctSliderHtml("cmSellSlider_"+c.ticker, sellMax, Math.min(10, sellMax), c.price/100, "Продать банку")}
+      ${pctSliderHtml("cmSellSlider_"+c.ticker, sellMax, Math.min(10, sellMax), c.price/100 * (1 - (s.sellCommissionPct||0)/100), s.sellCommissionPct ? `Продать банку · комиссия ${s.sellCommissionPct}%` : "Продать банку")}
       <button type="button" class="secondary block" onclick="doSellStock('${c.ticker}', pctSliderVal('cmSellSlider_${c.ticker}'));">Продать</button>
     </div>`;
   }
