@@ -14,14 +14,27 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  // Базовый пак аватарок бесплатный и доступен всем всегда (см. AVATAR_SET в index.html).
+  // Аватарки — контурные значки (в клиенте символы i-av-<id> спрайта), не эмодзи.
+  // Базовый пак бесплатный и доступен всем всегда.
   const AVATAR_PACKS = [
-    { id: "base", name: "Базовый", cost: 0, emojis: ["🧑","👩","👨","🧔","👩‍🦱","👨‍🦱","🧕","👳","🦸","🧙","🥷","🐱","🐶","🦊","🐼","🐸"] },
-    { id: "legend", name: "Легенда", cost: 300, emojis: ["🐉","🦄","👽","🤖","👻","🧞‍♂️","🧜‍♀️","🧙‍♂️"] },
-    { id: "vip", name: "VIP", cost: 600, emojis: ["👑","🎩","🕶️","🦹‍♂️","🦹‍♀️","🥷","🧛‍♂️","💎"] },
-    { id: "bulls", name: "Быки и медведи", cost: 0, premium: true, emojis: ["🐂","🐻","🦈","🦅","🐺","🦁","💼","📈"] },
-    { id: "wallstreet", name: "Уолл-стрит", cost: 0, set: "tm_set_wallstreet", emojis: ["🗽","🏦","💹","💵","🪙","📊","💰","🧾"] },
+    { id: "base", name: "Базовый", cost: 0, avatars: ["rocket", "sun", "anchor", "mountain", "flower", "compass", "feather", "key", "zap", "star", "swords", "cat", "dog", "squirrel", "rabbit", "turtle"] },
+    { id: "legend", name: "Легенда", cost: 300, avatars: ["flame", "sparkles", "orbit", "cpu", "ghost", "castle", "shell", "wand"] },
+    { id: "vip", name: "VIP", cost: 600, avatars: ["crown", "trophy", "glasses", "mask", "drama", "skull", "moon", "gem"] },
+    { id: "bulls", name: "Быки и медведи", cost: 0, premium: true, avatars: ["bull", "bear", "fish", "bird", "paw", "shield", "briefcase", "trend"] },
+    { id: "wallstreet", name: "Уолл-стрит", cost: 0, set: "tm_set_wallstreet", avatars: ["tower", "bank", "candles", "cash", "coins", "bars", "piggy", "receipt"] },
   ];
+  const AVATAR_NAMES = { rocket: "Ракета", sun: "Солнце", anchor: "Якорь", mountain: "Гора", flower: "Цветок", compass: "Компас", feather: "Перо", key: "Ключ", zap: "Молния", star: "Звезда", swords: "Мечи", cat: "Кот", dog: "Пёс", squirrel: "Белка", rabbit: "Кролик", turtle: "Черепаха", flame: "Пламя", sparkles: "Искры", orbit: "Орбита", cpu: "Процессор", ghost: "Призрак", castle: "Замок", shell: "Раковина", wand: "Волшебная палочка", crown: "Корона", trophy: "Кубок", glasses: "Очки", mask: "Маска", drama: "Театр", skull: "Череп", moon: "Луна", gem: "Бриллиант", bull: "Бык", bear: "Медведь", fish: "Акула", bird: "Орёл", paw: "Волк", shield: "Щит", briefcase: "Портфель", trend: "Рост", tower: "Небоскрёб", bank: "Банк", candles: "Свечи", cash: "Купюры", coins: "Монеты", bars: "Столбцы", piggy: "Копилка", receipt: "Чек" };
+  // До значков аватарки были эмодзи: сохранённые профили, комнаты и клиенты
+  // прежних версий присылают их — каждой своя замена из того же пака.
+  const LEGACY_AVATARS = { "\u{1F9D1}": "rocket", "\u{1F469}": "sun", "\u{1F468}": "anchor", "\u{1F9D4}": "mountain", "\u{1F469}\u{200D}\u{1F9B1}": "flower", "\u{1F468}\u{200D}\u{1F9B1}": "compass", "\u{1F9D5}": "feather", "\u{1F473}": "key", "\u{1F9B8}": "zap", "\u{1F9D9}": "star", "\u{1F977}": "swords", "\u{1F431}": "cat", "\u{1F436}": "dog", "\u{1F98A}": "squirrel", "\u{1F43C}": "rabbit", "\u{1F438}": "turtle", "\u{1F409}": "flame", "\u{1F984}": "sparkles", "\u{1F47D}": "orbit", "\u{1F916}": "cpu", "\u{1F47B}": "ghost", "\u{1F9DE}\u{200D}\u{2642}\u{FE0F}": "castle", "\u{1F9DC}\u{200D}\u{2640}\u{FE0F}": "shell", "\u{1F9D9}\u{200D}\u{2642}\u{FE0F}": "wand", "\u{1F451}": "crown", "\u{1F3A9}": "trophy", "\u{1F576}\u{FE0F}": "glasses", "\u{1F9B9}\u{200D}\u{2642}\u{FE0F}": "mask", "\u{1F9B9}\u{200D}\u{2640}\u{FE0F}": "drama", "\u{1F9DB}\u{200D}\u{2642}\u{FE0F}": "moon", "\u{1F48E}": "gem", "\u{1F402}": "bull", "\u{1F43B}": "bear", "\u{1F988}": "fish", "\u{1F985}": "bird", "\u{1F43A}": "paw", "\u{1F981}": "shield", "\u{1F4BC}": "briefcase", "\u{1F4C8}": "trend", "\u{1F5FD}": "tower", "\u{1F3E6}": "bank", "\u{1F4B9}": "candles", "\u{1F4B5}": "cash", "\u{1FA99}": "coins", "\u{1F4CA}": "bars", "\u{1F4B0}": "piggy", "\u{1F9FE}": "receipt" };
+  // Значение аватарки → id значка ("" — нет такой; "PHOTO" — фото профиля).
+  function avatarId(v) {
+    v = String(v || "");
+    if (v === "PHOTO") return v;
+    if (AVATAR_NAMES[v]) return v;
+    return LEGACY_AVATARS[v] || LEGACY_AVATARS[v.replace(/\uFE0F/g, "")] || "";
+  }
+  function packHasAvatar(pack, v) { return !!pack && pack.avatars.includes(avatarId(v)); }
 
   // Темы стола переопределяют градиент игрового стола (.theme-* классы на <body>
   // в index.html) — три цветовые точки радиального градиента + акцент рамок/подсветки.
@@ -38,5 +51,5 @@
   function avatarPackById(id) { return AVATAR_PACKS.find((p) => p.id === id); }
   function boardSkinById(id) { return BOARD_SKINS.find((s) => s.id === id); }
 
-  return { AVATAR_PACKS, BOARD_SKINS, avatarPackById, boardSkinById };
+  return { AVATAR_PACKS, AVATAR_NAMES, LEGACY_AVATARS, avatarId, packHasAvatar, BOARD_SKINS, avatarPackById, boardSkinById };
 });

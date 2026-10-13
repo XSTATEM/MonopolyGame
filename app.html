@@ -64,12 +64,12 @@
 <body>
 
 <header>
-  <h1>📈 Биржа — калькулятор рынка</h1>
+  <h1>Биржа — калькулятор рынка</h1>
   <span class="pill">Ход в раунде: <b id="turnCounter">1</b> / 3</span>
   <span class="pill">Событий сыграно: <b id="eventCounter">0</b></span>
   <span class="pill">Карт в колоде: <b id="deckCounter">68</b></span>
   <button id="btnEndTurn">Завершить ход игрока</button>
-  <button id="btnEvent" class="secondary">🎲 Биржевое событие сейчас</button>
+  <button id="btnEvent" class="secondary">Биржевое событие сейчас</button>
   <button id="btnReset" class="danger" style="margin-left:auto;">Новая партия</button>
 </header>
 
@@ -103,7 +103,7 @@
 
     <section>
       <h2>Стандартный ход</h2>
-      <div class="row-inline"><button id="btnRoll" style="width:100%;">🎲 Бросить 2×d12 и разыграть ход</button></div>
+      <div class="row-inline"><button id="btnRoll" style="width:100%;">Бросить 2×d12 и разыграть ход</button></div>
       <div class="muted" style="font-size:12px;">Первый кубик = номер строки, второй = номер столбца на поле. Пересечение — единственная компания, доступная в этот ход.</div>
     </section>
 
@@ -323,17 +323,17 @@ function marketEvent(){
 
   if(card.type==="global"){
     COMPANIES.forEach(c=>applyPriceDelta(c.ticker, card.percent));
-    addLog(`📰 [Глобальная] ${card.title}: ${card.percent>0?"+":""}${card.percent}% всем компаниям`, "news");
+    addLog(`[Глобальная] ${card.title}: ${card.percent>0?"+":""}${card.percent}% всем компаниям`, "news");
   } else if(card.type==="sector"){
     COMPANIES.filter(c=>c.sector===card.sector).forEach(c=>applyPriceDelta(c.ticker, card.percent));
-    addLog(`📰 [Отраслевая, ${card.sector}] ${card.title}: ${card.percent>0?"+":""}${card.percent}%`, "news");
+    addLog(`[Отраслевая, ${card.sector}] ${card.title}: ${card.percent>0?"+":""}${card.percent}%`, "news");
   } else if(card.type==="company"){
     const c = COMPANIES[Math.floor(Math.random()*COMPANIES.length)];
     applyPriceDelta(c.ticker, card.percent);
     if(card.skipDividend) state.companies[c.ticker].skipDividendUntil = state.eventCount+1;
-    addLog(`📰 [Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent>0?"+":""}${card.percent}%${card.skipDividend?" (дивиденды пропущены на 1 ход)":""}`, "news");
+    addLog(`[Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent>0?"+":""}${card.percent}%${card.skipDividend?" (дивиденды пропущены на 1 ход)":""}`, "news");
   } else if(card.type==="special"){
-    addLog(`🃏 [Особая] ${card.title}: ${card.desc}`, "news");
+    addLog(`[Особая] ${card.title}: ${card.desc}`, "news");
   }
 
   state.turn = 1;
@@ -368,7 +368,7 @@ function render(){
     const controller = ownerOfControl(c.ticker);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">👑 ${controller.name}</span>`:""}</td>
+      <td><b>${c.name}</b> <span class="muted">${c.ticker}</span>${controller?`<span class="badge control">${controller.name}</span>`:""}</td>
       <td><span class="sector-tag">${c.sector}</span></td>
       <td class="price">${fmt(cur.price)}</td>
       <td class="${delta>0?'up':delta<0?'down':'muted'}">${delta===0?"—":(delta>0?"▲":"▼")+Math.abs(deltaPct).toFixed(1)+"%"}</td>
@@ -390,7 +390,7 @@ function render(){
       .map(([t,v])=>`<span>${t}: ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`;
     div.innerHTML = `
       <div class="player-head">
-        <b>${p.name}${p.bankrupt?" 💀":""}</b>
+        <b>${p.name}${p.bankrupt?" (банкрот)":""}</b>
         <span class="net">Капитал: ${fmt(netWorth(p))}</span>
       </div>
       <div>Наличные: <span class="${p.cash<0?'down':''}">${fmt(p.cash)}</span></div>
@@ -446,7 +446,7 @@ function declareBankruptcy(id){
   showConfirm(`Объявить банкротство игрока «${p.name}»? Все его акции вернутся в банк.`, ()=>{
     p.holdings = {};
     p.bankrupt = true;
-    addLog(`💀 Игрок «${p.name}» объявлен банкротом. Его акции возвращены в банк / выставлены на аукцион.`, "bankrupt");
+    addLog(`Игрок «${p.name}» объявлен банкротом. Его акции возвращены в банк / выставлены на аукцион.`, "bankrupt");
     render(); save();
   });
 }
@@ -669,7 +669,7 @@ function rollDiceForTurn(){
   const owned = totalOwnedPct(ticker);
   const free = 100 - owned;
   currentRoll = {pid, row, col, ticker};
-  addLog(`🎲 Бросок: строка ${row}, столбец ${col} → ${c.name} (${ticker}).`, "roll");
+  addLog(`Бросок: строка ${row}, столбец ${col} → ${c.name} (${ticker}).`, "roll");
 
   let actionsHtml = "";
   if(free<=0){
@@ -684,7 +684,7 @@ function rollDiceForTurn(){
 
   document.getElementById("rollResult").innerHTML = `
     <div class="event-banner" style="margin-bottom:0;">
-      🎲 <b>${row}</b> / <b>${col}</b> → <b>${c.name}</b> <span class="muted">(${ticker})</span><br>
+      <b>${row}</b> / <b>${col}</b> → <b>${c.name}</b> <span class="muted">(${ticker})</span><br>
       Цена: <b>${fmt(cur.price)}</b> · В руках игроков: ${owned.toFixed(0)}%
     </div>
     ${actionsHtml}

@@ -220,11 +220,11 @@
     const u = p.unlocks || {};
     const S = window.Skins;
     if(!S) return "";
-    const emojis = [].concat(...(u.avatarPacks || []).map((id)=>{ const pk = S.avatarPackById(id); return pk ? pk.emojis.slice(0, 6) : []; }));
+    const avatars = [].concat(...(u.avatarPacks || []).map((id)=>{ const pk = S.avatarPackById(id); return pk ? pk.avatars.slice(0, 6) : []; }));
     const swatches = [].concat(...(u.boardSkins || []).map((id)=>{ const s = S.boardSkinById(id); return s ? s.stage : []; }))
       .filter((c)=> /^#[0-9a-f]{3,8}$/i.test(c));
-    if(!emojis.length && !swatches.length) return "";
-    return `<div class="shop-card-preview">${emojis.length ? `<span class="skin-emoji-row">${escapeHtml(emojis.join(""))}</span>` : ""}${swatches.length ? `<span class="skin-preview">${swatches.map((c)=> `<span class="skin-swatch" style="background:${c};"></span>`).join("")}</span>` : ""}</div>`;
+    if(!avatars.length && !swatches.length) return "";
+    return `<div class="shop-card-preview">${avatars.length ? `<span class="skin-emoji-row" aria-hidden="true">${avatars.map((a)=> `<svg class="ico av-ico" aria-hidden="true"><use href="#i-av-${a}"/></svg>`).join("")}</span>` : ""}${swatches.length ? `<span class="skin-preview">${swatches.map((c)=> `<span class="skin-swatch" style="background:${c};"></span>`).join("")}</span>` : ""}</div>`;
   }
   function highlighted(id){ return !!highlight && highlight.id === id && Date.now() < highlight.until; }
   function cardHtml(p){

@@ -1976,3 +1976,24 @@ button.board-dec-chip + button.board-dec-chip{margin-top:8px;}
 button.rep-badge.ev-news-badge{min-height:28px;max-width:100%;padding:4px 10px;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);border-radius:var(--r-pill);gap:5px;}
 .ev-news-badge > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ev-news-badge b{font-family:var(--font-mono);flex:none;} .ev-news-badge b.up{color:var(--up);} .ev-news-badge b.down{color:var(--down);}
+
+/* ---------------------------------------------------------------------
+   Без эмодзи (стиль-гайд v3.1): аватарки, реакции, характеры компаний и
+   звёзды уровня города — контурные значки спрайта (i-av-*, i-r-*).
+   --------------------------------------------------------------------- */
+.ico-xs{width:13px;height:13px;vertical-align:-2px;}
+.ico.av-ico{width:62%;height:62%;vertical-align:middle;}
+.avatar-opt .ico.av-ico{width:22px;height:22px;}
+.rating-row .avatar-opt .ico.av-ico, .rating-row .avatar-opt > .ico{width:18px;height:18px;}
+.skin-emoji-row{display:flex;flex-wrap:wrap;gap:6px;letter-spacing:0;color:var(--text-2);}
+.skin-emoji-row .ico.av-ico{width:22px;height:22px;}
+.reaction-btn .ico{width:24px;height:24px;}
+.pchip .av-reaction{width:30px;height:30px;border-radius:15px;background:var(--amber);color:var(--on-amber);display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.45);font-size:0;}
+.pchip .av-reaction .ico{width:18px;height:18px;stroke-width:2;}
+.re-stars{display:flex;justify-content:center;gap:1px;letter-spacing:0;}
+.re-stars .ico{width:6px;height:6px;fill:currentColor;stroke-width:2;}
+.co-profile-ico .ico{width:22px;height:22px;color:var(--amber);}
+.rules-profiles{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.rules-profiles li{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45;color:var(--text-2);}
+.rules-profiles li > .ico{flex:none;margin-top:1px;color:var(--clay);}
+.rules-profiles b{color:var(--text);}

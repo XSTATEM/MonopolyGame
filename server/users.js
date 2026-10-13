@@ -43,6 +43,12 @@ function saveUsers() {
 
 // usernameKey -> {username, salt, hash, gender, avatar, rating, points, pointsDebt?, entitlements, purchases, adRewards, billingId?, …, createdAt}
 const users = loadUsers();
+// Аватарки были эмодзи, теперь это id значков (skins.js): старые значения
+// переводятся в свою замену один раз при загрузке.
+for (const k in users) {
+  const rec = users[k];
+  if (rec && rec.avatar && rec.avatar !== "PHOTO" && !Skins.AVATAR_NAMES[rec.avatar]) rec.avatar = Skins.avatarId(rec.avatar);
+}
 
 function usernameKey(username) {
   return String(username || "").trim().toLowerCase();
@@ -126,7 +132,7 @@ function hashPassword(password, salt) {
 // открыл рейтинг (хранимый XSS → кража токена сессии).
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 function isAllowedAvatar(avatar) {
-  return avatar === "" || avatar === "PHOTO" || Skins.AVATAR_PACKS.some((p) => p.emojis.includes(avatar));
+  return avatar === "" || avatar === "PHOTO" || Skins.AVATAR_PACKS.some((p) => Skins.packHasAvatar(p, avatar));
 }
 
 // ---------------------------------------------------------------------
@@ -260,7 +266,7 @@ function register(username, password, gender, avatar) {
     username, salt, hash,
     gender: String(gender || "").trim().slice(0, 24),
     // При регистрации доступен только бесплатный пак: платные покупаются за очки.
-    avatar: (() => { const a = String(avatar || "").trim().slice(0, 8); const base = Skins.avatarPackById("base"); return base && base.emojis.includes(a) ? a : ""; })(),
+    avatar: (() => { const a = Skins.avatarId(String(avatar || "").trim().slice(0, 16)); return Skins.packHasAvatar(Skins.avatarPackById("base"), a) ? a : ""; })(),
     avatarPhoto: null,
     rating: 0,
     points: 0,
@@ -346,11 +352,14 @@ function updateProfile(username, password, gender, avatar, token) {
   const rec = auth.rec;
   if (gender != null) rec.gender = String(gender || "").trim().slice(0, 24);
   if (avatar != null) {
-    avatar = String(avatar || "").trim().slice(0, 8);
-    // "PHOTO" — зарезервированное значение: показывать avatarPhoto вместо эмодзи.
-    if (avatar !== "PHOTO") {
+    // Клиенты прежних версий присылают эмодзи — переводим в id значка.
+    avatar = Skins.avatarId(String(avatar || "").trim().slice(0, 16));
+    // "PHOTO" — зарезервированное значение: показывать avatarPhoto вместо значка.
+    if (avatar === "") {
+      return { error: "Такого аватара нет." };
+    } else if (avatar !== "PHOTO") {
       const owned = effectiveOwned(rec, "avatarPack");
-      const allowed = Skins.AVATAR_PACKS.filter((p) => owned.includes(p.id)).some((p) => p.emojis.includes(avatar));
+      const allowed = Skins.AVATAR_PACKS.filter((p) => owned.includes(p.id)).some((p) => Skins.packHasAvatar(p, avatar));
       if (!allowed) return { error: "Этот аватар вам ещё недоступен." };
     } else if (!rec.avatarPhoto) {
       return { error: "Сначала загрузите фото." };
@@ -573,7 +582,7 @@ function revokeOrder(order) {
   if (!ownsSkin(rec, "avatarPack", rec.equippedAvatarPack || "base")) rec.equippedAvatarPack = "base";
   if (rec.avatar && rec.avatar !== "PHOTO") {
     const owned = effectiveOwned(rec, "avatarPack");
-    if (!Skins.AVATAR_PACKS.some((p) => owned.includes(p.id) && p.emojis.includes(rec.avatar))) rec.avatar = "";
+    if (!Skins.AVATAR_PACKS.some((p) => owned.includes(p.id) && Skins.packHasAvatar(p, rec.avatar))) rec.avatar = "";
   }
   saveUsers();
   return { ok: true, revoked: true };

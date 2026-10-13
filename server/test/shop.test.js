@@ -229,7 +229,7 @@ function pureChecks() {
   check(users.applyOrder(premiumOrder).applied === false, "applyOrder повторно — без второго начисления");
   check(ap.profile.ownedBoardSkins.includes("gold") && ap.profile.ownedAvatarPacks.includes("bulls") && !ap.profile.ownedBoardSkins.includes("wallstreet"), "Премиум открывает gold и bulls, но не набор «Уолл-стрит»");
   check(users.equipSkin("Pure", "pass1234", "gold", "boardSkin").ok, "тему «Золото биржи» можно надеть");
-  check(users.updateProfile("Pure", "pass1234", null, "🐂").ok, "аватар из пака «Быки и медведи» доступен");
+  check(users.updateProfile("Pure", "pass1234", null, "\u{1F402}").ok, "аватар из пака «Быки и медведи» доступен (старое эмодзи быка → значок bull)");
   check(users.buySkin("Pure", "pass1234", "royal", "boardSkin").error === "Этот скин уже куплен.", "скин за очки уже входит в Премиум — очки не списываются");
   const spent = users.buySkin("Pure", "pass1234", "wallstreet", "boardSkin");
   check(spent.error === "Этот скин продаётся только в наборе.", "скин набора за очки не продаётся");
@@ -489,7 +489,7 @@ async function main() {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync("pass1234", salt, 64).toString("hex");
   fs.writeFileSync(path.join(DATA, "users.json"), JSON.stringify({
-    old: { username: "Old", salt, hash, gender: "", avatar: "🐉", avatarPhoto: null, points: 500,
+    old: { username: "Old", salt, hash, gender: "", avatar: "\u{1F409}", avatarPhoto: null, points: 500,
       ownedAvatarPacks: ["base", "legend"], ownedBoardSkins: ["default"], equippedAvatarPack: "legend", equippedBoardSkin: "default", createdAt: Date.now() },
   }), "utf8");
   await restart();
@@ -512,7 +512,7 @@ async function main() {
   const l0 = await post("/api/login", { username: "Old", password: "pass1234" });
   const oldTok = l0.body.sessionToken;
   check(l0.status === 200 && l0.body.user.rating === 500 && l0.body.user.points === 500, "миграция: rating = points = 500");
-  check(l0.body.user.premium === false && JSON.stringify(l0.body.user.ownedAvatarPacks) === '["base","legend"]' && l0.body.user.avatar === "🐉", "старые покупки и аватар на месте");
+  check(l0.body.user.premium === false && JSON.stringify(l0.body.user.ownedAvatarPacks) === '["base","legend"]' && l0.body.user.avatar === "flame", "старые покупки и аватар на месте");
   const buy = await post("/api/skins/buy", Object.assign(acc("Old", oldTok), { skinId: "emerald", kind: "boardSkin" }));
   check(buy.status === 200 && buy.body.user.points === 300 && buy.body.user.rating === 500, "скин за 200 очков: баланс 300, рейтинг 500");
   const buyGold = await post("/api/skins/buy", Object.assign(acc("Old", oldTok), { skinId: "gold", kind: "boardSkin" }));

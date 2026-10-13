@@ -335,8 +335,8 @@ function printReport(sum, meta, log) {
   log(`Движок: ${path.relative(process.cwd(), meta.engine.file) || meta.engine.file} (sha1 ${meta.engine.sha1})`);
   if (meta.engine.overrides.length) log(`Подмены: ${meta.engine.overrides.map((o) => `${o.name}: ${o.from} → ${o.to}`).join("; ")}`);
   if (Object.keys(c.settings).length) log(`Настройки комнаты: ${JSON.stringify(c.settings)}`);
-  if (meta.settingsNotes && meta.settingsNotes.length) log(`  ⚠ ${meta.settingsNotes.join("; ")}`);
-  (meta.probeWarnings || []).forEach((w) => log(`  ⚠ ${w}`));
+  if (meta.settingsNotes && meta.settingsNotes.length) log(`  ! ${meta.settingsNotes.join("; ")}`);
+  (meta.probeWarnings || []).forEach((w) => log(`  ! ${w}`));
   log(`Время: ${(meta.durationMs / 1000).toFixed(1)} с · ${num(meta.gamesPerSec, 0)} партий/с · потоков: ${meta.workers}`);
 
   log(`\n— Как заканчиваются партии —`);
@@ -413,7 +413,7 @@ function printReport(sum, meta, log) {
   const an = sum.anomalies;
   if (!an.hardCount && !Object.keys(an.softKinds).length) log("  нет: ни зависаний, ни ошибок, ни нарушений инвариантов");
   if (an.hardCount) {
-    log(`  ✖ Зависаний/ошибок: ${an.hardCount}. Первые:`);
+    log(`  × Зависаний/ошибок: ${an.hardCount}. Первые:`);
     an.hard.slice(0, 3).forEach((h) => {
       log(`    партия ${h.game} (${h.reason}${h.note ? ": " + h.note : ""}) · событие ${h.eventCount}, шаг ${h.step}${h.error ? "\n      " + h.error.split("\n").slice(0, 3).join("\n      ") : ""}`);
       log(`      повтор: ${h.replay}`);
@@ -421,7 +421,7 @@ function printReport(sum, meta, log) {
   }
   for (const [k, n] of Object.entries(an.softKinds)) {
     const ex = an.softExamples.find((e) => e.kind === k);
-    log(`  ⚠ ${k}: ${n} раз(а)` + (ex ? ` — например, партия ${ex.game}, событие ${ex.event}: ${JSON.stringify(Object.fromEntries(Object.entries(ex).filter(([kk]) => !["kind", "game", "seed", "count", "event", "step"].includes(kk))))}` : ""));
+    log(`  ! ${k}: ${n} раз(а)` + (ex ? ` — например, партия ${ex.game}, событие ${ex.event}: ${JSON.stringify(Object.fromEntries(Object.entries(ex).filter(([kk]) => !["kind", "game", "seed", "count", "event", "step"].includes(kk))))}` : ""));
   }
 }
 
@@ -437,7 +437,7 @@ function printSweep(variants, sweep, log) {
     log("  " + pad(v.label, 22) + lpad(num(s.events.mean, 1), 9) + lpad(pct(surv, 0), 8) + lpad(num(s.bankruptcies.perGame.mean, 2), 9) + lpad(num(s.bankruptcies.firstEvent.mean, 1), 10)
       + lpad(pct(s.lowCashShare.mean, 0), 9) + lpad(num(s.gini.mean, 2), 7) + lpad(pct(s.snowball.rate, 0), 10) + lpad(num(s.leadChanges.mean, 1), 9)
       + "  " + profNames.map((n) => (s.profiles[n] ? pct(s.profiles[n].win.rate, 0) : "—")).join(" / ")
-      + (s.anomalies.hardCount ? `  ✖ аномалий ${s.anomalies.hardCount}` : ""));
+      + (s.anomalies.hardCount ? `  × аномалий ${s.anomalies.hardCount}` : ""));
   }
 }
 

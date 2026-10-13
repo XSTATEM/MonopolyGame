@@ -297,7 +297,7 @@ async function main() {
 
   // --- лимит потока сообщений с одного сокета --------------------------------
   const wf = await wsClient();
-  for (let i = 0; i < 70; i++) wf.send(JSON.stringify({ type: "reaction", emoji: "👍" }));
+  for (let i = 0; i < 70; i++) wf.send(JSON.stringify({ type: "reaction", emoji: "\u{1F44D}" }));
   check(!!(await waitMsg(wf, (m) => m.type === "error" && /Слишком много действий/.test(m.message))), "per-socket flood limit");
 }
 

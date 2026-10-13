@@ -133,7 +133,7 @@ function startQuickRoom(room) {
   // Кто не в сети, в партию не попадёт (engine.startGame) — места считаем без них.
   while (room.players.filter((p) => p.isBot || p.connected).length < QUICK_SEATS) {
     const name = QUICK_BOT_NAMES.find((x) => !room.players.some((p) => p.name === x)) || `Бот ${++n}`;
-    if (engine.addPlayer(room, name, "", "🤖", 0, "default", true).error) break;
+    if (engine.addPlayer(room, name, "", "", 0, "default", true).error) break;
   }
   const st = engine.startGame(room, room.hostPlayerId);
   if (st && st.error) { console.warn(`Быстрая игра ${room.code}: ${st.error}`); return; }

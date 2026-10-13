@@ -69,7 +69,7 @@
     let name = String(humanName || "").trim().slice(0, 20);
     if(!name || BOT_NAMES.indexOf(name) >= 0) name = "Инвестор";
     const me = E.addPlayer(room, name, "", "", 0, "default", false).player;
-    const bots = BOT_NAMES.map((n)=> E.addPlayer(room, n, "", "🤖", 0, "default", true).player);
+    const bots = BOT_NAMES.map((n)=> E.addPlayer(room, n, "", "", 0, "default", true).player);
     room.phase = "roll";
     seed(room, me, SCRIPT.seed[0][0], SCRIPT.seed[0][1]);
     seed(room, bots[0], SCRIPT.seed[1][0], SCRIPT.seed[1][1]);
@@ -1145,8 +1145,8 @@
     exit("offlineSetup");
     offlinePlayerNames = [
       { name, gender: "", avatar: "" },
-      { name: "Бот 1", gender: "", avatar: "🤖", isBot: true },
-      { name: "Бот 2", gender: "", avatar: "🤖", isBot: true },
+      { name: "Бот 1", gender: "", avatar: "", isBot: true },
+      { name: "Бот 2", gender: "", avatar: "", isBot: true },
     ];
     const err = byId("offlineErr");
     if(err) err.textContent = "";
@@ -1183,7 +1183,7 @@
   function renderMenuEntry(){
     const done = isDone();
     const sub = byId("tutorialCardSub");
-    if(sub) sub.textContent = done ? "Пройдено ✓" : "Мини-партия · 3 минуты";
+    if(sub) sub.textContent = done ? "Пройдено" : "Мини-партия · 3 минуты";
     const offer = byId("tutorialOffer");
     if(!offer) return;
     if(offerSession === null){
