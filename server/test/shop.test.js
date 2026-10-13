@@ -126,6 +126,32 @@ function pureChecks() {
   const A = require("../ads.js");
 
   check(Products.PRODUCTS.every((p) => /^[a-z0-9][a-z0-9_]*$/.test(p.id)), "id товаров — строчная латиница, цифры и «_»");
+
+  // Лига недели: неделя по Москве, билеты, очки по месту, итоги недели.
+  users.register("liga1", "pass1234"); users.register("liga2", "pass1234");
+  const MON = Date.UTC(2026, 9, 11, 21, 0); // понедельник 12.10 00:00 по Москве
+  check(users.leagueWeekOf(MON).key === "2026-10-12" && users.leagueWeekOf(MON - 1).key === "2026-10-05", "неделя лиги — с понедельника по Москве");
+  const lg1 = users.recordLeagueGame("liga1", 1, false, MON + 3600e3);
+  check(lg1.counted && lg1.points === 10 && lg1.tickets.free === 2, "победа: 10 очков лиги, билет потрачен");
+  const lg2 = users.recordLeagueGame("liga1", 2, true, MON + 7200e3);
+  check(lg2.points === 3 && lg2.total === 13, "2 место в партии с ботами — половина");
+  users.recordLeagueGame("liga1", 3, false, MON + 7300e3);
+  const lg4 = users.recordLeagueGame("liga1", 1, false, MON + 7400e3);
+  check(lg4.counted === false && lg4.code === "no_tickets", "4-я партия за день без билета в лигу не идёт");
+  const lg5 = users.recordLeagueGame("liga1", 1, false, MON + 86400e3 + 3600e3);
+  check(lg5.counted && lg5.tickets.free === 2 && lg5.total === 27, "на следующий день — снова 3 бесплатных билета");
+  users.recordLeagueGame("liga2", 1, false, MON + 3600e3);
+  const ltb = users.leagueTable(MON + 2 * 86400e3, users.usernameKey("liga2"));
+  check(ltb.top.length === 2 && ltb.top[0].username === "liga1" && ltb.top[0].points === 27 && ltb.me.place === 2 && ltb.me.points === 10, "таблица недели и своё место");
+  check(users.buyLeagueTicket("liga2", "pass1234").code === "no_points", "билет без очков не продаётся");
+  check(users.settleLeague(MON + 7 * 86400e3 + 1000) === true && users.settleLeague(MON + 7 * 86400e3 + 2000) === false, "итоги недели подводятся один раз");
+  const champ = users.login("liga1", "pass1234").user, second = users.login("liga2", "pass1234").user;
+  check(champ.points === 500 && champ.leagueAward.place === 1 && second.points === 300 && second.leagueAward.prize === 300, "призы недели: 500 и 300 очков");
+  const ltb2 = users.leagueTable(MON + 7 * 86400e3 + 3000, null);
+  check(ltb2.week === "2026-10-19" && ltb2.top.length === 0 && ltb2.hall[0].week === "2026-10-12" && ltb2.hall[0].top[0].username === "liga1", "новая неделя с нуля, призёры — в зале славы");
+  check(ltb2.top.length === 0 && users.leagueTable(MON + 8 * 86400e3, null).hall[0].top.length === 2, "зал славы хранит призёров");
+  const tk = users.buyLeagueTicket("liga2", "pass1234");
+  check(tk.ok && tk.user.points === 270 && tk.user.league.tickets.extra === 1, "билет лиги за 30 очков");
   check(Products.byId("tm_points_300").rub === 99 && Products.rubValue(Products.byId("tm_points_300")) === "99.00", "цена tm_points_300 = 99.00");
   check(JSON.stringify(P.catalogFor("web")) === '{"enabled":false}', "без настроек каталог выключен (в процессе)");
 

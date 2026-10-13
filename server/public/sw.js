@@ -4,7 +4,7 @@
 // (при stale-while-revalidate новая страница могла бы встретиться со старым
 // скриптом), а без сети офлайн-партия (хот-сит с ботами) открывается из кеша.
 // /api/* и WebSocket не кешируются.
-const VERSION = "tm-2026-10-13-trader";
+const VERSION = "tm-2026-10-13-league";
 const CACHE = `shell-${VERSION}`;
 const SHELL = [
   "/",

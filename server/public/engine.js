@@ -3201,6 +3201,11 @@
       },
       roundNumber: room.roundNumber || 1,
       maxRounds: room.maxRounds || null,
+      // «Быстрая игра» (server.js): автостарт через quickStartIn мс, свободные
+      // места займут боты. Итог лиги недели — только свой.
+      quick: !!room.quick,
+      quickStartIn: room.quick && room.phase === "lobby" ? Math.max(0, (room.quickStartAt || 0) - Date.now()) : null,
+      leagueResult: (room.leagueResults && room.leagueResults[youId]) || null,
       eventCount: room.eventCount,
       deckRemaining: room.deckOrder.length - room.deckPos,
       phase: room.phase,

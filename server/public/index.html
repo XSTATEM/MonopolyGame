@@ -112,9 +112,17 @@
 
 <div class="center-screen" id="ratingScreen" style="display:none;">
   <div class="join-box" style="width:400px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-trophy"/></svg> Рейтинг игроков <button type="button" class="hint-q" data-hint-key="rating" data-hint="Места по очкам рейтинга. Очки дают только победы в онлайн-партиях от 40 ходов за столом." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></h1>
-    <div id="ratingList" class="rating-list"></div>
-    <div class="muted" id="ratingEmpty" style="font-size:12px;display:none;text-align:center;padding:10px 0;">Пока никто не заработал очков.</div>
+    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-trophy"/></svg> Рейтинг</h1>
+    <div class="seg" role="tablist" aria-label="Таблица" id="ratingTabs">
+      <button type="button" role="tab" data-tab="league" aria-selected="true">Лига недели</button>
+      <button type="button" role="tab" data-tab="rating" aria-selected="false">За всё время</button>
+    </div>
+    <div id="leaguePane" role="tabpanel"></div>
+    <div id="ratingPane" role="tabpanel" hidden>
+      <div class="sheet-note">Места по очкам рейтинга. Очки дают только победы в онлайн-партиях от 40 ходов за столом.</div>
+      <div id="ratingList" class="rating-list"></div>
+      <div class="muted" id="ratingEmpty" style="font-size:12px;display:none;text-align:center;padding:10px 0;">Пока никто не заработал очков.</div>
+    </div>
     <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromRating"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
@@ -347,8 +355,14 @@
 
     <div id="onlineContent" style="display:none;">
       <div class="online-who"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-user"/></svg> <span>Вы — <b id="onlineWhoName"></b></span></div>
+      <button type="button" class="online-quick" id="btnOnlineQuick">
+        <span class="online-quick-icon"><svg class="ico" aria-hidden="true"><use href="#i-bolt"/></svg></span>
+        <span class="online-quick-text"><b>Быстрая игра</b><span>Сразу за стол — свободные места займут боты</span></span>
+        <svg class="ico ico-sm" aria-hidden="true"><use href="#i-chev-right"/></svg>
+      </button>
+      <button type="button" class="league-card" id="onlineLeagueCard" onclick="openLeague()" hidden></button>
       <div class="online-actions">
-        <button type="button" class="online-action primary" id="btnOnlineCreate" aria-expanded="false" aria-controls="onlineCreatePanel">
+        <button type="button" class="online-action" id="btnOnlineCreate" aria-expanded="false" aria-controls="onlineCreatePanel">
           <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span><b>Создать комнату</b><span>Позовите друзей по коду</span></button>
         <button type="button" class="online-action" id="btnOnlineByCode" aria-expanded="false" aria-controls="onlineCodePanel">
           <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg></span><b>По коду</b><span>Войти к друзьям</span></button>
@@ -461,6 +475,7 @@
       <button type="button" class="secondary small" id="btnShareRoomCode" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-share"/></svg> Пригласить</button>
       <button type="button" class="hint-q" data-hint-key="lobby" data-hint="Передайте код друзьям: «Онлайн» → «По коду» или «Есть код комнаты?» в меню. Когда все соберутся, партию начинает хост." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
     </div>
+    <div class="quick-banner" id="quickBanner" role="status" hidden></div>
     <label>Игроки</label>
     <div id="lobbyPlayers" style="margin-bottom:6px;"></div>
     <div id="lobbyStartArea" style="margin-bottom:14px;"></div>
@@ -900,6 +915,7 @@ document.getElementById("btnGoOnline").onclick = ()=>{
   showOnly("onlineScreen");
   renderOnlineGate();
   retryRestoreSession(); // сессия не восстановилась на старте из-за сети — пробуем ещё раз
+  refreshAccountUser(); // очки и билеты лиги могли смениться после партии
 };
 document.getElementById("btnBackFromOnline").onclick = ()=>{
   // Отменяем и незавершённое подключение (сервер может просыпаться минуту):
@@ -922,6 +938,8 @@ function renderOnlineGate(){
   }
   gate.style.display = "none"; content.style.display = "block";
   document.getElementById("onlineWhoName").textContent = accountUser.username;
+  renderLeagueCard();
+  maybeShowLeagueAward();
   document.getElementById("joinErr").textContent = "";
   // Список комнат опрашиваем, только пока экран «Играть онлайн» открыт: вход
   // в аккаунт из главного меню, профиля или скинов не должен запускать опрос в фоне.
@@ -1274,7 +1292,7 @@ function handleAccountSessionExpired(){
   if(errEl) errEl.textContent = "Сессия истекла — войдите заново.";
 }
 
-document.getElementById("btnGoRating").onclick = ()=>{ showOnly("ratingScreen"); loadRating(); };
+document.getElementById("btnGoRating").onclick = ()=>{ showOnly("ratingScreen"); setRatingTab(ratingTab); };
 document.getElementById("btnBackFromRating").onclick = ()=> showOnly("mainMenu");
 async function loadRating(){
   const list = document.getElementById("ratingList");
@@ -2055,13 +2073,15 @@ function connectOnline(room, auth, opts){
     if(window.Anim) Anim.reset();
     rejoinAfterDrop = reconnectAttempts > 0;
     reconnectAttempts = 0;
-    sock.send(JSON.stringify(Object.assign({type:"join", room, username: auth.username, sessionToken: auth.sessionToken}, opts && opts.private ? { private: true } : {})));
+    sock.send(JSON.stringify(Object.assign({type:"join", room, username: auth.username, sessionToken: auth.sessionToken}, opts && opts.private ? { private: true } : {}, opts && opts.quick ? { quick: true } : {})));
   };
   sock.onmessage = (ev)=>{
     if(sock !== ws || mode !== "online") return;
     const msg = JSON.parse(ev.data);
     if(msg.type === "joined"){
       joined = true;
+      // «Быстрая игра»: комнату выбрал сервер — переподключаемся уже в неё.
+      if(msg.room){ roomCode = msg.room; if(reconnectInfo) reconnectInfo.room = msg.room; }
       const firstJoin = joinPending; // вход из списка комнат, а не восстановление партии
       setJoinPending(false);
       you = msg.playerId;
@@ -3048,6 +3068,7 @@ function closeMarketEventModal(){
 // ---------------------------------------------------------------------
 function renderLobby(s){
   document.getElementById("lobbyRoomCode").textContent = s.room;
+  renderQuickBanner(s);
   document.getElementById("btnShareRoomCode").hidden = typeof navigator.share !== "function";
   const playersHtml = s.players.map(p=>{
     const isHost = p.id === s.hostPlayerId;
@@ -4942,6 +4963,7 @@ function gameEndPopupHtml(s){
         : !gr.pointsEarned
         ? `<div class="sheet-note">${noPointsNote}</div>`
         : `<div class="sheet-note">Только у победителя</div>`}
+      ${leagueResultHtml(s.leagueResult)}
     </div>` : ""}
     ${s.tutorial ? "" /* реванша и разбора у учебной партии нет (localDispatch откажет) — дальше карточка тренера */
       : `<button type="button" class="secondary block end-analysis-btn" onclick="openAnalysis()">${ico("chart")} Разбор партии</button>
@@ -5125,6 +5147,177 @@ function showAnalysisCard(bodyHtml){
     ov.style.display = "flex";
     modalFocusIn("analysisOverlay", "analysisCard");
   }
+}
+// ---------------------------------------------------------------------
+// «Быстрая игра» (server.js, handleJoin с quick): сервер сажает в комнату,
+// которая ждёт игроков, или создаёт новую; через 40 с свободные места займут
+// боты, и партия начнётся сама.
+// ---------------------------------------------------------------------
+document.getElementById("btnOnlineQuick").onclick = ()=>{
+  if(joinPending) return;
+  const auth = currentAuthPayload();
+  const err = validateAuthPayload(auth);
+  if(err){ document.getElementById("joinErr").textContent = err; return; }
+  document.getElementById("joinErr").textContent = "";
+  setJoinPending(true);
+  connectOnline(null, auth, { quick: true });
+};
+// Отсчёт до автостарта в лобби: quickStartIn — сколько оставалось, когда
+// сервер собрал состояние; считаем от момента получения.
+let quickStartAt = 0, quickTimer = null;
+function renderQuickBanner(s){
+  const box = document.getElementById("quickBanner");
+  if(!box) return;
+  const on = !!s.quick && s.phase === "lobby" && s.quickStartIn != null;
+  box.hidden = !on;
+  if(!on){ if(quickTimer){ clearInterval(quickTimer); quickTimer = null; } return; }
+  quickStartAt = Date.now() + s.quickStartIn;
+  const tick = ()=>{
+    const left = Math.max(0, Math.ceil((quickStartAt - Date.now()) / 1000));
+    box.innerHTML = `${ico("bolt","ico-sm")}<span><b>Быстрая игра.</b> ${left > 0 ? `Старт через <b class="mono">${left}</b> с` : "Начинаем…"} — свободные места займут боты.</span>`;
+  };
+  tick();
+  if(!quickTimer) quickTimer = setInterval(()=>{ if(document.getElementById("lobbyScreen").style.display === "none"){ clearInterval(quickTimer); quickTimer = null; return; } tick(); }, 1000);
+}
+
+// ---------------------------------------------------------------------
+// Лига недели (users.js, GET /api/league): таблица, своё место, билеты, зал
+// славы. Очки лиги дают онлайн-партии от 40 ходов; каждая тратит билет.
+// ---------------------------------------------------------------------
+let leagueData = null;
+let ratingTab = "league";
+function leagueRulesText(r){
+  const pp = (r && r.placePoints) || [10, 6, 4, 2];
+  return `Очки лиги дают онлайн-партии от 40 ходов за столом: 1 место — ${pp[0]}, 2 — ${pp[1]}, 3 — ${pp[2]}, 4 — ${pp[3]}, дальше — 1. В партии с ботами — половина. Каждая партия тратит билет: ${(r && r.freeTickets) || 3} бесплатных в день, дальше — за ${(r && r.ticketPrice) || 30} очков. Неделя заканчивается в воскресенье в полночь по Москве.`;
+}
+function leagueLeftText(endsAt){
+  const ms = Math.max(0, endsAt - Date.now());
+  const d = Math.floor(ms / 86400e3), h = Math.floor(ms % 86400e3 / 3600e3), m = Math.floor(ms % 3600e3 / 60e3);
+  return d > 0 ? `${d} ${pluralRu(d, "день", "дня", "дней")} ${h} ч` : h > 0 ? `${h} ч ${m} мин` : `${m} мин`;
+}
+function weekLabel(key){
+  try {
+    const a = new Date(key + "T00:00:00Z"), b = new Date(a.getTime() + 6 * 86400e3);
+    const f = (d, o)=> d.toLocaleDateString("ru-RU", Object.assign({ timeZone: "UTC" }, o));
+    return a.getUTCMonth() === b.getUTCMonth() ? `${f(a, { day: "numeric" })}–${f(b, { day: "numeric", month: "long" })}` : `${f(a, { day: "numeric", month: "long" })} – ${f(b, { day: "numeric", month: "long" })}`;
+  } catch(e){ return key; }
+}
+function setRatingTab(tab){
+  ratingTab = tab === "rating" ? "rating" : "league";
+  document.querySelectorAll("#ratingTabs [data-tab]").forEach(b=> b.setAttribute("aria-selected", String(b.dataset.tab === ratingTab)));
+  document.getElementById("leaguePane").hidden = ratingTab !== "league";
+  document.getElementById("ratingPane").hidden = ratingTab !== "rating";
+  if(ratingTab === "league") loadLeague(); else loadRating();
+}
+document.querySelectorAll("#ratingTabs [data-tab]").forEach(b=> b.addEventListener("click", ()=> setRatingTab(b.dataset.tab)));
+async function loadLeague(){
+  const pane = document.getElementById("leaguePane");
+  if(!leagueData) pane.innerHTML = `<div class="muted" style="text-align:center;padding:10px 0;">Загрузка...</div>`;
+  let data = null;
+  try {
+    const res = await fetch(TMNative.api("/api/league"), { headers: accountSessionToken ? { Authorization: "Bearer " + accountSessionToken } : {} });
+    if(res.ok) data = await res.json();
+  } catch(e){ data = null; }
+  if(!data || !Array.isArray(data.top)){
+    pane.innerHTML = `<div class="err" style="text-align:center;">Не удалось загрузить лигу — проверьте интернет и попробуйте ещё раз.</div>`;
+    return;
+  }
+  leagueData = data;
+  renderLeague();
+}
+function renderLeague(){
+  const d = leagueData, pane = document.getElementById("leaguePane");
+  if(!d || !pane) return;
+  const r = d.rules || {};
+  const me = d.me;
+  const prizes = (r.prizes || []).map((p, i)=> `<span><b>${i + 1}</b> ${pointsWord(p)}</span>`).join("") + (r.prizeRest ? `<span><b>4–${r.prizePlaces || 10}</b> ${pointsWord(r.prizeRest)}</span>` : "");
+  const meHtml = me ? `<div class="league-me">
+      <div class="league-me-main">
+        <span class="league-me-place">${me.place ? `<b>${me.place}</b><small>место</small>` : `<b>—</b><small>нет партий</small>`}</span>
+        <div><b>${me.points} ${pluralRu(me.points, "очко", "очка", "очков")} лиги</b><span>${me.games} ${pluralRu(me.games, "партия", "партии", "партий")} · ${me.wins} ${pluralRu(me.wins, "победа", "победы", "побед")}</span></div>
+      </div>
+      <div class="league-tickets"><span>${ico("cards","ico-sm")} Билеты сегодня: <b>${me.tickets.free}</b> из ${r.freeTickets || 3}${me.tickets.extra ? ` · купленные: <b>${me.tickets.extra}</b>` : ""}</span>
+        <button type="button" class="secondary small" id="btnBuyLeagueTicket">Билет за ${r.ticketPrice || 30} очков</button></div>
+      <div class="err" id="leagueTicketErr"></div>
+    </div>` : `<div class="sheet-note">Войдите в аккаунт, чтобы играть в лиге.</div>`;
+  const rows = d.top.map(e=>{
+    const av = e.avatar === "PHOTO" && e.avatarPhoto
+      ? `<img src="${escapeHtml(avatarPhotoSrc(e.avatarPhoto))}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      : escapeHtml(e.avatar || "🧑");
+    const titles = e.titles && e.titles.champion ? `<span class="league-title" title="Чемпион недели">${ico("trophy","ico-sm")}${e.titles.champion > 1 ? `×${e.titles.champion}` : ""}<span class="sr-only">Чемпион недели</span></span>` : "";
+    const isMe = accountUser && e.username === accountUser.username;
+    return `<div class="rating-row league-row${isMe ? " you" : ""}">
+      <span class="league-pos${e.place <= 3 ? " p" + e.place : ""}">${e.place}</span>
+      <span class="avatar-opt">${av}</span>
+      <span class="league-name">${escapeHtml(e.username)}${titles}</span>
+      <span class="league-wins muted">${e.wins} ${pluralRu(e.wins, "поб.", "поб.", "поб.")}</span>
+      <b class="mono">${e.points}</b>
+    </div>`;
+  }).join("");
+  const hall = (d.hall || []).map(h=> `<div class="league-hall-row"><span class="muted">${escapeHtml(weekLabel(h.week))}</span><span>${h.top.map(t=> `<b class="league-medal p${t.place}">${t.place}</b> ${escapeHtml(t.username)}`).join(" · ")}</span></div>`).join("");
+  pane.innerHTML = `
+    <div class="league-head">
+      <div><b>Неделя ${escapeHtml(weekLabel(d.week))}</b><span>До конца — ${leagueLeftText(d.endsAt)}</span></div>
+      ${hintBtn("league-rules", escapeHtml(leagueRulesText(r)))}
+    </div>
+    ${meHtml}
+    <div class="league-prizes"><span class="eyebrow">Призы недели</span><div>${prizes}</div></div>
+    <div class="rating-list league-list">${rows || `<div class="muted" style="text-align:center;padding:12px 0;">На этой неделе ещё никто не играл — станьте первым.</div>`}</div>
+    ${hall ? `<details class="tips league-hall"><summary>Зал славы</summary>${hall}</details>` : ""}
+    <button type="button" class="block" style="margin-top:14px;" onclick="goQuickPlay()">${ico("bolt")} Быстрая игра</button>`;
+  const buy = document.getElementById("btnBuyLeagueTicket");
+  if(buy) buy.onclick = buyLeagueTicket;
+}
+function pointsWord(n){ return `${n} ${pluralRu(n, "очко", "очка", "очков")}`; }
+async function buyLeagueTicket(){
+  const btn = document.getElementById("btnBuyLeagueTicket");
+  if(!accountUser || !btn || btn.disabled) return;
+  btn.disabled = true;
+  let d;
+  try { d = await accountApiPost("/api/league/ticket", {}); } catch(e){ d = { error: "Нет связи с сервером — попробуйте ещё раз." }; }
+  if(d.error){
+    btn.disabled = false;
+    const err = document.getElementById("leagueTicketErr");
+    if(err) err.textContent = d.code === "no_points" ? `${d.error} Очки дают победы онлайн и магазин.` : d.error;
+    return;
+  }
+  if(d.user) accountUser = d.user;
+  updateAccountCornerBtn();
+  showToast({ kind: "good", icon: "check", title: "Билет лиги куплен", duration: 2500 });
+  loadLeague();
+}
+// Онлайн-экран: короткая сводка лиги из профиля и переход к таблице.
+function renderLeagueCard(){
+  const card = document.getElementById("onlineLeagueCard");
+  if(!card) return;
+  const L = accountUser && accountUser.league;
+  card.hidden = !L;
+  if(!L) return;
+  card.innerHTML = `<span class="league-card-icon">${ico("trophy")}</span>
+    <span class="league-card-text"><b>Лига недели</b><span>${L.points} ${pluralRu(L.points, "очко", "очка", "очков")} · билеты сегодня: ${L.tickets.free} из 3${L.tickets.extra ? ` + ${L.tickets.extra}` : ""}</span></span>
+    ${ico("chev-right","ico-sm")}`;
+}
+function openLeague(){ showOnly("ratingScreen"); setRatingTab("league"); }
+function goQuickPlay(){
+  showOnly("onlineScreen");
+  renderOnlineGate();
+  if(accountUser) document.getElementById("btnOnlineQuick").click();
+}
+// Итоги прошлой недели (users.js, settleLeague): поздравляем один раз.
+function maybeShowLeagueAward(){
+  const a = accountUser && accountUser.leagueAward;
+  if(!a || !a.week) return;
+  const key = `tm_league_award_${accountUser.username}_${a.week}`;
+  try { if(localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch(e){ return; }
+  showToast({ kind: "good", icon: "trophy", title: a.place === 1 ? "Вы — чемпион недели!" : `${a.place} место в лиге недели`, text: `Приз — ${pointsWord(a.prize)} на баланс.`, duration: 8000 });
+}
+
+// Итог лиги в карточке очков на экране итогов (server.js, settleRoomLeague).
+function leagueResultHtml(lr){
+  if(!lr) return "";
+  if(lr.counted) return `<div class="cap-summary"><span>Лига недели${lr.withBots ? ` <span class="muted">· с ботами — половина</span>` : ""}</span><b class="up">+${lr.points}</b></div>`;
+  if(lr.code === "no_tickets") return `<div class="sheet-note">Билеты лиги на сегодня закончились — партия не пошла в лигу. <button type="button" class="link-btn" onclick="openLeague()">Купить билет</button></div>`;
+  return "";
 }
 function closeAnalysis(){
   analysisWanted = false;

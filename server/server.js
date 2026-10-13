@@ -1,4 +1,5 @@
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
@@ -48,11 +49,111 @@ function broadcast(room) {
   // для сохранения на диск и для таймера удаления заброшенных комнат.
   roomsDirty = true;
   roomLastActive.set(room.code, Date.now());
+  // Партия закончилась — засчитать её в лигу до рассылки: итог лиги уходит
+  // каждому в его состоянии (leagueResult).
+  if (room.phase === "ended" && !room.leagueDone) settleRoomLeague(room);
   for (const [ws, conn] of connections) {
     if (conn.roomCode === room.code && ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(engine.buildStatePayload(room, conn.playerId)));
     }
   }
+  scheduleRoomBots(room);
+}
+
+// ---------------------------------------------------------------------
+// Боты в онлайн-комнатах («Быстрая игра» добирает ими стол): один шаг движка
+// раз в BOT_STEP_MS, пока ботам есть что делать и за столом есть человек в
+// сети (и разорившийся: боты доигрывают партию у него на глазах). Бот ждёт
+// цену выкупа от человека-контролёра — перепроверяем реже.
+// ---------------------------------------------------------------------
+const BOT_STEP_MS = Number(process.env.BOT_STEP_MS) || 900;
+const BOT_WAIT_RETRY_MS = 3000;
+const botTimers = new Map(); // code -> таймер следующего шага
+function scheduleRoomBots(room, delay) {
+  if (!room || room.phase !== "roll" || botTimers.has(room.code)) return;
+  if (!room.players.some((p) => p.isBot && !p.bankrupt)) return;
+  if (!room.players.some((p) => !p.isBot && p.connected && !p.kicked)) return;
+  botTimers.set(room.code, setTimeout(() => {
+    botTimers.delete(room.code);
+    if (rooms.get(room.code) !== room || room.phase !== "roll") return;
+    let res;
+    try { res = engine.botStep(room); } catch (e) { console.error("botStep:", e); return; }
+    if (res.acted) { syncAccountPoints(room); broadcast(room); }
+    else {
+      const roll = room.pendingRoll;
+      const roller = roll && room.players.find((p) => p.id === roll.playerId);
+      if (roller && roller.isBot) scheduleRoomBots(room, BOT_WAIT_RETRY_MS);
+    }
+  }, delay || BOT_STEP_MS));
+}
+
+// ---------------------------------------------------------------------
+// «Быстрая игра»: одна кнопка сажает в комнату, которая ждёт игроков, или
+// создаёт новую. Через QUICK_WAIT_MS свободные места до QUICK_SEATS занимают
+// боты, и партия стартует сама; соберётся QUICK_SEATS людей — сразу.
+// Партия короткая — QUICK_TURNS ходов у каждого.
+// ---------------------------------------------------------------------
+const QUICK_SEATS = 4;
+const QUICK_WAIT_MS = Number(process.env.QUICK_WAIT_MS) || 40000;
+const QUICK_TURNS = 40;
+const QUICK_BOT_NAMES = ["Бот Уоррен", "Бот Джесси", "Бот Гордон", "Бот Кэти", "Бот Рэй"];
+const quickTimers = new Map(); // code -> таймер автостарта
+const humansIn = (room) => room.players.filter((p) => !p.isBot && !p.kicked);
+function pickQuickRoom(username) {
+  let best = null;
+  for (const room of rooms.values()) {
+    if (!room.quick || room.isPrivate || room.phase !== "lobby") continue;
+    if (room.players.some((p) => p.name === username)) return room.code; // уже ждёт там
+    if (humansIn(room).length >= QUICK_SEATS) continue;
+    // Сначала — где людей больше: стол соберётся быстрее.
+    if (!best || humansIn(room).length > humansIn(best).length) best = room;
+  }
+  return best ? best.code : null;
+}
+function newQuickCode() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  for (let i = 0; i < 50; i++) {
+    let c = "Q";
+    for (let k = 0; k < 4; k++) c += A[crypto.randomInt(A.length)];
+    if (!rooms.has(c)) return c;
+  }
+  return null;
+}
+function scheduleQuickStart(room) {
+  if (!room.quick || room.phase !== "lobby" || quickTimers.has(room.code)) return;
+  const left = Math.max(0, (room.quickStartAt || 0) - Date.now());
+  quickTimers.set(room.code, setTimeout(() => { quickTimers.delete(room.code); startQuickRoom(room); }, left));
+}
+function startQuickRoom(room) {
+  if (rooms.get(room.code) !== room || !room.quick || room.phase !== "lobby") return;
+  if (!humansIn(room).some((p) => p.connected)) return; // все ушли — комнату уберёт sweepRooms
+  let n = 0;
+  while (room.players.length < QUICK_SEATS) {
+    const name = QUICK_BOT_NAMES.find((x) => !room.players.some((p) => p.name === x)) || `Бот ${++n}`;
+    if (engine.addPlayer(room, name, "", "🤖", 0, "default", true).error) break;
+  }
+  const st = engine.startGame(room, room.hostPlayerId);
+  if (st && st.error) { console.warn(`Быстрая игра ${room.code}: ${st.error}`); return; }
+  broadcast(room);
+}
+
+// ---------------------------------------------------------------------
+// Лига недели (users.js): каждому человеку за столом — очки по месту, если
+// партия даёт очки рейтинга (не короткая, без исключения голосованием).
+// ---------------------------------------------------------------------
+function settleRoomLeague(room) {
+  room.leagueDone = true;
+  room.leagueResults = {};
+  const gr = room.gameResult;
+  if (!gr || !Array.isArray(gr.ranking)) return;
+  const withBots = room.players.some((p) => p.isBot);
+  gr.ranking.forEach((row, i) => {
+    const p = room.players.find((x) => x.id === row.id);
+    if (!p || p.isBot || p.kicked) return;
+    if (gr.noPointsReason) { room.leagueResults[p.id] = { counted: false, code: gr.noPointsReason }; return; }
+    const res = users.recordLeagueGame(p.name, i + 1, withBots);
+    if (res) room.leagueResults[p.id] = res;
+  });
 }
 
 // Универсальный раннер: вызывает engine-функцию, при ошибке шлёт sendError,
@@ -205,10 +306,12 @@ const MAX_ROOMS = Number(process.env.MAX_ROOMS) || 500;
 const ROOM_CODE_RE = /^[^\u0000-\u001f\u007f<>"'&\\`]{1,20}$/;
 
 function handleJoin(ws, msg) {
-  const code = String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
-  if (!ROOM_CODE_RE.test(code)) return sendTo(ws, { type: "error", message: "Код комнаты не должен содержать кавычек, угловых скобок и служебных символов." });
-  if (!rooms.has(code) && rooms.size >= MAX_ROOMS) return sendTo(ws, { type: "error", message: "На сервере слишком много комнат. Войдите в существующую или попробуйте позже." });
-  if (!rooms.has(code) && roomLimit.blocked(ws.clientIp)) return sendTo(ws, { type: "error", message: "Слишком много новых комнат с вашего адреса — войдите в существующую или подождите несколько минут." });
+  // «Быстрая игра» (quick): комнату выбирает сервер — после входа в аккаунт.
+  const quick = msg.quick === true;
+  let code = quick ? "" : String(msg.room || "MAIN").trim().toUpperCase().slice(0, 20) || "MAIN";
+  if (!quick && !ROOM_CODE_RE.test(code)) return sendTo(ws, { type: "error", message: "Код комнаты не должен содержать кавычек, угловых скобок и служебных символов." });
+  if (!quick && !rooms.has(code) && rooms.size >= MAX_ROOMS) return sendTo(ws, { type: "error", message: "На сервере слишком много комнат. Войдите в существующую или попробуйте позже." });
+  if (!quick && !rooms.has(code) && roomLimit.blocked(ws.clientIp)) return sendTo(ws, { type: "error", message: "Слишком много новых комнат с вашего адреса — войдите в существующую или подождите несколько минут." });
 
   // Три способа подтвердить личность: свежий логин, регистрация, либо (новое)
   // токен сессии из куки — так игрока не выкидывает из аккаунта при обновлении
@@ -234,6 +337,17 @@ function handleJoin(ws, msg) {
   if (authResult.error) return sendTo(ws, { type: "error", message: authResult.error, sessionExpired: !!sessionToken });
   const profile = authResult.user;
   const effectiveToken = authResult.sessionToken || sessionToken;
+  let quickNew = false;
+  if (quick) {
+    code = pickQuickRoom(profile.username);
+    if (!code) {
+      if (rooms.size >= MAX_ROOMS) return sendTo(ws, { type: "error", message: "На сервере слишком много комнат. Попробуйте позже." });
+      if (roomLimit.blocked(ws.clientIp)) return sendTo(ws, { type: "error", message: "Слишком много новых комнат с вашего адреса — подождите несколько минут." });
+      code = newQuickCode();
+      if (!code) return sendTo(ws, { type: "error", message: "Не удалось подобрать комнату — попробуйте ещё раз." });
+      quickNew = true;
+    }
+  }
 
   // Этот же сокет уже сидел в другой комнате (повторный join без
   // переподключения): там игрок иначе навсегда остался бы «в сети».
@@ -256,7 +370,12 @@ function handleJoin(ws, msg) {
   if (isNewRoom) roomLimit.note(ws.clientIp);
   // Закрытая комната: её нет в /api/rooms, войти можно только по коду. Признак
   // задаёт тот, кто комнату создаёт; повторный join с private его не меняет.
-  if (isNewRoom && msg.private === true) room.isPrivate = true;
+  if (isNewRoom && msg.private === true && !quick) room.isPrivate = true;
+  if (isNewRoom && quickNew) {
+    room.quick = true;
+    room.quickStartAt = Date.now() + QUICK_WAIT_MS;
+    room.settings.maxTurnsPerPlayer = QUICK_TURNS;
+  }
 
   // Тот же аккаунт уже сидит в этой комнате через другой сокет. Чаще всего это
   // «полуоткрытое» соединение после смены сети на телефоне (Wi-Fi → LTE):
@@ -282,8 +401,12 @@ function handleJoin(ws, msg) {
   result.player.avatarPhoto = users.photoUrl(profile);
 
   connections.set(ws, { ws, roomCode: code, playerId: result.player.id, name: profile.username, accountUsername: profile.username });
-  sendTo(ws, { type: "joined", playerId: result.player.id, room: code, sessionToken: effectiveToken, username: profile.username });
+  sendTo(ws, { type: "joined", playerId: result.player.id, room: code, sessionToken: effectiveToken, username: profile.username, quick: !!room.quick });
   broadcast(room);
+  if (room.quick && room.phase === "lobby") {
+    if (humansIn(room).filter((p) => p.connected).length >= QUICK_SEATS) startQuickRoom(room);
+    else scheduleQuickStart(room);
+  }
 }
 
 // Тикеры приходят от клиента как есть. Ключ вроде "__proto__" или
@@ -540,6 +663,8 @@ function restoreRooms() {
     // перезапуск, но контролёр ещё переподключается — иначе после простоя
     // бросающий сразу оплатил бы по тарифу, не дав ему назначить цену.
     if (room.pendingRoll && room.pendingRoll.controllerWaitSince) room.pendingRoll.controllerWaitSince = now;
+    // Партия закончилась до появления лиги — в лигу её не засчитываем.
+    if (room.phase === "ended" && room.leagueDone === undefined) room.leagueDone = true;
     rooms.set(room.code, room);
     roomLastActive.set(room.code, now);
     // В лобби не вернувшиеся после перезапуска уходят из комнаты (с запасом
@@ -783,6 +908,15 @@ const server = http.createServer((req, res) => {
   if (reqPath === "/api/profile/photo" && req.method === "POST") {
     return handleApiPost(req, res, (b) => users.setPhoto(b.username, b.password, b.photoDataUrl, b.token), AUTH);
   }
+  // Лига недели: таблица (своё место — по токену сессии) и билет за очки.
+  if (reqPath === "/api/league" && req.method === "GET") {
+    const auth = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const viewer = auth ? users.accountByToken(auth) : null;
+    return sendJson(res, 200, users.leagueTable(Date.now(), viewer ? viewer.key : null));
+  }
+  if (reqPath === "/api/league/ticket" && req.method === "POST") {
+    return handleApiPost(req, res, (b) => users.buyLeagueTicket(b.username, b.password, b.token), AUTH);
+  }
   // Разбор офлайн-партии: сам разбор считает клиент, сервер ведёт лимит.
   if (reqPath === "/api/analysis/claim" && req.method === "POST") {
     return handleApiPost(req, res, (b) => Payments.shopEnabled() ? users.claimAnalysis(b.username, b.password, b.token, b.game) : { ok: true, open: true }, AUTH);
@@ -889,6 +1023,7 @@ wss.on("close", () => clearInterval(pingInterval));
 
 const maintenanceInterval = setInterval(() => {
   sweepRooms();
+  try { users.settleLeague(); } catch (e) { console.error("Лига: итоги недели:", e); }
   if (roomsDirty) persistRooms();
 }, 30000);
 

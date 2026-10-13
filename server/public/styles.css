@@ -1843,3 +1843,48 @@ body.reduce-motion .coach-ring.pulse{animation:none;}
 .end-analysis-note{font-size:12.5px;margin:6px 0 10px;}
 .shop-trader-icon{background:var(--accent);color:var(--on-accent);}
 .shop-trader-active{margin-bottom:10px;}
+
+/* «Быстрая игра» и лига недели (index.html: онлайн-экран, лобби, рейтинг) */
+.online-quick{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:12px 14px;margin:0 0 10px;border-radius:var(--r-lg);
+  background:var(--accent);color:var(--on-accent);text-align:left;box-shadow:var(--shadow-1);}
+.online-quick-icon{width:40px;height:40px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--on-accent) 16%, transparent);}
+.online-quick-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.online-quick-text b{font-size:16px;}
+.online-quick-text span{font-size:12.5px;font-weight:500;opacity:.85;}
+.league-card{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 12px;margin:0 0 12px;border-radius:var(--r-md);
+  background:var(--surface-2);color:var(--text);border:1px solid var(--line);text-align:left;}
+.league-card-icon{width:32px;height:32px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--warn-bg);color:var(--warn);}
+.league-card-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.league-card-text b{font-size:14px;}
+.league-card-text span{font-size:12.5px;color:var(--text-2);font-weight:500;}
+.quick-banner{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin:0 0 12px;border-radius:var(--r-md);
+  background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 40%, transparent);font-size:13.5px;line-height:1.4;}
+.quick-banner .ico{flex:none;margin-top:2px;color:var(--warn);}
+#ratingTabs{margin:4px 0 12px;}
+.league-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;}
+.league-head > div{display:flex;flex-direction:column;gap:1px;}
+.league-head b{font-size:15px;}
+.league-head span{font-size:12.5px;color:var(--text-2);}
+.league-me{padding:12px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);margin:0 0 12px;}
+.league-me-main{display:flex;align-items:center;gap:12px;}
+.league-me-main > div{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.league-me-main > div span{font-size:12.5px;color:var(--text-2);}
+.league-me-place{width:52px;height:52px;flex:none;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--warn-bg);color:var(--warn);}
+.league-me-place b{font-size:20px;line-height:1;font-family:var(--font-mono);}
+.league-me-place small{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+.league-tickets{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;}
+.league-tickets > span{display:inline-flex;align-items:center;gap:6px;}
+.league-prizes{margin:0 0 6px;}
+.league-prizes > div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.league-prizes > div span{font-size:12px;padding:4px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--text-2);}
+.league-prizes > div b{color:var(--text);margin-right:2px;}
+.league-row .league-pos{width:24px;text-align:center;font-weight:800;font-family:var(--font-mono);color:var(--text-2);flex:none;}
+.league-pos.p1, .league-medal.p1{color:#C99A2E;} .league-pos.p2, .league-medal.p2{color:#8C939B;} .league-pos.p3, .league-medal.p3{color:#B0703F;}
+.league-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
+.league-title{display:inline-flex;align-items:center;gap:1px;color:var(--warn);font-size:11px;font-weight:800;}
+.league-wins{font-size:12px;}
+.league-hall{margin-top:12px;}
+.league-hall-row{display:flex;flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.league-hall-row:last-child{border-bottom:none;}
+.league-medal{font-family:var(--font-mono);}
+.link-btn{background:none;border:none;padding:0;min-height:0;color:var(--accent);text-decoration:underline;font:inherit;font-weight:700;cursor:pointer;}

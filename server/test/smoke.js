@@ -53,7 +53,7 @@ function freePort() {
 
 function startServer() {
   const p = spawn(process.execPath, [SERVER], {
-    env: Object.assign({}, process.env, { PORT: String(PORT), HOST: "127.0.0.1", DATA_DIR: DATA, TRUST_PROXY: "1" }),
+    env: Object.assign({}, process.env, { PORT: String(PORT), HOST: "127.0.0.1", DATA_DIR: DATA, TRUST_PROXY: "1", QUICK_WAIT_MS: "1500", BOT_STEP_MS: "40" }),
     stdio: ["ignore", "pipe", "pipe"],
   });
   const sink = (tag) => (d) => {
@@ -201,7 +201,45 @@ async function main() {
   const an = await waitMsg(sec2, (m) => m.type === "analysis");
   check(an && an.analysis && an.analysis.won === true && an.analysis.place === 1 && an.analysis.name === "alice" && Array.isArray(an.analysis.chart.me),
     "analysis sent to the winner after the game: " + JSON.stringify(an && (an.analysis ? { won: an.analysis.won, place: an.analysis.place } : an)));
+  const endSt = lastState(sec2);
+  check(endSt && endSt.leagueResult && endSt.leagueResult.counted === false && endSt.leagueResult.code === "short", "too short a game does not count for the league: " + JSON.stringify(endSt && endSt.leagueResult));
   sec1.terminate(); sec2.terminate();
+
+  // --- «Быстрая игра»: один стол на двоих, автостарт с ботами, ходы ботов ---
+  const q1 = await wsClient(), q2 = await wsClient();
+  q1.send(JSON.stringify({ type: "join", quick: true, sessionToken: r1.body.sessionToken }));
+  const qj1 = await waitMsg(q1, (m) => m.type === "joined");
+  q2.send(JSON.stringify({ type: "join", quick: true, sessionToken: r2.body.sessionToken }));
+  const qj2 = await waitMsg(q2, (m) => m.type === "joined");
+  check(qj1 && qj2 && /^Q/.test(qj1.room) && qj1.room === qj2.room && qj1.quick === true, "quick play seats both players at one table: " + (qj1 && qj1.room) + " / " + (qj2 && qj2.room));
+  await sleep(150);
+  let qs = lastState(q1);
+  check(qs && qs.quick === true && qs.phase === "lobby" && qs.quickStartIn > 0 && qs.settings.maxTurnsPerPlayer === 40, "quick room waits with a countdown, 40 turns each");
+  const qList = await (await fetch(BASE + "/api/rooms")).json();
+  check(qList.some((r) => r.code === qj1.room), "quick room is listed while waiting");
+  await sleep(1700);
+  qs = lastState(q1);
+  check(qs && qs.phase === "roll" && qs.players.length === 4 && qs.players.filter((p) => p.isBot).length === 2, "quick room auto-started with two bots");
+  // Люди ходят по-простому, боты — сами на сервере: ход должен дойти до ботов и уйти от них.
+  const botIds = new Set(((qs && qs.players) || []).filter((p) => p.isBot).map((p) => p.id));
+  let botTurnsDone = 0, prevCur = qs && qs.currentPlayerId;
+  for (let i = 0; i < 120 && botTurnsDone < 2; i++) {
+    for (const sock of [q1, q2]) {
+      const st2 = lastState(sock);
+      if (!st2 || st2.phase !== "roll" || st2.currentPlayerId !== st2.you) continue;
+      const roll = st2.pendingRoll;
+      const mine = roll && roll.playerId === st2.you;
+      const re = mine && roll.realEstateId ? (st2.realEstate || []).find((x) => x.id === roll.realEstateId) : null;
+      const type = !st2.rolledThisTurn ? "roll" : mine ? (roll.ticker ? "dividendFromRoll" : re && re.ownerId && re.ownerId !== st2.you ? "payRealEstateRentFromRoll" : "skipRoll") : "endTurn";
+      sock.send(JSON.stringify({ type }));
+    }
+    await sleep(100);
+    const cur = (lastState(q1) || {}).currentPlayerId;
+    if (cur !== prevCur && botIds.has(prevCur)) botTurnsDone++;
+    prevCur = cur;
+  }
+  check(botTurnsDone >= 2, "server bots play their turns online: " + botTurnsDone);
+  q1.terminate(); q2.terminate();
 
   // --- лимит неудачных входов (HTTP) ----------------------------------------
   let last;

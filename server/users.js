@@ -215,6 +215,8 @@ function publicProfile(rec) {
     boughtScenarios: ownedScenariosRec(rec, true),
     trader: { active: traderActiveRec(rec), until: traderUntilRec(rec) },
     analysisFreeToday: analysisFreeTodayRec(rec),
+    league: leagueView(rec, Date.now()),
+    leagueAward: rec.leagueAward || null,
     equippedAvatarPack: rec.equippedAvatarPack || "base",
     equippedBoardSkin: rec.equippedBoardSkin || "default",
   };
@@ -577,6 +579,151 @@ function revokeOrder(order) {
   return { ok: true, revoked: true };
 }
 
+// ---------------------------------------------------------------------
+// Лига недели. Неделя — с понедельника 00:00 по Москве. Очки лиги дают
+// онлайн-партии, за которые положены очки рейтинга (не короче
+// MIN_TURNS_FOR_POINTS, без исключения голосованием): по месту за столом, в
+// партии с ботами — половина. Засчитанная партия тратит билет:
+// LEAGUE_FREE_TICKETS бесплатных в сутки, сверх них — купленные за очки
+// баланса (не сгорают). После недели лучшие получают очки баланса и титул
+// (settleLeague), тройка призёров попадает в зал славы (DATA_DIR/league.json).
+// ---------------------------------------------------------------------
+const LEAGUE_FREE_TICKETS = 3;
+const LEAGUE_TICKET_PRICE = 30;
+const LEAGUE_PLACE_POINTS = [10, 6, 4, 2]; // 5-е место и ниже — 1
+const LEAGUE_PRIZES = [500, 300, 200];      // 4–10 места — LEAGUE_PRIZE_REST
+const LEAGUE_PRIZE_REST = 50;
+const LEAGUE_PRIZE_PLACES = 10;
+const LEAGUE_FILE = path.join(DATA_DIR, "league.json");
+function leagueWeekOf(now) {
+  const d = new Date(now + MSK_OFFSET_MS);
+  const monday = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return { key: new Date(monday).toISOString().slice(0, 10), endsAt: monday + 7 * DAY_MS - MSK_OFFSET_MS };
+}
+// Запись лиги на текущую неделю и день: новая неделя обнуляет очки (прошлая
+// остаётся в prev до подведения итогов), новый день — бесплатные билеты.
+function leagueRec(rec, now) {
+  const wk = leagueWeekOf(now).key, day = mskDay(now);
+  let L = rec.league && typeof rec.league === "object" ? rec.league : null;
+  if (!L) L = rec.league = { week: wk, points: 0, games: 0, wins: 0, day, freeUsed: 0, extra: 0 };
+  if (L.week !== wk) {
+    if (L.games > 0) L.prev = { week: L.week, points: L.points, games: L.games, wins: L.wins };
+    Object.assign(L, { week: wk, points: 0, games: 0, wins: 0 });
+  }
+  if (L.day !== day) { L.day = day; L.freeUsed = 0; }
+  return L;
+}
+// То же без записи — для профиля и таблицы.
+function leagueView(rec, now) {
+  const wk = leagueWeekOf(now).key, day = mskDay(now);
+  const L = rec && rec.league && typeof rec.league === "object" ? rec.league : {};
+  const cur = L.week === wk;
+  return {
+    week: wk,
+    points: cur ? L.points || 0 : 0, games: cur ? L.games || 0 : 0, wins: cur ? L.wins || 0 : 0,
+    tickets: { free: Math.max(0, LEAGUE_FREE_TICKETS - (L.day === day ? L.freeUsed || 0 : 0)), extra: Math.max(0, L.extra || 0) },
+  };
+}
+// Онлайн-партия закончилась: засчитать её игроку в лигу (server.js, settleRoomLeague).
+function recordLeagueGame(username, place, withBots, now) {
+  const key = usernameKey(username);
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  if (!rec) return null;
+  now = now || Date.now();
+  const L = leagueRec(rec, now);
+  if (L.freeUsed < LEAGUE_FREE_TICKETS) L.freeUsed++;
+  else if (L.extra > 0) L.extra--;
+  else { saveUsers(); return { counted: false, code: "no_tickets" }; }
+  const base = LEAGUE_PLACE_POINTS[place - 1] || 1;
+  const points = withBots ? Math.ceil(base / 2) : base;
+  L.points += points;
+  L.games++;
+  if (place === 1) L.wins++;
+  saveUsers();
+  return { counted: true, points, total: L.points, withBots: !!withBots, tickets: leagueView(rec, now).tickets };
+}
+// POST /api/league/ticket — билет лиги за очки баланса.
+function buyLeagueTicket(username, password, token) {
+  const auth = authenticate(username, password, token);
+  if (auth.error) return auth;
+  const rec = auth.rec;
+  if ((rec.points || 0) < LEAGUE_TICKET_PRICE) return { error: `Нужно ${LEAGUE_TICKET_PRICE} очков.`, code: "no_points" };
+  rec.points -= LEAGUE_TICKET_PRICE;
+  const L = leagueRec(rec, Date.now());
+  L.extra = (L.extra || 0) + 1;
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+function loadLeagueFile() {
+  try {
+    const d = JSON.parse(fs.readFileSync(LEAGUE_FILE, "utf8"));
+    if (d && Array.isArray(d.settled) && Array.isArray(d.hall)) return d;
+  } catch (e) {}
+  return { v: 1, settled: [], hall: [] };
+}
+let leagueFile = null;
+function saveLeagueFile() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = LEAGUE_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(leagueFile, null, 2), "utf8");
+  fs.renameSync(tmp, LEAGUE_FILE);
+}
+function leagueRows(weekKey) {
+  const rows = [];
+  for (const rec of Object.values(users)) {
+    if (!rec) continue;
+    const L = rec.league;
+    const e = L && L.week === weekKey && L.games > 0 ? L : L && L.prev && L.prev.week === weekKey ? L.prev : null;
+    if (e) rows.push({ rec, points: e.points || 0, games: e.games || 0, wins: e.wins || 0 });
+  }
+  return rows.sort((a, b) => b.points - a.points || b.wins - a.wins || a.games - b.games || a.rec.username.localeCompare(b.rec.username));
+}
+// Итоги прошлой недели — один раз (вызывает server.js раз в 30 с и таблица).
+function settleLeague(now) {
+  now = now || Date.now();
+  if (!leagueFile) leagueFile = loadLeagueFile();
+  const prevKey = leagueWeekOf(now - 7 * DAY_MS).key;
+  if (leagueFile.settled.includes(prevKey)) return false;
+  const rows = leagueRows(prevKey);
+  rows.slice(0, LEAGUE_PRIZE_PLACES).forEach((r, i) => {
+    const prize = LEAGUE_PRIZES[i] || LEAGUE_PRIZE_REST;
+    creditPoints(r.rec, prize);
+    if (!Array.isArray(r.rec.leagueTitles)) r.rec.leagueTitles = [];
+    r.rec.leagueTitles.push({ week: prevKey, place: i + 1 });
+    r.rec.leagueAward = { week: prevKey, place: i + 1, prize };
+  });
+  if (rows.length) leagueFile.hall.unshift({ week: prevKey, top: rows.slice(0, 3).map((r, i) => ({ username: r.rec.username, points: r.points, place: i + 1 })) });
+  leagueFile.hall = leagueFile.hall.slice(0, 12);
+  leagueFile.settled = [prevKey].concat(leagueFile.settled).slice(0, 30);
+  saveLeagueFile();
+  if (rows.length) saveUsers();
+  return true;
+}
+function leagueTitleCounts(rec) {
+  const t = Array.isArray(rec.leagueTitles) ? rec.leagueTitles : [];
+  return { champion: t.filter((x) => x.place === 1).length, podium: t.filter((x) => x.place <= 3).length };
+}
+// GET /api/league — таблица недели, своё место, зал славы и правила.
+function leagueTable(now, viewerKey) {
+  now = now || Date.now();
+  settleLeague(now);
+  const wk = leagueWeekOf(now);
+  const rows = leagueRows(wk.key);
+  const entry = (r, i) => {
+    const { avatar, photo } = safeAvatar(r.rec);
+    return { place: i + 1, username: r.rec.username, avatar, avatarPhoto: photo, points: r.points, games: r.games, wins: r.wins, titles: leagueTitleCounts(r.rec) };
+  };
+  const viewer = viewerKey && Object.prototype.hasOwnProperty.call(users, viewerKey) ? users[viewerKey] : null;
+  const myIdx = viewer ? rows.findIndex((r) => r.rec === viewer) : -1;
+  return {
+    week: wk.key, endsAt: wk.endsAt, players: rows.length,
+    top: rows.slice(0, 50).map(entry),
+    me: viewer ? Object.assign(leagueView(viewer, now), { place: myIdx >= 0 ? myIdx + 1 : null }) : null,
+    hall: (leagueFile ? leagueFile.hall : []).slice(0, 6),
+    rules: { freeTickets: LEAGUE_FREE_TICKETS, ticketPrice: LEAGUE_TICKET_PRICE, placePoints: LEAGUE_PLACE_POINTS, prizes: LEAGUE_PRIZES, prizeRest: LEAGUE_PRIZE_REST, prizePlaces: LEAGUE_PRIZE_PLACES },
+  };
+}
+
 // Видео с наградой: дневной лимит и пауза. Сутки — по Москве (сброс в 00:00 МСК).
 const MSK_OFFSET_MS = 3 * 3600e3;
 function mskDay(now) { return new Date(now + MSK_OFFSET_MS).toISOString().slice(0, 10); }
@@ -658,5 +805,6 @@ module.exports = {
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
   createSession, loginWithToken, invalidateSession,
   authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, ownsProduct, isPremium, ownsScenario, traderActive, claimAnalysis, claimAnalysisKey,
+  recordLeagueGame, buyLeagueTicket, leagueTable, settleLeague, leagueWeekOf,
   applyOrder, revokeOrder, claimAdReward, adStatus, adRewardBlock, accountShopInfo,
 };
