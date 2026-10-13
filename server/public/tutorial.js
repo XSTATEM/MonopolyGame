@@ -1183,7 +1183,7 @@
   function renderMenuEntry(){
     const done = isDone();
     const sub = byId("tutorialCardSub");
-    if(sub) sub.textContent = done ? "Пройдено ✓ · можно повторить" : "Мини-партия с подсказками · 3 минуты";
+    if(sub) sub.textContent = done ? "Пройдено ✓" : "Мини-партия · 3 минуты";
     const offer = byId("tutorialOffer");
     if(!offer) return;
     if(offerSession === null){
@@ -1192,6 +1192,9 @@
       if(offerSession) lsSet(LS_OFFERED, "1");
     }
     offer.hidden = !offerSession || done;
+    // Пока видно предложение, строка «Обучение» ниже его только дублирует.
+    const row = byId("btnGoTutorial");
+    if(row) row.hidden = !offer.hidden;
   }
   function renderSettingsEntry(){
     const done = isDone();

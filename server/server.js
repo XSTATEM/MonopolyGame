@@ -254,6 +254,9 @@ function handleJoin(ws, msg) {
   const isNewRoom = !rooms.has(code);
   const room = getOrCreateRoom(code);
   if (isNewRoom) roomLimit.note(ws.clientIp);
+  // Закрытая комната: её нет в /api/rooms, войти можно только по коду. Признак
+  // задаёт тот, кто комнату создаёт; повторный join с private его не меняет.
+  if (isNewRoom && msg.private === true) room.isPrivate = true;
 
   // Тот же аккаунт уже сидит в этой комнате через другой сокет. Чаще всего это
   // «полуоткрытое» соединение после смены сети на телефоне (Wi-Fi → LTE):
@@ -444,6 +447,7 @@ function handleNewGame(conn) {
     }
   }
   const fresh = engine.newGameKeepPlayers(room);
+  if (room.isPrivate) fresh.isPrivate = true; // реванш остаётся закрытым
   rooms.set(room.code, fresh);
   for (const [, c] of connections) {
     if (c.roomCode === room.code) {
@@ -686,17 +690,26 @@ const server = http.createServer((req, res) => {
   }
 
   if (reqPath === "/api/rooms") {
+    // Закрытые комнаты не показываем; закончившуюся партию — только пока за
+    // столом кто-то есть (там может начаться реванш).
     const list = [...rooms.values()]
-      .filter((r) => r.players.length > 0)
-      .map((r) => ({
-        code: r.code,
-        totalPlayers: r.players.length,
-        connectedCount: r.players.filter((p) => p.connected).length,
-        activeCount: r.players.filter((p) => !p.bankrupt).length,
-        phase: r.phase,
-        eventCount: r.eventCount,
-        createdAt: r.createdAt,
-      }))
+      .filter((r) => r.players.length > 0 && !r.isPrivate)
+      .filter((r) => r.phase !== "ended" || r.players.some((p) => p.connected))
+      .map((r) => {
+        const host = r.players.find((p) => p.id === r.hostPlayerId);
+        return {
+          code: r.code,
+          hostName: host ? host.name : "",
+          totalPlayers: r.players.length,
+          connectedCount: r.players.filter((p) => p.connected).length,
+          activeCount: r.players.filter((p) => !p.bankrupt).length,
+          phase: r.phase,
+          eventCount: r.eventCount,
+          roundNumber: r.roundNumber || 1,
+          maxRounds: r.maxRounds || null,
+          createdAt: r.createdAt,
+        };
+      })
       .sort((a, b) => b.createdAt - a.createdAt);
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     return res.end(JSON.stringify(list));

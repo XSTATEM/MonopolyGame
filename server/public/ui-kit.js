@@ -46,7 +46,7 @@
   let popAnchor = null;  // кнопка, у которой он открыт
 
   function hintBtn(key, html, label){
-    return `<button type="button" class="hint-q" data-hint-key="${escAttr(key)}" data-hint="${escAttr(html)}"`
+    return `<button type="button" class="hint-q" data-hint-key="${escAttr(key)}" data-fkey="hint:${escAttr(key)}" data-hint="${escAttr(html)}"`
       + ` aria-label="${escAttr(label || "Подсказка")}" aria-expanded="false">${HELP_ICON}</button>`;
   }
   function ensurePop(){
@@ -91,10 +91,15 @@
     const body = pop.querySelector(".hint-pop-body");
     body.innerHTML = "";
     pop.hidden = false;
-    // Текст — следующим кадром: так живой регион объявит его экранному диктору.
-    body.innerHTML = btn.getAttribute("data-hint") || "";
-    placePop();
-    requestAnimationFrame(()=>{ if(pop && !pop.hidden){ placePop(); pop.classList.add("open"); } });
+    // Текст — следующим кадром после показа: так живой регион объявит его
+    // экранному диктору (изменение в том же кадре, что и показ, часто теряется).
+    const html = btn.getAttribute("data-hint") || "";
+    requestAnimationFrame(()=>{
+      if(!pop || pop.hidden || popAnchor !== btn) return;
+      body.innerHTML = html;
+      placePop();
+      pop.classList.add("open");
+    });
   }
   function closeHint(){
     if(!pop || pop.hidden) return false;
@@ -156,6 +161,7 @@
     btn.className = "pick-btn";
     if(select.getAttribute("style")) btn.setAttribute("style", select.getAttribute("style"));
     btn.setAttribute("aria-haspopup", "listbox");
+    if(select.id) btn.dataset.fkey = "pick:" + select.id; // фокус переживает перерисовку (captureFocus)
     btn.setAttribute("aria-expanded", "false");
     btn.innerHTML = `<span class="pick-value"></span>${CHEV_ICON}`;
     btn.addEventListener("click", ()=> openPicker(select));
@@ -282,24 +288,33 @@
     else if(e.key === "End"){ e.preventDefault(); sheet.active = sheet.items.length; moveActive(-1); }
     else if(e.key === "Enter" || e.key === " "){ e.preventDefault(); if(sheet.active >= 0) choose(sheet.active); }
   }
+  // Панель могли пересобрать, пока лист открыт (ход бота, новое состояние):
+  // тогда старый <select> уже вне DOM — берём живой с тем же id.
+  function liveSelect(select){
+    if(select.isConnected || !select.id) return select;
+    return document.getElementById(select.id) || select;
+  }
   function choose(i){
     if(!sheet) return;
     const it = sheet.items[i];
     if(!it || !it.opt || it.disabled) return;
-    const select = sheet.select;
-    const changed = select.value !== it.opt.value || select.selectedIndex !== it.opt.index;
+    const select = liveSelect(sheet.select);
+    const idx = Array.from(select.options).findIndex((o)=> o.value === it.opt.value && o.text === it.opt.text);
+    const target = idx >= 0 ? idx : Array.from(select.options).findIndex((o)=> o.value === it.opt.value);
     closePicker(true);
-    if(changed){
-      select.selectedIndex = it.opt.index;
+    if(target < 0 || !select.isConnected) return; // варианта больше нет — ничего не меняем
+    if(select.selectedIndex !== target){
+      select.selectedIndex = target;
       select.dispatchEvent(new Event("input", { bubbles: true }));
       select.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    if(select.isConnected) syncProxy(select);
+    syncProxy(select);
   }
   function closePicker(returnFocus){
     if(!sheet) return false;
     const { overlay, btn } = sheet;
     sheet = null;
+    overlay.style.pointerEvents = "none"; // угасающий слой не должен глотать следующий тап
     if(btn && btn.isConnected){ btn.setAttribute("aria-expanded", "false"); if(returnFocus) btn.focus({ preventScroll: true }); }
     overlay.classList.remove("open");
     if(overlay.classList.contains("no-anim")) overlay.remove();
@@ -347,7 +362,14 @@
   function onMutations(){
     if(queued) return;
     queued = true;
-    Promise.resolve().then(()=>{ queued = false; enhanceAll(); reanchorHint(); });
+    Promise.resolve().then(()=>{
+      queued = false; enhanceAll(); reanchorHint();
+      // Открытый лист — к живому <select> и его новой кнопке.
+      if(sheet && !sheet.select.isConnected){
+        const live = liveSelect(sheet.select);
+        if(live !== sheet.select && live._pickBtn){ sheet.select = live; sheet.btn = live._pickBtn; live._pickBtn.setAttribute("aria-expanded", "true"); }
+      }
+    });
   }
   function start(){
     enhanceAll();

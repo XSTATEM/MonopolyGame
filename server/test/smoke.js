@@ -177,6 +177,18 @@ async function main() {
     check(st && st.phase === "roll" && JSON.stringify(st.pendingRoll) === rollBefore, "game state preserved (pendingRoll same)");
   }
 
+  // --- список комнат: хост и закрытые комнаты ---------------------------------
+  const sec1 = await wsClient(), sec2 = await wsClient();
+  sec1.send(JSON.stringify({ type: "join", room: "secret", private: true, sessionToken: r2.body.sessionToken }));
+  check(!!(await waitMsg(sec1, (m) => m.type === "joined")), "bob created private room");
+  const listed = await (await fetch(BASE + "/api/rooms")).json();
+  check(!listed.some((r) => r.code === "SECRET"), "private room hidden from /api/rooms");
+  const test = listed.find((r) => r.code === "TEST");
+  check(test && test.hostName === "alice" && test.roundNumber >= 1, "room list has host and round: " + JSON.stringify(test));
+  sec2.send(JSON.stringify({ type: "join", room: "secret", sessionToken: r1.body.sessionToken }));
+  check(!!(await waitMsg(sec2, (m) => m.type === "joined")), "private room joinable by code");
+  sec1.terminate(); sec2.terminate();
+
   // --- лимит неудачных входов (HTTP) ----------------------------------------
   let last;
   for (let i = 0; i < 21; i++) last = await post("/api/login", { username: "alice", password: "wrong" + i }, { "X-Real-IP": "10.0.0.5" });
