@@ -9,6 +9,7 @@ const path = require("path");
 const crypto = require("crypto");
 const Skins = require("./public/skins.js");
 const Products = require("./products.js");
+const Engine = require("./public/engine.js"); // сценарии рынка (SCENARIOS)
 
 // Каталог данных можно вынести за пределы кода (DATA_DIR в /etc/birzha.env),
 // чтобы аккаунты переживали обновления и переустановку.
@@ -42,6 +43,12 @@ function saveUsers() {
 
 // usernameKey -> {username, salt, hash, gender, avatar, rating, points, pointsDebt?, entitlements, purchases, adRewards, billingId?, …, createdAt}
 const users = loadUsers();
+// Аватарки были эмодзи, теперь это id значков (skins.js): старые значения
+// переводятся в свою замену один раз при загрузке.
+for (const k in users) {
+  const rec = users[k];
+  if (rec && rec.avatar && rec.avatar !== "PHOTO" && !Skins.AVATAR_NAMES[rec.avatar]) rec.avatar = Skins.avatarId(rec.avatar);
+}
 
 function usernameKey(username) {
   return String(username || "").trim().toLowerCase();
@@ -125,7 +132,7 @@ function hashPassword(password, salt) {
 // открыл рейтинг (хранимый XSS → кража токена сессии).
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 function isAllowedAvatar(avatar) {
-  return avatar === "" || avatar === "PHOTO" || Skins.AVATAR_PACKS.some((p) => p.emojis.includes(avatar));
+  return avatar === "" || avatar === "PHOTO" || Skins.AVATAR_PACKS.some((p) => Skins.packHasAvatar(p, avatar));
 }
 
 // ---------------------------------------------------------------------
@@ -163,6 +170,30 @@ function effectiveOwned(rec, kind) {
 function ownsSkin(rec, kind, id) {
   return effectiveOwned(rec, kind).includes(id);
 }
+// Сценарии рынка (engine.js, SCENARIOS): бесплатные — всем, платные — по
+// покупке (unlocks.scenarios в entitlements). Как и скины наборов, не хранятся
+// отдельно, а вычисляются: возврат снимает их удалением записи entitlements.
+// Подписка «Трейдер»: срок в rec.traderUntil (мс). Продлевается покупкой
+// tm_trader_30 (applyOrder), без автопродления.
+const DAY_MS = 86400e3;
+function traderUntilRec(rec) { return Math.max(0, Math.round(Number(rec && rec.traderUntil) || 0)); }
+function traderActiveRec(rec, now) { return traderUntilRec(rec) > (now || Date.now()); }
+// Сценарии, доступные для игры. permanent — только купленные навсегда, без
+// подписки: по ним решается, продавать ли сценарий (ownsProduct).
+function ownedScenariosRec(rec, permanent) {
+  if (!permanent && traderActiveRec(rec)) return Engine.SCENARIOS.map((sc) => sc.id);
+  const own = new Set();
+  for (const pid of Object.keys((rec && rec.entitlements) || {})) {
+    const product = Products.byId(pid);
+    if (product) Products.unlocksOf(product).scenarios.forEach((id) => own.add(id));
+  }
+  return Engine.SCENARIOS.filter((sc) => sc.free || own.has(sc.id)).map((sc) => sc.id);
+}
+function ownsScenario(username, id) {
+  const key = usernameKey(username);
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  return !!rec && ownedScenariosRec(rec).includes(id);
+}
 
 // Аватар и фото — проверяем и при выдаче: в users.json могли остаться
 // значения, сохранённые до появления строгих проверок.
@@ -186,6 +217,12 @@ function publicProfile(rec) {
     entitlements: Object.keys(rec.entitlements || {}),
     ownedAvatarPacks: effectiveOwned(rec, "avatarPack"),
     ownedBoardSkins: effectiveOwned(rec, "boardSkin"),
+    ownedScenarios: ownedScenariosRec(rec),
+    boughtScenarios: ownedScenariosRec(rec, true),
+    trader: { active: traderActiveRec(rec), until: traderUntilRec(rec) },
+    analysisFreeToday: analysisFreeTodayRec(rec),
+    league: leagueView(rec, Date.now()),
+    leagueAward: rec.leagueAward || null,
     equippedAvatarPack: rec.equippedAvatarPack || "base",
     equippedBoardSkin: rec.equippedBoardSkin || "default",
   };
@@ -229,7 +266,7 @@ function register(username, password, gender, avatar) {
     username, salt, hash,
     gender: String(gender || "").trim().slice(0, 24),
     // При регистрации доступен только бесплатный пак: платные покупаются за очки.
-    avatar: (() => { const a = String(avatar || "").trim().slice(0, 8); const base = Skins.avatarPackById("base"); return base && base.emojis.includes(a) ? a : ""; })(),
+    avatar: (() => { const a = Skins.avatarId(String(avatar || "").trim().slice(0, 16)); return Skins.packHasAvatar(Skins.avatarPackById("base"), a) ? a : ""; })(),
     avatarPhoto: null,
     rating: 0,
     points: 0,
@@ -315,11 +352,14 @@ function updateProfile(username, password, gender, avatar, token) {
   const rec = auth.rec;
   if (gender != null) rec.gender = String(gender || "").trim().slice(0, 24);
   if (avatar != null) {
-    avatar = String(avatar || "").trim().slice(0, 8);
-    // "PHOTO" — зарезервированное значение: показывать avatarPhoto вместо эмодзи.
-    if (avatar !== "PHOTO") {
+    // Клиенты прежних версий присылают эмодзи — переводим в id значка.
+    avatar = Skins.avatarId(String(avatar || "").trim().slice(0, 16));
+    // "PHOTO" — зарезервированное значение: показывать avatarPhoto вместо значка.
+    if (avatar === "") {
+      return { error: "Такого аватара нет." };
+    } else if (avatar !== "PHOTO") {
       const owned = effectiveOwned(rec, "avatarPack");
-      const allowed = Skins.AVATAR_PACKS.filter((p) => owned.includes(p.id)).some((p) => p.emojis.includes(avatar));
+      const allowed = Skins.AVATAR_PACKS.filter((p) => owned.includes(p.id)).some((p) => Skins.packHasAvatar(p, avatar));
       if (!allowed) return { error: "Этот аватар вам ещё недоступен." };
     } else if (!rec.avatarPhoto) {
       return { error: "Сначала загрузите фото." };
@@ -442,6 +482,45 @@ function hasEntitlement(key, productId) {
   const rec = users[key];
   return !!(rec && rec.entitlements && rec.entitlements[productId]);
 }
+// Покупать незачем: товар уже есть или все его сценарии открыты другой
+// покупкой (отдельный сценарий после набора «Все сценарии» и наоборот).
+function ownsProduct(key, product) {
+  if (hasEntitlement(key, product.id)) return true;
+  const ids = Products.unlocksOf(product).scenarios;
+  if (!ids.length) return false;
+  const rec = users[key];
+  if (!rec) return false;
+  const own = ownedScenariosRec(rec, true);
+  return ids.every((id) => own.includes(id));
+}
+function traderActive(username) {
+  const key = usernameKey(username);
+  return Object.prototype.hasOwnProperty.call(users, key) && traderActiveRec(users[key]);
+}
+// Разбор партии: с подпиской — без ограничений, без неё — один в сутки (по
+// Москве). Повторное открытие разбора той же партии (gameKey) лимит не тратит.
+const GAME_KEY_RE = /^[A-Za-z0-9:._-]{1,80}$/;
+function claimAnalysisKey(key, gameKey) {
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  if (!rec) return { error: "Аккаунт не найден.", code: "session" };
+  if (traderActiveRec(rec)) return { ok: true, trader: true };
+  gameKey = String(gameKey || "");
+  if (!GAME_KEY_RE.test(gameKey)) return { error: "Неизвестная партия.", code: "bad_game" };
+  const day = mskDay(Date.now());
+  const a = rec.analysis && typeof rec.analysis === "object" ? rec.analysis : {};
+  if (a.day === day && a.game === gameKey) return { ok: true, again: true };
+  if (a.day === day) return { error: "Бесплатный разбор на сегодня уже был. Без ограничений — с подпиской «Трейдер».", code: "analysis_limit" };
+  rec.analysis = { day, game: gameKey };
+  saveUsers();
+  return { ok: true, profile: publicProfile(rec) };
+}
+// POST /api/analysis/claim — офлайн-партия: сам разбор считает клиент.
+function claimAnalysis(username, password, token, gameKey) {
+  const auth = authenticate(username, password, token);
+  if (auth.error) return auth;
+  return claimAnalysisKey(usernameKey(username), gameKey);
+}
+function analysisFreeTodayRec(rec) { return !(rec.analysis && rec.analysis.day === mskDay(Date.now())); }
 function isPremium(key) {
   return isPremiumRec(users[key]);
 }
@@ -458,6 +537,10 @@ function applyOrder(order) {
   const at = order.grantedAt || Date.now();
   const points = Math.max(0, Math.round(product.points || 0));
   creditPoints(rec, points); // долг после прежнего возврата гасится первым
+  // Подписка «Трейдер»: срок продлевается от более позднего — конца текущей
+  // подписки или момента оплаты.
+  const traderDays = Products.traderDaysOf(product);
+  if (traderDays) rec.traderUntil = Math.max(at, traderUntilRec(rec)) + traderDays * DAY_MS;
   if (product.kind === "non-consumable") {
     if (!rec.entitlements || typeof rec.entitlements !== "object") rec.entitlements = {};
     // Уже есть по другому заказу (две оплаты наперегонки) — запись не трогаем:
@@ -484,6 +567,9 @@ function revokeOrder(order) {
     rec.pointsDebt = Math.max(0, Math.round(rec.pointsDebt || 0)) + entry.debt;
     rec.points = 0;
   }
+  const refunded = Products.byId(entry.productId);
+  const traderDays = Products.traderDaysOf(refunded);
+  if (traderDays) rec.traderUntil = Math.max(0, traderUntilRec(rec) - traderDays * DAY_MS);
   const ent = rec.entitlements && rec.entitlements[entry.productId];
   if (ent && ent.orderId === order.id) {
     delete rec.entitlements[entry.productId];
@@ -496,10 +582,155 @@ function revokeOrder(order) {
   if (!ownsSkin(rec, "avatarPack", rec.equippedAvatarPack || "base")) rec.equippedAvatarPack = "base";
   if (rec.avatar && rec.avatar !== "PHOTO") {
     const owned = effectiveOwned(rec, "avatarPack");
-    if (!Skins.AVATAR_PACKS.some((p) => owned.includes(p.id) && p.emojis.includes(rec.avatar))) rec.avatar = "";
+    if (!Skins.AVATAR_PACKS.some((p) => owned.includes(p.id) && Skins.packHasAvatar(p, rec.avatar))) rec.avatar = "";
   }
   saveUsers();
   return { ok: true, revoked: true };
+}
+
+// ---------------------------------------------------------------------
+// Лига недели. Неделя — с понедельника 00:00 по Москве. Очки лиги дают
+// онлайн-партии, за которые положены очки рейтинга (не короче
+// MIN_TURNS_FOR_POINTS, без исключения голосованием): по месту за столом, в
+// партии с ботами — половина. Засчитанная партия тратит билет:
+// LEAGUE_FREE_TICKETS бесплатных в сутки, сверх них — купленные за очки
+// баланса (не сгорают). После недели лучшие получают очки баланса и титул
+// (settleLeague), тройка призёров попадает в зал славы (DATA_DIR/league.json).
+// ---------------------------------------------------------------------
+const LEAGUE_FREE_TICKETS = 3;
+const LEAGUE_TICKET_PRICE = 30;
+const LEAGUE_PLACE_POINTS = [10, 6, 4, 2]; // 5-е место и ниже — 1
+const LEAGUE_PRIZES = [500, 300, 200];      // 4–10 места — LEAGUE_PRIZE_REST
+const LEAGUE_PRIZE_REST = 50;
+const LEAGUE_PRIZE_PLACES = 10;
+const LEAGUE_FILE = path.join(DATA_DIR, "league.json");
+function leagueWeekOf(now) {
+  const d = new Date(now + MSK_OFFSET_MS);
+  const monday = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return { key: new Date(monday).toISOString().slice(0, 10), endsAt: monday + 7 * DAY_MS - MSK_OFFSET_MS };
+}
+// Запись лиги на текущую неделю и день: новая неделя обнуляет очки (прошлая
+// остаётся в prev до подведения итогов), новый день — бесплатные билеты.
+function leagueRec(rec, now) {
+  const wk = leagueWeekOf(now).key, day = mskDay(now);
+  let L = rec.league && typeof rec.league === "object" ? rec.league : null;
+  if (!L) L = rec.league = { week: wk, points: 0, games: 0, wins: 0, day, freeUsed: 0, extra: 0 };
+  if (L.week !== wk) {
+    if (L.games > 0) L.prev = { week: L.week, points: L.points, games: L.games, wins: L.wins };
+    Object.assign(L, { week: wk, points: 0, games: 0, wins: 0 });
+  }
+  if (L.day !== day) { L.day = day; L.freeUsed = 0; }
+  return L;
+}
+// То же без записи — для профиля и таблицы.
+function leagueView(rec, now) {
+  const wk = leagueWeekOf(now).key, day = mskDay(now);
+  const L = rec && rec.league && typeof rec.league === "object" ? rec.league : {};
+  const cur = L.week === wk;
+  return {
+    week: wk,
+    points: cur ? L.points || 0 : 0, games: cur ? L.games || 0 : 0, wins: cur ? L.wins || 0 : 0,
+    tickets: { free: Math.max(0, LEAGUE_FREE_TICKETS - (L.day === day ? L.freeUsed || 0 : 0)), extra: Math.max(0, L.extra || 0) },
+  };
+}
+// Онлайн-партия закончилась: засчитать её игроку в лигу (server.js, settleRoomLeague).
+function recordLeagueGame(username, place, withBots, now) {
+  const key = usernameKey(username);
+  const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
+  if (!rec) return null;
+  now = now || Date.now();
+  const L = leagueRec(rec, now);
+  if (L.freeUsed < LEAGUE_FREE_TICKETS) L.freeUsed++;
+  else if (L.extra > 0) L.extra--;
+  else { saveUsers(); return { counted: false, code: "no_tickets" }; }
+  const base = LEAGUE_PLACE_POINTS[place - 1] || 1;
+  const points = withBots ? Math.ceil(base / 2) : base;
+  L.points += points;
+  L.games++;
+  if (place === 1) L.wins++;
+  saveUsers();
+  return { counted: true, points, total: L.points, withBots: !!withBots, tickets: leagueView(rec, now).tickets };
+}
+// POST /api/league/ticket — билет лиги за очки баланса.
+function buyLeagueTicket(username, password, token) {
+  const auth = authenticate(username, password, token);
+  if (auth.error) return auth;
+  const rec = auth.rec;
+  if ((rec.points || 0) < LEAGUE_TICKET_PRICE) return { error: `Нужно ${LEAGUE_TICKET_PRICE} очков.`, code: "no_points" };
+  rec.points -= LEAGUE_TICKET_PRICE;
+  const L = leagueRec(rec, Date.now());
+  L.extra = (L.extra || 0) + 1;
+  saveUsers();
+  return { ok: true, user: publicProfile(rec) };
+}
+function loadLeagueFile() {
+  try {
+    const d = JSON.parse(fs.readFileSync(LEAGUE_FILE, "utf8"));
+    if (d && Array.isArray(d.settled) && Array.isArray(d.hall)) return d;
+  } catch (e) {}
+  return { v: 1, settled: [], hall: [] };
+}
+let leagueFile = null;
+function saveLeagueFile() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = LEAGUE_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(leagueFile, null, 2), "utf8");
+  fs.renameSync(tmp, LEAGUE_FILE);
+}
+function leagueRows(weekKey) {
+  const rows = [];
+  for (const rec of Object.values(users)) {
+    if (!rec) continue;
+    const L = rec.league;
+    const e = L && L.week === weekKey && L.games > 0 ? L : L && L.prev && L.prev.week === weekKey ? L.prev : null;
+    if (e) rows.push({ rec, points: e.points || 0, games: e.games || 0, wins: e.wins || 0 });
+  }
+  return rows.sort((a, b) => b.points - a.points || b.wins - a.wins || a.games - b.games || a.rec.username.localeCompare(b.rec.username));
+}
+// Итоги прошлой недели — один раз (вызывает server.js раз в 30 с и таблица).
+function settleLeague(now) {
+  now = now || Date.now();
+  if (!leagueFile) leagueFile = loadLeagueFile();
+  const prevKey = leagueWeekOf(now - 7 * DAY_MS).key;
+  if (leagueFile.settled.includes(prevKey)) return false;
+  const rows = leagueRows(prevKey);
+  rows.slice(0, LEAGUE_PRIZE_PLACES).forEach((r, i) => {
+    const prize = LEAGUE_PRIZES[i] || LEAGUE_PRIZE_REST;
+    creditPoints(r.rec, prize);
+    if (!Array.isArray(r.rec.leagueTitles)) r.rec.leagueTitles = [];
+    r.rec.leagueTitles.push({ week: prevKey, place: i + 1 });
+    r.rec.leagueAward = { week: prevKey, place: i + 1, prize };
+  });
+  if (rows.length) leagueFile.hall.unshift({ week: prevKey, top: rows.slice(0, 3).map((r, i) => ({ username: r.rec.username, points: r.points, place: i + 1 })) });
+  leagueFile.hall = leagueFile.hall.slice(0, 12);
+  leagueFile.settled = [prevKey].concat(leagueFile.settled).slice(0, 30);
+  saveLeagueFile();
+  if (rows.length) saveUsers();
+  return true;
+}
+function leagueTitleCounts(rec) {
+  const t = Array.isArray(rec.leagueTitles) ? rec.leagueTitles : [];
+  return { champion: t.filter((x) => x.place === 1).length, podium: t.filter((x) => x.place <= 3).length };
+}
+// GET /api/league — таблица недели, своё место, зал славы и правила.
+function leagueTable(now, viewerKey) {
+  now = now || Date.now();
+  settleLeague(now);
+  const wk = leagueWeekOf(now);
+  const rows = leagueRows(wk.key);
+  const entry = (r, i) => {
+    const { avatar, photo } = safeAvatar(r.rec);
+    return { place: i + 1, username: r.rec.username, avatar, avatarPhoto: photo, points: r.points, games: r.games, wins: r.wins, titles: leagueTitleCounts(r.rec) };
+  };
+  const viewer = viewerKey && Object.prototype.hasOwnProperty.call(users, viewerKey) ? users[viewerKey] : null;
+  const myIdx = viewer ? rows.findIndex((r) => r.rec === viewer) : -1;
+  return {
+    week: wk.key, endsAt: wk.endsAt, players: rows.length,
+    top: rows.slice(0, 50).map(entry),
+    me: viewer ? Object.assign(leagueView(viewer, now), { place: myIdx >= 0 ? myIdx + 1 : null }) : null,
+    hall: (leagueFile ? leagueFile.hall : []).slice(0, 6),
+    rules: { freeTickets: LEAGUE_FREE_TICKETS, ticketPrice: LEAGUE_TICKET_PRICE, placePoints: LEAGUE_PLACE_POINTS, prizes: LEAGUE_PRIZES, prizeRest: LEAGUE_PRIZE_REST, prizePlaces: LEAGUE_PRIZE_PLACES },
+  };
 }
 
 // Видео с наградой: дневной лимит и пауза. Сутки — по Москве (сброс в 00:00 МСК).
@@ -582,6 +813,7 @@ module.exports = {
   register, login, addPoints, publicProfile, getLeaderboard,
   updateProfile, changePassword, setPhoto, buySkin, equipSkin,
   createSession, loginWithToken, invalidateSession,
-  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, isPremium,
+  authAccount, accountByToken, billingUserId, accountCreatedAt, hasEntitlement, ownsProduct, isPremium, ownsScenario, traderActive, claimAnalysis, claimAnalysisKey,
+  recordLeagueGame, buyLeagueTicket, leagueTable, settleLeague, leagueWeekOf,
   applyOrder, revokeOrder, claimAdReward, adStatus, adRewardBlock, accountShopInfo,
 };

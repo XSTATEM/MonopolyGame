@@ -41,6 +41,13 @@ const PROFILES = {
     desc: "Бот движка как есть (engine.botStep): случайная доля до 35% свободного кэша, редкие меры.",
   },
 
+  // Сильный бот движка (engine.botStep с botLevel "strong", подписка «Трейдер»).
+  strong: {
+    pure: true,
+    botLevel: "strong",
+    desc: "Сильный бот движка (botLevel \"strong\"): максимум доступного на бросок при резерве $15 000, города без случайных пропусков.",
+  },
+
   passive: {
     desc: "Ничего не покупает (ни акций, ни недвижимости), всегда отказывается и платит, мер не применяет.",
     preRoll: (ctx) => act("rollDice"),
@@ -141,9 +148,9 @@ const PROFILES = {
             if (a) return a;
           }
         }
-        // 3) PR своих — когда прирост моего пакета окупает 5% капитализации.
+        // 3) PR своих — когда прирост моего пакета окупает цену PR с запасом 10%.
         const prs = mine
-          .filter((t) => room.companies[t].lastPrEvent !== ev && (ctx.held(t) / 100) * 0.1 * ctx.vol(t) >= 0.055)
+          .filter((t) => room.companies[t].lastPrEvent !== ev && (ctx.held(t) / 100) * 0.1 * ctx.vol(t) * ctx.price(t) >= 1.1 * ctx.cost.pr(t))
           .sort((a, b) => ctx.held(b) * ctx.price(b) - ctx.held(a) * ctx.price(a));
         for (const t of prs) {
           if (me.cash - ctx.cost.pr(t) >= reserve) {
@@ -153,12 +160,12 @@ const PROFILES = {
         }
         // 4) Негатив по компании, где у соперников больше всего денег (раз в событие).
         if (ctx.mem.lastNegEvent !== ev) {
-          const cost = ctx.cost.negativeInfo();
           const best = ctx.live()
             .map((c) => c.ticker)
             .filter((t) => !mine.includes(t) && ctx.held(t) < 10 && ev - room.companies[t].lastNegInfoEvent >= 2 && !ctx.atFloor(t))
             .map((t) => ({ t, dmg: (ctx.othersPct(t) / 100) * ctx.price(t) * 0.15 * ctx.vol(t) }))
             .sort((a, b) => b.dmg - a.dmg || (a.t < b.t ? -1 : 1))[0];
+          const cost = best ? ctx.cost.negativeInfo(best.t) : 0;
           if (best && best.dmg >= 0.6 * cost && me.cash - cost >= reserve) {
             const a = ctx.fresh(act("ctrlNegativeInfo", best.t));
             if (a) { ctx.mem.lastNegEvent = ev; return a; }
@@ -290,6 +297,60 @@ const PROFILES = {
       const loan = ctx.me.loan;
       if (loan && ctx.me.cash >= loan.principal + 0.3 * ctx.startCash) return ctx.fresh(act("repayLoan", Math.ceil(loan.principal)));
       return null;
+    },
+  },
+
+  // Испытание мер: обычный бот движка (покупки как у него), который пользуется
+  // мерами, когда они окупаются: PR своих компаний, негатив по компании, где у
+  // соперников больше всего денег, инсайд при большом портфеле.
+  meddler: {
+    pure: false,
+    desc: "Бот движка + меры по расчёту: PR своих (если прирост пакета окупает цену), негатив по чужой компании, инсайд при большом портфеле.",
+    preRoll(ctx) {
+      const { room, me } = ctx;
+      const ev = room.eventCount;
+      const reserve = 0.15 * ctx.startCash;
+      const mine = ctx.controlled();
+      if (room.frozen || !mine.length) return null;
+      for (const t of mine) {
+        if (room.companies[t].lastPrEvent === ev) continue;
+        const gain = (ctx.held(t) / 100) * 0.1 * ctx.vol(t) * ctx.price(t);
+        const cost = ctx.cost.pr(t);
+        if (gain >= 1.1 * cost && me.cash - cost >= reserve) { const a = ctx.fresh(act("ctrlPrCampaign", t)); if (a) return a; }
+      }
+      if (ctx.mem.lastNegEvent !== ev) {
+        const best = ctx.live().map((c) => c.ticker)
+          .filter((t) => !mine.includes(t) && ctx.held(t) < 10 && ev - room.companies[t].lastNegInfoEvent >= 2 && !ctx.atFloor(t))
+          .map((t) => ({ t, dmg: (ctx.othersPct(t) / 100) * ctx.price(t) * 0.15 * ctx.vol(t) }))
+          .sort((a, b) => b.dmg - a.dmg || (a.t < b.t ? -1 : 1))[0];
+        const cost = best ? ctx.cost.negativeInfo(best.t) : 0;
+        if (best && best.dmg >= 0.6 * cost && me.cash - cost >= reserve) { const a = ctx.fresh(act("ctrlNegativeInfo", best.t)); if (a) { ctx.mem.lastNegEvent = ev; return a; } }
+      }
+      const peek = ctx.cost.insiderPeek();
+      if (room.insiderUsedEvent[me.id] !== ev && !room.pendingInsider && ctx.stockValue() >= 15 * peek && me.cash - peek >= reserve) {
+        const a = ctx.fresh(act("ctrlInsiderPeek"));
+        if (a) return a;
+      }
+      return null;
+    },
+  },
+
+  // Испытание «покупка вне броска» (engine DIRECT_BUY): бот движка, который
+  // каждый ход добирает до 5% компании, где у него больше всего (к контролю),
+  // а без своих — самой дешёвой со свободными акциями; резерв $15 000.
+  direct: {
+    pure: false,
+    desc: "Бот движка + покупка вне броска каждый ход: до 5% своей главной компании (иначе самой дешёвой), резерв $15 000.",
+    preRoll(ctx) {
+      if (typeof ctx.E.buyDirect !== "function") return null;
+      const cands = ctx.live().map((c) => c.ticker).filter((t) => ctx.free(t) >= 1 && ctx.othersPct(t) < 50);
+      if (!cands.length) return null;
+      cands.sort((a, b) => ctx.held(b) - ctx.held(a) || ctx.price(a) - ctx.price(b) || (a < b ? -1 : 1));
+      const t = cands[0];
+      const pct = Math.min(5, ctx.free(t));
+      const cost = ctx.price(t) * (pct / 100) * 1.25 * (1 + ctx.feePct());
+      if (ctx.me.cash - cost < 15000) return null;
+      return ctx.fresh(act("buyDirect", t, pct));
     },
   },
 

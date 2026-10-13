@@ -174,7 +174,20 @@
     if(ent && ent.entitlements && typeof ent.entitlements === "object") Object.keys(ent.entitlements).forEach((id)=> set.add(id));
     return set;
   }
-  function owns(p){ return !!p && p.kind === "non-consumable" && ownedIds().has(p.id); }
+  // Товар сценариев считается купленным и тогда, когда все его сценарии уже
+  // открыты другими покупками (набор «Все сценарии» после трёх по отдельности).
+  // Купленные навсегда (boughtScenarios), без открытых подпиской «Трейдер»:
+  // сценарий можно купить навсегда и при активной подписке.
+  function ownsScenarios(p){
+    const ids = (p && p.unlocks && p.unlocks.scenarios) || [];
+    const own = accountUser && Array.isArray(accountUser.boughtScenarios) ? accountUser.boughtScenarios : [];
+    return ids.length > 0 && ids.every((id)=> own.includes(id));
+  }
+  function isScenarioProduct(p){ return !!(p && p.unlocks && p.unlocks.scenarios && p.unlocks.scenarios.length); }
+  function isTraderProduct(p){ return !!(p && p.traderDays > 0); }
+  function traderInfo(){ const t = accountUser && accountUser.trader; return t && t.active && t.until > Date.now() ? t : null; }
+  function dateRu(ms){ try { return new Date(ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }); } catch(e){ return ""; } }
+  function owns(p){ return !!p && p.kind === "non-consumable" && (ownedIds().has(p.id) || ownsScenarios(p)); }
 
   // --- Данные аккаунта для магазина (видео за сутки, история покупок) ---------
   function loadEntitlements(){
@@ -193,7 +206,8 @@
       const sp = storePrices[storeIdOf(p, prov)];
       return sp && sp.priceText ? "Купить · " + sp.priceText : "Купить";
     }
-    return p.price && p.price.text ? "Купить за " + p.price.text : "Купить";
+    const verb = isTraderProduct(p) && traderInfo() ? "Продлить" : "Купить";
+    return p.price && p.price.text ? verb + " за " + p.price.text : verb;
   }
   function buyButtonHtml(p, cls){
     if(owns(p)) return `<button type="button" class="secondary" disabled>Куплено</button>`;
@@ -206,22 +220,34 @@
     const u = p.unlocks || {};
     const S = window.Skins;
     if(!S) return "";
-    const emojis = [].concat(...(u.avatarPacks || []).map((id)=>{ const pk = S.avatarPackById(id); return pk ? pk.emojis.slice(0, 6) : []; }));
+    const avatars = [].concat(...(u.avatarPacks || []).map((id)=>{ const pk = S.avatarPackById(id); return pk ? pk.avatars.slice(0, 6) : []; }));
     const swatches = [].concat(...(u.boardSkins || []).map((id)=>{ const s = S.boardSkinById(id); return s ? s.stage : []; }))
       .filter((c)=> /^#[0-9a-f]{3,8}$/i.test(c));
-    if(!emojis.length && !swatches.length) return "";
-    return `<div class="shop-card-preview">${emojis.length ? `<span class="skin-emoji-row">${escapeHtml(emojis.join(""))}</span>` : ""}${swatches.length ? `<span class="skin-preview">${swatches.map((c)=> `<span class="skin-swatch" style="background:${c};"></span>`).join("")}</span>` : ""}</div>`;
+    if(!avatars.length && !swatches.length) return "";
+    return `<div class="shop-card-preview">${avatars.length ? `<span class="skin-emoji-row" aria-hidden="true">${avatars.map((a)=> `<svg class="ico av-ico" aria-hidden="true"><use href="#i-av-${a}"/></svg>`).join("")}</span>` : ""}${swatches.length ? `<span class="skin-preview">${swatches.map((c)=> `<span class="skin-swatch" style="background:${c};"></span>`).join("")}</span>` : ""}</div>`;
   }
   function highlighted(id){ return !!highlight && highlight.id === id && Date.now() < highlight.until; }
   function cardHtml(p){
     const owned = owns(p);
-    const icon = p.kind === "consumable" ? ico("coins", "ico-sm") : ico("palette", "ico-sm");
+    const icon = p.kind === "consumable" ? ico("coins", "ico-sm") : isScenarioProduct(p) ? ico("news", "ico-sm") : ico("palette", "ico-sm");
     return `<div class="shop-card${owned ? " owned" : ""}${highlighted(p.id) ? " shop-focus" : ""}" id="shopItem-${escapeHtml(p.id)}">
       <div class="shop-card-title">${icon}<span>${escapeHtml(p.title || p.id)}</span></div>
       ${p.subtitle ? `<div class="shop-card-sub">${escapeHtml(p.subtitle)}</div>` : ""}
       ${previewHtml(p)}
       ${buyButtonHtml(p)}
     </div>`;
+  }
+  // Подписка «Трейдер»: польза и контент на 30 дней, без автопродления.
+  function traderHtml(p){
+    const benefits = Array.isArray(catalog.traderBenefits) ? catalog.traderBenefits : [];
+    const t = traderInfo();
+    return `<div class="shop-premium-head">
+        <span class="shop-premium-icon shop-trader-icon">${ico("chart")}</span>
+        <div><h2 id="shopTraderTitle">Подписка «Трейдер»</h2><div class="shop-premium-sub">${p.traderDays} дней · без автопродления</div></div>
+      </div>
+      ${benefits.length ? `<ul class="shop-premium-list">${benefits.map((b)=> `<li>${ico("check", "ico-sm")}<span>${escapeHtml(b)}</span></li>`).join("")}</ul>` : `<p class="shop-premium-text">${escapeHtml(p.subtitle || "")}</p>`}
+      ${t ? `<div class="shop-premium-active shop-trader-active">${ico("check", "ico-sm")} Активна до ${escapeHtml(dateRu(t.until))}</div>` : ""}
+      ${buyButtonHtml(p, "shop-premium-buy")}`;
   }
   function premiumHtml(p){
     const benefits = Array.isArray(catalog.premiumBenefits) ? catalog.premiumBenefits : [];
@@ -375,11 +401,20 @@
       free.hidden = true;
     }
 
-    const points = list.filter((p)=> p.kind === "consumable");
+    const trader = list.find(isTraderProduct);
+    const traderBox = byId("shopTrader");
+    traderBox.hidden = !trader;
+    traderBox.innerHTML = trader ? traderHtml(trader) : "";
+    traderBox.classList.toggle("shop-focus", !!trader && highlighted(trader.id));
+
+    const points = list.filter((p)=> p.kind === "consumable" && !isTraderProduct(p));
     byId("shopPointsSection").hidden = !points.length;
     byId("shopPointsSection").classList.toggle("shop-focus", highlighted("points"));
     byId("shopPoints").innerHTML = points.map(cardHtml).join("");
-    const sets = list.filter((p)=> p.kind === "non-consumable" && !p.premium);
+    const scenarios = list.filter((p)=> p.kind === "non-consumable" && isScenarioProduct(p));
+    byId("shopScenariosSection").hidden = !scenarios.length;
+    byId("shopScenarios").innerHTML = scenarios.map(cardHtml).join("");
+    const sets = list.filter((p)=> p.kind === "non-consumable" && !p.premium && !isScenarioProduct(p));
     byId("shopSetsSection").hidden = !sets.length;
     byId("shopSets").innerHTML = sets.map(cardHtml).join("");
 
@@ -435,7 +470,8 @@
   }
   function focusProduct(id){
     // id товара, "tm_premium" — карточка Премиума, "points" — раздел очков («Пополнить» в скинах).
-    const el = id === "tm_premium" ? byId("shopPremium") : id === "points" ? byId("shopPointsSection") : byId("shopItem-" + id);
+    const el = id === "tm_premium" ? byId("shopPremium") : id === "points" ? byId("shopPointsSection")
+      : isTraderProduct(productById(id)) ? byId("shopTrader") : byId("shopItem-" + id);
     if(!el || el.hidden) return;
     const reduced = document.body.classList.contains("reduce-motion")
       || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -574,6 +610,7 @@
   function grantText(p){
     if(!p) return "";
     if(p.premium) return "Премиум активен" + (p.points ? ` · +${pointsLabel(p.points)}` : "");
+    if(isTraderProduct(p)){ const t = traderInfo(); return t ? `«Трейдер» активен до ${dateRu(t.until)}` : "«Трейдер» активен"; }
     if(p.kind === "consumable") return "+" + pointsLabel(p.points || 0);
     return `${p.title} — в разделе «Скины»`;
   }

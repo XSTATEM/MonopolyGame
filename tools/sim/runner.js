@@ -25,7 +25,7 @@ const ACTION_TYPES = new Set([
   "setForcedPrice", "payForcedPrice", "ctrlNegativeInfo", "ctrlPrCampaign", "ctrlInsiderPeek", "ctrlInsiderResolve",
   "ctrlSqueezeOut", "ctrlShort", "ctrlPublicIPO", "ctrlMergeCompanies", "takeLoan", "repayLoan",
   "buyRealEstateFromRoll", "upgradeRealEstateFromRoll", "payRealEstateRentFromRoll",
-  "ctrlEspionage", "ctrlDiscredit", "ctrlInvestigate", "personalPr", "declareBankruptcy",
+  "ctrlEspionage", "ctrlDiscredit", "ctrlInvestigate", "personalPr", "declareBankruptcy", "buyDirect",
 ]);
 const MAX_PHASE_ACTIONS = 8; // действий профиля за одну фазу хода (до броска / бросок / после)
 
@@ -46,6 +46,7 @@ const LOG_COUNTERS = [
   ["taxPaid", "tax", null],
   ["dividendSkipped", "dividend", "пропущены"],
   ["dividendBlocked", "dividend", "не проводится"],
+  ["scenarioNews", "news", "Сценарий ·"],
   ["passiveRent", "realestate", "пассивную ренту"],
   ["reSetBonus", "realestate", "за комплект"],
   ["reTax", "realestate", "налог на недвижимость"],
@@ -118,8 +119,12 @@ function runGame(env, cfg, gameIndex) {
   const players = seats.map((prof, i) => {
     const res = E.addPlayer(room, `P${i + 1}-${prof}`.slice(0, 20), "", "", 0, "default", true);
     if (!res || !res.player) throw new Error("addPlayer: " + (res && res.error));
+    if (PROFILES[prof].botLevel) res.player.botLevel = PROFILES[prof].botLevel;
     return res.player;
   });
+  // Сценарий рынка (--set 'scenario="crisis2008"'): цены, колода и сценарные
+  // новости — как при старте партии; длительность задаёт --max-rounds.
+  if (typeof E.applyScenario === "function") E.applyScenario(room);
   room.maxRounds = cfg.maxRounds > 0 ? cfg.maxRounds : null;
   room.phase = "roll";
   const startCash = (room.settings && room.settings.startingCash) || players[0].cash;
@@ -546,7 +551,21 @@ function driverStep(S) {
   }
   // 4) Бросок на компанию с единоличным контролёром.
   const roll = room.pendingRoll;
-  if (roll && roll.ticker) {
+  // Правила 2 (engine rulesV2): плата за попадание обязательна — контролёр
+  // назначает цену до покупки (её оплатит шаг 2), дальше ход идёт как обычно.
+  const v2 = typeof E.rulesV2 === "function" && E.rulesV2(room);
+  if (v2 && roll && roll.ticker && roll.fee && !roll.fee.settled) {
+    const R = player(S, roll.playerId), C = player(S, roll.fee.controllerId);
+    if (R && C && !(isEngine(S, R) && isEngine(S, C))) {
+      const held = C.holdings[roll.ticker] || 0;
+      const disc = roll.fee.discount == null ? 1 : roll.fee.discount;
+      const cap = Math.max(1, Math.round(E.forcedPriceCap(room, roll.ticker, held) * disc));
+      let amount = isEngine(S, C) ? null : callHook(S, C, "forcedPrice", { ticker: roll.ticker, targetId: R.id });
+      if (!Number.isFinite(amount) || amount < 1) amount = engineForcedPrice(S, C, roll.ticker) * disc;
+      return exec(S, C.id, act("setForcedPrice", Math.max(1, Math.min(cap, Math.round(amount)))), isEngine(S, C) ? "driver" : "profile");
+    }
+  }
+  if (!v2 && roll && roll.ticker) {
     const R = player(S, roll.playerId);
     const C = singleController(S, roll.ticker, roll.playerId);
     if (R && C && !(isEngine(S, R) && isEngine(S, C))) {

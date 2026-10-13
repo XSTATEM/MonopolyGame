@@ -801,6 +801,9 @@
     if(!card || reduced()) return;
     try {
       card.querySelectorAll(".cap-row, .log-entry").forEach((el, i)=> el.style.setProperty("--i", Math.min(i, 12)));
+      // Карточка события (правила 3): шапка, заголовок, затем последствия по очереди.
+      card.querySelectorAll(".ev-card-top, .ev-title, .ev-desc").forEach((el, i)=> el.style.setProperty("--i", i));
+      card.querySelectorAll(".ev-chip, .ev-cons-row, .board-dec").forEach((el, i)=> el.style.setProperty("--i", Math.min(i, 14)));
       retrigger(card, "anim-flip");
     } catch(e){ console.error(e); }
   }

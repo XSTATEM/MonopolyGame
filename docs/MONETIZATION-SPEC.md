@@ -183,8 +183,8 @@ module.exports = { PRODUCTS, PREMIUM_BENEFITS, byId, storeId, byStoreId, rubValu
 
 ```js
 // AVATAR_PACKS — добавить в конец:
-{ id: "bulls", name: "Быки и медведи", cost: 0, premium: true, emojis: ["🐂","🐻","🦈","🦅","🐺","🦁","💼","📈"] },
-{ id: "wallstreet", name: "Уолл-стрит", cost: 0, set: "tm_set_wallstreet", emojis: ["🗽","🏦","💹","💵","🪙","📊","💰","🧾"] },
+{ id: "bulls", name: "Быки и медведи", cost: 0, premium: true, avatars: ["bull","bear","fish","bird","paw","shield","briefcase","trend"] },
+{ id: "wallstreet", name: "Уолл-стрит", cost: 0, set: "tm_set_wallstreet", avatars: ["tower","bank","candles","cash","coins","bars","piggy","receipt"] },
 
 // BOARD_SKINS — добавить в конец:
 { id: "gold", name: "Золото биржи", cost: 0, premium: true, cls: "theme-gold", stage: ["#5c4a1e", "#2b200b", "#171006"], accent: "#f2c94c" },

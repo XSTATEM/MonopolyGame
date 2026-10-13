@@ -126,6 +126,32 @@ function pureChecks() {
   const A = require("../ads.js");
 
   check(Products.PRODUCTS.every((p) => /^[a-z0-9][a-z0-9_]*$/.test(p.id)), "id товаров — строчная латиница, цифры и «_»");
+
+  // Лига недели: неделя по Москве, билеты, очки по месту, итоги недели.
+  users.register("liga1", "pass1234"); users.register("liga2", "pass1234");
+  const MON = Date.UTC(2026, 9, 11, 21, 0); // понедельник 12.10 00:00 по Москве
+  check(users.leagueWeekOf(MON).key === "2026-10-12" && users.leagueWeekOf(MON - 1).key === "2026-10-05", "неделя лиги — с понедельника по Москве");
+  const lg1 = users.recordLeagueGame("liga1", 1, false, MON + 3600e3);
+  check(lg1.counted && lg1.points === 10 && lg1.tickets.free === 2, "победа: 10 очков лиги, билет потрачен");
+  const lg2 = users.recordLeagueGame("liga1", 2, true, MON + 7200e3);
+  check(lg2.points === 3 && lg2.total === 13, "2 место в партии с ботами — половина");
+  users.recordLeagueGame("liga1", 3, false, MON + 7300e3);
+  const lg4 = users.recordLeagueGame("liga1", 1, false, MON + 7400e3);
+  check(lg4.counted === false && lg4.code === "no_tickets", "4-я партия за день без билета в лигу не идёт");
+  const lg5 = users.recordLeagueGame("liga1", 1, false, MON + 86400e3 + 3600e3);
+  check(lg5.counted && lg5.tickets.free === 2 && lg5.total === 27, "на следующий день — снова 3 бесплатных билета");
+  users.recordLeagueGame("liga2", 1, false, MON + 3600e3);
+  const ltb = users.leagueTable(MON + 2 * 86400e3, users.usernameKey("liga2"));
+  check(ltb.top.length === 2 && ltb.top[0].username === "liga1" && ltb.top[0].points === 27 && ltb.me.place === 2 && ltb.me.points === 10, "таблица недели и своё место");
+  check(users.buyLeagueTicket("liga2", "pass1234").code === "no_points", "билет без очков не продаётся");
+  check(users.settleLeague(MON + 7 * 86400e3 + 1000) === true && users.settleLeague(MON + 7 * 86400e3 + 2000) === false, "итоги недели подводятся один раз");
+  const champ = users.login("liga1", "pass1234").user, second = users.login("liga2", "pass1234").user;
+  check(champ.points === 500 && champ.leagueAward.place === 1 && second.points === 300 && second.leagueAward.prize === 300, "призы недели: 500 и 300 очков");
+  const ltb2 = users.leagueTable(MON + 7 * 86400e3 + 3000, null);
+  check(ltb2.week === "2026-10-19" && ltb2.top.length === 0 && ltb2.hall[0].week === "2026-10-12" && ltb2.hall[0].top[0].username === "liga1", "новая неделя с нуля, призёры — в зале славы");
+  check(ltb2.top.length === 0 && users.leagueTable(MON + 8 * 86400e3, null).hall[0].top.length === 2, "зал славы хранит призёров");
+  const tk = users.buyLeagueTicket("liga2", "pass1234");
+  check(tk.ok && tk.user.points === 270 && tk.user.league.tickets.extra === 1, "билет лиги за 30 очков");
   check(Products.byId("tm_points_300").rub === 99 && Products.rubValue(Products.byId("tm_points_300")) === "99.00", "цена tm_points_300 = 99.00");
   check(JSON.stringify(P.catalogFor("web")) === '{"enabled":false}', "без настроек каталог выключен (в процессе)");
 
@@ -203,7 +229,7 @@ function pureChecks() {
   check(users.applyOrder(premiumOrder).applied === false, "applyOrder повторно — без второго начисления");
   check(ap.profile.ownedBoardSkins.includes("gold") && ap.profile.ownedAvatarPacks.includes("bulls") && !ap.profile.ownedBoardSkins.includes("wallstreet"), "Премиум открывает gold и bulls, но не набор «Уолл-стрит»");
   check(users.equipSkin("Pure", "pass1234", "gold", "boardSkin").ok, "тему «Золото биржи» можно надеть");
-  check(users.updateProfile("Pure", "pass1234", null, "🐂").ok, "аватар из пака «Быки и медведи» доступен");
+  check(users.updateProfile("Pure", "pass1234", null, "\u{1F402}").ok, "аватар из пака «Быки и медведи» доступен (старое эмодзи быка → значок bull)");
   check(users.buySkin("Pure", "pass1234", "royal", "boardSkin").error === "Этот скин уже куплен.", "скин за очки уже входит в Премиум — очки не списываются");
   const spent = users.buySkin("Pure", "pass1234", "wallstreet", "boardSkin");
   check(spent.error === "Этот скин продаётся только в наборе.", "скин набора за очки не продаётся");
@@ -463,7 +489,7 @@ async function main() {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync("pass1234", salt, 64).toString("hex");
   fs.writeFileSync(path.join(DATA, "users.json"), JSON.stringify({
-    old: { username: "Old", salt, hash, gender: "", avatar: "🐉", avatarPhoto: null, points: 500,
+    old: { username: "Old", salt, hash, gender: "", avatar: "\u{1F409}", avatarPhoto: null, points: 500,
       ownedAvatarPacks: ["base", "legend"], ownedBoardSkins: ["default"], equippedAvatarPack: "legend", equippedBoardSkin: "default", createdAt: Date.now() },
   }), "utf8");
   await restart();
@@ -478,13 +504,15 @@ async function main() {
   check(ads0.status === 404 && ads0.body.code === "ads_disabled", "POST /api/ads/start → 404 ads_disabled");
   check((await post("/api/ads/reward", { username: "Old", password: "pass1234", provider: "yandex", nonce: "0".repeat(32) })).status === 404, "POST /api/ads/reward → 404");
   check((await get("/api/ads/admob-ssv?ad_unit=1&signature=x&key_id=1")).status === 404, "GET /api/ads/admob-ssv → 404");
+  const an0 = await post("/api/analysis/claim", { username: "Old", password: "pass1234", game: "off-1" });
+  check(an0.status === 200 && an0.body.open === true, "без магазина разбор партии открыт всегда");
   check((await post("/api/shop/yookassa/webhook", { type: "notification", event: "payment.succeeded", object: { id: "x" } })).status === 404, "вебхук ЮKassa → 404");
   check((await get("/api/shop/order/" + crypto.randomUUID())).status === 404, "GET /api/shop/order/:id → 404");
 
   const l0 = await post("/api/login", { username: "Old", password: "pass1234" });
   const oldTok = l0.body.sessionToken;
   check(l0.status === 200 && l0.body.user.rating === 500 && l0.body.user.points === 500, "миграция: rating = points = 500");
-  check(l0.body.user.premium === false && JSON.stringify(l0.body.user.ownedAvatarPacks) === '["base","legend"]' && l0.body.user.avatar === "🐉", "старые покупки и аватар на месте");
+  check(l0.body.user.premium === false && JSON.stringify(l0.body.user.ownedAvatarPacks) === '["base","legend"]' && l0.body.user.avatar === "flame", "старые покупки и аватар на месте");
   const buy = await post("/api/skins/buy", Object.assign(acc("Old", oldTok), { skinId: "emerald", kind: "boardSkin" }));
   check(buy.status === 200 && buy.body.user.points === 300 && buy.body.user.rating === 500, "скин за 200 очков: баланс 300, рейтинг 500");
   const buyGold = await post("/api/skins/buy", Object.assign(acc("Old", oldTok), { skinId: "gold", kind: "boardSkin" }));
@@ -524,7 +552,11 @@ async function main() {
   check(cat.enabled === true && cat.mock === true && JSON.stringify(cat.providers) === '["mock"]' && cat.receipts === false, "каталог: enabled, mock");
   const p300 = cat.products && cat.products.find((p) => p.id === "tm_points_300");
   check(p300 && p300.price && p300.price.value === "99.00" && p300.price.text === "99 ₽" && p300.storeIds.rustore === "tm_points_300", "цена tm_points_300 в каталоге");
-  check(cat.products.length === 5 && !cat.products.some((p) => p.id === "tm_points_4500"), "выключенный tm_points_4500 не в каталоге");
+  check(cat.products.length === 10 && !cat.products.some((p) => p.id === "tm_points_4500"), "выключенный tm_points_4500 не в каталоге");
+  const trCat = cat.products.find((p) => p.id === "tm_trader_30");
+  check(trCat && trCat.kind === "consumable" && trCat.traderDays === 30 && trCat.price.text === "199 ₽" && Array.isArray(cat.traderBenefits) && cat.traderBenefits.length >= 3, "каталог: подписка «Трейдер»");
+  const scnAll = cat.products.find((p) => p.id === "tm_scn_all");
+  check(scnAll && scnAll.price.text === "349 ₽" && JSON.stringify(scnAll.unlocks.scenarios) === '["crisis2008","rumarket","commodity"]', "каталог: набор «Все сценарии»");
   check(cat.ads && cat.ads.enabled === false, "на сайте рекламы нет");
   check(Array.isArray(cat.premiumBenefits) && cat.premiumBenefits.length === 5 && JSON.stringify(cat.legal) === "{}", "преимущества Премиума; legal пуст без SHOP_*");
   const catD = (await get("/api/shop/catalog?platform=direct")).body;
@@ -576,6 +608,40 @@ async function main() {
   const set = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_set_wallstreet", provider: "mock", platform: "direct" }));
   check(set.status === 200 && set.body.user.ownedBoardSkins.includes("wallstreet") && set.body.user.ownedAvatarPacks.includes("wallstreet") && !set.body.user.premium && !set.body.user.ownedBoardSkins.includes("gold"), "набор «Уолл-стрит» открывает только свои скины");
 
+  // Сценарии: бесплатный открыт всем, платный — после покупки; набор открывает
+  // все, и купить отдельный сценарий поверх набора уже нельзя.
+  check(JSON.stringify(set.body.user.ownedScenarios) === '["dotcom"]', "без покупок открыт только бесплатный сценарий");
+  const sc1 = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_crisis2008", provider: "mock", platform: "web" }));
+  check(sc1.status === 200 && JSON.stringify(sc1.body.user.ownedScenarios) === '["dotcom","crisis2008"]', "сценарий «Кризис 2008» открыт");
+  const scAll = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_all", provider: "mock", platform: "web" }));
+  check(scAll.status === 200 && JSON.stringify(scAll.body.user.ownedScenarios) === '["dotcom","crisis2008","rumarket","commodity"]', "набор открывает все сценарии");
+  const scAgain = await post("/api/shop/order", Object.assign(acc("Bob", bobTok), { productId: "tm_scn_rumarket", provider: "mock", platform: "web" }));
+  check(scAgain.status === 400 && scAgain.body.code === "already_owned", "сценарий из набора повторно не продаётся");
+
+  // Подписка «Трейдер»: 30 дней, повторная покупка продлевает; пока активна —
+  // все сценарии, но навсегда сценарий можно купить и при подписке.
+  const DAY = 86400e3;
+  const tr1 = await post("/api/shop/order", Object.assign(acc("Old", oldTok), { productId: "tm_trader_30", provider: "mock", platform: "web" }));
+  const t1 = tr1.body.user && tr1.body.user.trader;
+  check(tr1.status === 200 && t1 && t1.active && Math.abs(t1.until - Date.now() - 30 * DAY) < 60e3, "«Трейдер»: активен на 30 дней");
+  check(JSON.stringify(tr1.body.user.ownedScenarios) === '["dotcom","crisis2008","rumarket","commodity"]' && JSON.stringify(tr1.body.user.boughtScenarios) === '["dotcom"]', "«Трейдер»: все сценарии, купленных навсегда нет");
+  const tr2 = await post("/api/shop/order", Object.assign(acc("Old", oldTok), { productId: "tm_trader_30", provider: "mock", platform: "web" }));
+  check(tr2.status === 200 && Math.abs(tr2.body.user.trader.until - t1.until - 30 * DAY) < 5e3, "повторная покупка продлевает ещё на 30 дней");
+  const scTr = await post("/api/shop/order", Object.assign(acc("Old", oldTok), { productId: "tm_scn_commodity", provider: "mock", platform: "web" }));
+  check(scTr.status === 200 && JSON.stringify(scTr.body.user.boughtScenarios) === '["dotcom","commodity"]', "при подписке сценарий покупается навсегда");
+
+  // Разбор офлайн-партии: без подписки — один в сутки, та же партия повторно
+  // бесплатно; с подпиской — без лимита.
+  const an1 = await post("/api/analysis/claim", Object.assign(acc("Bob", bobTok), { game: "off-1" }));
+  check(an1.status === 200 && an1.body.ok && an1.body.profile.analysisFreeToday === false, "первый разбор за сутки");
+  check((await post("/api/analysis/claim", Object.assign(acc("Bob", bobTok), { game: "off-1" }))).body.again === true, "та же партия — повторно без лимита");
+  const an2 = await post("/api/analysis/claim", Object.assign(acc("Bob", bobTok), { game: "off-2" }));
+  check(an2.status === 400 && an2.body.code === "analysis_limit", "второй разбор за сутки — только с подпиской");
+  const anOld = await Promise.all(["off-1", "off-2", "off-3"].map((g) => post("/api/analysis/claim", Object.assign(acc("Old", oldTok), { game: g }))));
+  check(anOld.every((x) => x.status === 200 && x.body.trader === true), "с подпиской разбор без лимита");
+  check((await post("/api/analysis/claim", Object.assign(acc("Bob", bobTok), { game: "../x" }))).body.code === "bad_game", "кривой id партии отклонён");
+  check((await post("/api/analysis/claim", { username: "Bob", password: "", token: "bad", game: "off-9" })).status === 400, "разбор без входа отклонён");
+
   // Видео: у Bob лимит 2 (без Премиума), у Old — 4.
   const adStart = () => post("/api/ads/start", Object.assign(acc("Bob", bobTok), { provider: "yandex", adUnit: "demo-rewarded-yandex", platform: "direct" }));
   const s1 = await adStart();
@@ -601,7 +667,7 @@ async function main() {
   const entOld = await get("/api/shop/entitlements", bearer(oldTok));
   const eo = entOld.body;
   check(eo.premium === true && eo.entitlements.tm_premium && eo.entitlements.tm_premium.provider === "mock" && !("orderId" in eo.entitlements.tm_premium), "entitlements: Премиум");
-  check(eo.purchases.length === 3 && eo.purchases[0].productId === "tm_points_700" && eo.purchases.every((p) => p.test === true), "история покупок: новые первыми");
+  check(eo.purchases.length === 6 && eo.purchases[0].productId === "tm_scn_commodity" && eo.purchases[5].productId === "tm_points_300" && eo.purchases.every((p) => p.test === true), "история покупок: новые первыми");
   check(eo.ads.enabled === true && eo.ads.cap === 4 && eo.ads.today === 0, "entitlements: видео сегодня 0 из 4");
 
   // Перезапуск: заказы на месте, начисления не повторяются (сверка идемпотентна).
@@ -614,7 +680,7 @@ async function main() {
   const v3 = await post("/api/shop/verify", Object.assign(acc("Old", oldTok), { provider: "mock", productId: "tm_points_700", purchaseToken: "tok-1" }));
   check(v3.body.alreadyGranted === true && v3.body.user.points === 1600, "повтор verify после перезапуска — без выдачи");
   const ordersFile = JSON.parse(fs.readFileSync(path.join(DATA, "orders.json"), "utf8"));
-  check(ordersFile.v === 1 && Object.keys(ordersFile.grants).length === 4 && !fs.existsSync(path.join(DATA, "orders.json.tmp")), "orders.json: 4 выдачи, без обрывков записи");
+  check(ordersFile.v === 1 && Object.keys(ordersFile.grants).length === 9 && !fs.existsSync(path.join(DATA, "orders.json.tmp")), "orders.json: 9 выдач (сценарии и «Трейдер»), без обрывков записи");
 
   await restart(Object.assign({}, MOCK_ENV, { NODE_ENV: "production" }));
   const catProd = (await get("/api/shop/catalog?platform=direct")).body;
