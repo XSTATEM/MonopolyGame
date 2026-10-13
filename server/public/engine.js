@@ -102,7 +102,7 @@
   //  - Продажа банку — с комиссией SELL_BANK_COMMISSION.
   //  - Боты торгуют между собой (BOT_TRADE_CHANCE на ход).
   // ---------------------------------------------------------------------
-  const RULES_VERSION = 2;
+  const RULES_VERSION = 3;
   const LANDING_FEE_DISCOUNT_PER_PCT = 0.10;
   const LANDING_FEE_MULT = 0.75;
   const FEE_CURVE_N_EXP_V2 = 0;
@@ -113,6 +113,40 @@
   const SELL_BANK_COMMISSION = 0.15;
   const BOT_TRADE_CHANCE = 0.25;
   function rulesV2(room) { return !!room && (room.rulesV || 1) >= 2; }
+  // ---------------------------------------------------------------------
+  // Правила 3 (rulesV >= 3): живой рынок.
+  //  - У каждой компании свой характер (COMPANY_PROFILES, поле profile в
+  //    COMPANIES): насколько она идёт за рынком (beta к кубику волатильности),
+  //    свой шум, свой долгосрочный уклон, волны у циклических, скачки у
+  //    рискованных и множитель дивидендов. Без вмешательства игроков компании
+  //    ведут себя по-разному, а не качаются все вместе.
+  //  - Банкротство компании: цена ниже COMPANY_DISTRESS_PCT от стартовой
+  //    COMPANY_BANKRUPT_EVENTS событий подряд — пакеты сгорают, компания после
+  //    реструктуризации возвращается на биржу (COMPANY_RELIST_PCT), все акции у банка.
+  //  - Решения совета директоров владельцу контрольного пакета (>50%):
+  //    карточка с вариантами, у каждого свои последствия (BOARD_DECISIONS).
+  //  - room.lastEvent — разобранное событие для карточки события в клиенте.
+  // drift и noise — проценты цены за событие (до множителя волатильности тира),
+  // cycleAmp — размах волны в % за событие, jump* — скачки рискованных.
+  // ---------------------------------------------------------------------
+  const COMPANY_PROFILES = {
+    growth: { label: "Рост", icon: "🚀", beta: 1.3, noise: 3.5, drift: 1.8, divMult: 0.4,
+      desc: "Дорожает быстрее рынка, но сильно качается. Дивиденды скромные." },
+    stable: { label: "Стабильная", icon: "🛡️", beta: 0.5, noise: 1.2, drift: 0.3, divMult: 1.5,
+      desc: "Цена спокойная, дивиденды щедрые." },
+    cyclical: { label: "Циклическая", icon: "🔄", beta: 1.0, noise: 2, drift: 0, cycleAmp: 8, divMult: 1.0,
+      desc: "Ходит волнами: несколько событий растёт, потом столько же падает." },
+    risky: { label: "Рискованная", icon: "🎲", beta: 1.5, noise: 5, drift: 0, jumpChance: 0.18, jumpUp: 35, jumpDown: -22, divMult: 0.5,
+      desc: "Резкие скачки в обе стороны. Может обанкротиться." },
+    fading: { label: "Угасающая", icon: "🍂", beta: 0.8, noise: 1.8, drift: -1.2, trendMin: 0.5, divMult: 2.0,
+      desc: "Медленно дешевеет, зато платит большие дивиденды." },
+  };
+  const COMPANY_DISTRESS_PCT = 0.3;
+  const COMPANY_BANKRUPT_EVENTS = 2;
+  const COMPANY_RELIST_PCT = 0.6;
+  const BOARD_DECISION_CHANCE = 0.35;
+  function rulesV3(room) { return !!room && (room.rulesV || 1) >= 3; }
+  function profileOf(c) { return COMPANY_PROFILES[(c && c.profile) || "stable"] || COMPANY_PROFILES.stable; }
   // Длительность партии по умолчанию — в своих ходах на игрока (решение владельца,
   // 2026-10-11: «до банкротства», ≈100 своих ходов у каждого). Это страховочный
   // лимит, а не цель: обычно партия кончается последним выжившим раньше
@@ -149,37 +183,37 @@
   const CONTROLLER_DECISION_MS = 45000;
   const ANTITRUST_CONFISCATE_PCT = 15;
   const COMPANIES = [
-    { ticker: "AAPL", name: "Apple", sector: "Технологии", tier: "A" },
-    { ticker: "MSFT", name: "Microsoft", sector: "Технологии", tier: "A" },
-    { ticker: "GOOGL", name: "Google", sector: "Технологии", tier: "A" },
-    { ticker: "NVDA", name: "NVIDIA", sector: "Технологии", tier: "B" },
-    { ticker: "IBM", name: "IBM", sector: "Технологии", tier: "B" },
-    { ticker: "INTC", name: "Intel", sector: "Технологии", tier: "B" },
-    { ticker: "SONY", name: "Sony", sector: "Технологии", tier: "B" },
-    { ticker: "AMZN", name: "Amazon", sector: "Интернет и медиа", tier: "B" },
-    { ticker: "DIS", name: "Disney", sector: "Интернет и медиа", tier: "A" },
-    { ticker: "NFLX", name: "Netflix", sector: "Интернет и медиа", tier: "A" },
-    { ticker: "META", name: "Meta", sector: "Интернет и медиа", tier: "A" },
-    { ticker: "YDEX", name: "Яндекс", sector: "Интернет и медиа", tier: "C" },
-    { ticker: "VKCO", name: "VK", sector: "Интернет и медиа", tier: "C" },
-    { ticker: "MCD", name: "McDonald's", sector: "Потребительские товары", tier: "A" },
-    { ticker: "NKE", name: "Nike", sector: "Потребительские товары", tier: "B" },
-    { ticker: "KO", name: "Coca-Cola", sector: "Потребительские товары", tier: "B" },
-    { ticker: "WMT", name: "Walmart", sector: "Потребительские товары", tier: "B" },
-    { ticker: "PEP", name: "Pepsi", sector: "Потребительские товары", tier: "B" },
-    { ticker: "SBUX", name: "Starbucks", sector: "Потребительские товары", tier: "B" },
-    { ticker: "RKT", name: "Durex", sector: "Потребительские товары", tier: "C" },
-    { ticker: "ADS", name: "Adidas", sector: "Потребительские товары", tier: "C" },
-    { ticker: "BA", name: "Boeing", sector: "Промышленность и транспорт", tier: "A" },
-    { ticker: "TSLA", name: "Tesla", sector: "Промышленность и транспорт", tier: "A" },
-    { ticker: "MMM", name: "3M", sector: "Промышленность и транспорт", tier: "B" },
-    { ticker: "AFLT", name: "Аэрофлот", sector: "Промышленность и транспорт", tier: "C" },
-    { ticker: "F", name: "Ford", sector: "Промышленность и транспорт", tier: "C" },
-    { ticker: "V", name: "Visa", sector: "Финансы и сырьё", tier: "A" },
-    { ticker: "SBER", name: "Сбербанк", sector: "Финансы и сырьё", tier: "B" },
-    { ticker: "GAZP", name: "Газпром", sector: "Финансы и сырьё", tier: "C" },
-    { ticker: "MGNT", name: "Магнит", sector: "Финансы и сырьё", tier: "C" },
-    { ticker: "MTSS", name: "МТС", sector: "Финансы и сырьё", tier: "C" },
+    { ticker: "AAPL", name: "Apple", sector: "Технологии", tier: "A", profile: "stable" },
+    { ticker: "MSFT", name: "Microsoft", sector: "Технологии", tier: "A", profile: "stable" },
+    { ticker: "GOOGL", name: "Google", sector: "Технологии", tier: "A", profile: "growth" },
+    { ticker: "NVDA", name: "NVIDIA", sector: "Технологии", tier: "B", profile: "growth" },
+    { ticker: "IBM", name: "IBM", sector: "Технологии", tier: "B", profile: "fading" },
+    { ticker: "INTC", name: "Intel", sector: "Технологии", tier: "B", profile: "cyclical" },
+    { ticker: "SONY", name: "Sony", sector: "Технологии", tier: "B", profile: "cyclical" },
+    { ticker: "AMZN", name: "Amazon", sector: "Интернет и медиа", tier: "B", profile: "growth" },
+    { ticker: "DIS", name: "Disney", sector: "Интернет и медиа", tier: "A", profile: "stable" },
+    { ticker: "NFLX", name: "Netflix", sector: "Интернет и медиа", tier: "A", profile: "growth" },
+    { ticker: "META", name: "Meta", sector: "Интернет и медиа", tier: "A", profile: "growth" },
+    { ticker: "YDEX", name: "Яндекс", sector: "Интернет и медиа", tier: "C", profile: "growth" },
+    { ticker: "VKCO", name: "VK", sector: "Интернет и медиа", tier: "C", profile: "risky" },
+    { ticker: "MCD", name: "McDonald's", sector: "Потребительские товары", tier: "A", profile: "stable" },
+    { ticker: "NKE", name: "Nike", sector: "Потребительские товары", tier: "B", profile: "growth" },
+    { ticker: "KO", name: "Coca-Cola", sector: "Потребительские товары", tier: "B", profile: "stable" },
+    { ticker: "WMT", name: "Walmart", sector: "Потребительские товары", tier: "B", profile: "stable" },
+    { ticker: "PEP", name: "Pepsi", sector: "Потребительские товары", tier: "B", profile: "stable" },
+    { ticker: "SBUX", name: "Starbucks", sector: "Потребительские товары", tier: "B", profile: "cyclical" },
+    { ticker: "RKT", name: "Durex", sector: "Потребительские товары", tier: "C", profile: "risky" },
+    { ticker: "ADS", name: "Adidas", sector: "Потребительские товары", tier: "C", profile: "cyclical" },
+    { ticker: "BA", name: "Boeing", sector: "Промышленность и транспорт", tier: "A", profile: "cyclical" },
+    { ticker: "TSLA", name: "Tesla", sector: "Промышленность и транспорт", tier: "A", profile: "risky" },
+    { ticker: "MMM", name: "3M", sector: "Промышленность и транспорт", tier: "B", profile: "fading" },
+    { ticker: "AFLT", name: "Аэрофлот", sector: "Промышленность и транспорт", tier: "C", profile: "risky" },
+    { ticker: "F", name: "Ford", sector: "Промышленность и транспорт", tier: "C", profile: "fading" },
+    { ticker: "V", name: "Visa", sector: "Финансы и сырьё", tier: "A", profile: "growth" },
+    { ticker: "SBER", name: "Сбербанк", sector: "Финансы и сырьё", tier: "B", profile: "cyclical" },
+    { ticker: "GAZP", name: "Газпром", sector: "Финансы и сырьё", tier: "C", profile: "fading" },
+    { ticker: "MGNT", name: "Магнит", sector: "Финансы и сырьё", tier: "C", profile: "stable" },
+    { ticker: "MTSS", name: "МТС", sector: "Финансы и сырьё", tier: "C", profile: "fading" },
   ];
   // Клетки вида "RE:<cityId>" — недвижимость (см. CITIES ниже), вкраплена в поле
   // акций почти как в «Монополии»: 16 клеток из 144 отданы под конкретные города
@@ -344,6 +378,68 @@
   // Стоимость следующего улучшения — снижена с 1.5x до 1.0x для повышения привлекательности.
   function realEstateUpgradeCost(room, cityId) { return realEstatePrice(room, cityId) * 1.0; }
 
+  // Короткие пояснения к картам новостей — подзаголовок карточки события
+  // (правила 3). По заголовку: так пояснение есть и у колод старых сохранённых
+  // комнат, где карты хранятся без него.
+  const NEWS_DESC = {
+    "Мировой кризис": "Крупнейшие экономики уходят в спад, инвесторы бегут из акций.",
+    "Рецессия": "Второй квартал подряд экономика сжимается.",
+    "Паника на рынке": "Слух о дефолте крупного фонда — все продают всё.",
+    "Инфляционный шок": "Цены в магазинах растут быстрее прогнозов.",
+    "Бум на рынке": "Деньги рекой текут на биржу, покупают всё подряд.",
+    "Позитивная макростатистика": "Безработица на минимуме, экономика растёт.",
+    "Снижение ставки ЦБ": "Кредиты дешевеют — бизнесу легче расти.",
+    "Оптимизм инвесторов": "Аналитики дружно повышают прогнозы.",
+    "Валютный кризис": "Курс скачет, импорт дорожает, компании пересчитывают планы.",
+    "Дефицит поставок": "Контейнеры застряли в портах, заводы стоят.",
+    "Технологический ренессанс": "Новая волна изобретений поднимает всю экономику.",
+    "Волна IPO": "На биржу выходят новые компании — интерес к акциям растёт.",
+    "Технологический прорыв": "Квантовый чип прошёл испытания.",
+    "Утечка данных в отрасли": "Хакеры выложили базы нескольких IT-гигантов.",
+    "Взрывной спрос на чипы": "Заводы не успевают за заказами.",
+    "Антимонопольное расследование": "Регулятор проверяет крупнейших игроков отрасли.",
+    "Рост онлайн-аудитории": "Люди проводят в сети больше времени, чем когда-либо.",
+    "Отток рекламодателей": "Бренды урезают рекламные бюджеты.",
+    "Успешный запуск сервиса": "Новинку скачали миллионы за неделю.",
+    "Блокировка платформы": "Популярный сервис закрыли в нескольких странах.",
+    "Ажиотажный спрос к сезону": "Очереди у магазинов с самого утра.",
+    "Бойкот покупателей": "Соцсети призывают не покупать известные бренды.",
+    "Успешная рекламная кампания": "Ролик набрал сотни миллионов просмотров.",
+    "Отзыв продукции": "Партию товара признали опасной и снимают с полок.",
+    "Крупный госконтракт": "Государство заказало технику на годы вперёд.",
+    "Авария на производстве": "Крупный завод остановлен, идёт расследование.",
+    "Модернизация флота": "Перевозчики обновляют технику — заказы растут.",
+    "Забастовка транспортников": "Грузы стоят, сроки поставок срываются.",
+    "Скачок цен на сырьё": "Нефть и металлы резко подорожали.",
+    "Обвал цен на сырьё": "Спрос упал, склады переполнены.",
+    "Снижение налогов на сектор": "Компании сохранят больше прибыли.",
+    "Ужесточение регулирования банков": "Новые нормативы съедают прибыль.",
+    "Смена CEO": "Основатель уходит, рынок не верит новому руководителю.",
+    "Рекордная квартальная прибыль": "Отчёт превзошёл самые смелые прогнозы.",
+    "Скандал с отчётностью": "Аудиторы нашли «дыры» в балансе.",
+    "Крупная сделка слияния": "Компания объединяется с сильным партнёром.",
+    "Забастовка сотрудников": "Работники требуют повышения зарплат.",
+    "Прорывной продукт": "Новинку раскупили в первый же день.",
+    "Иск от регулятора": "Штраф может съесть годовую прибыль.",
+    "Buyback объявлен менеджментом": "Компания выкупает собственные акции.",
+    "Утечка исходного кода": "Конкуренты получили секреты компании.",
+    "Партнёрство с гигантом отрасли": "Подписан долгосрочный контракт.",
+    "Санкции против компании": "Компания отрезана от ключевых рынков.",
+    "Позитивный прогноз аналитиков": "Крупные банки советуют покупать.",
+    "Кибератака на инфраструктуру": "Сервисы компании лежат несколько дней.",
+    "Выход на новый рынок": "Первые продажи за рубежом превзошли план.",
+    "Отставка совета директоров": "Акционеры недовольны курсом компании.",
+    "Заявление о рекордных дивидендах": "Компания щедро поделится прибылью.",
+    "Отзыв лицензии": "Часть бизнеса придётся закрыть.",
+    "Крупный контракт с государством": "Заказ на несколько лет вперёд.",
+    "Утечка данных клиентов": "Миллионы записей оказались в сети.",
+    "Успешное IPO дочерней компании": "Дочерняя компания привлекла миллиарды.",
+    "Расследование по коррупции": "Обыски в головном офисе.",
+    "Прорывная разработка запатентована": "Конкурентам придётся платить за лицензию.",
+    "Массовые увольнения": "Компания сокращает каждого десятого.",
+    "Повышение кредитного рейтинга": "Деньги для компании стали дешевле.",
+  };
+
   function buildDeck() {
     const deck = [];
     const globals = [
@@ -381,13 +477,13 @@
     ];
     companyEvents.forEach(([t, p, skip]) => deck.push({ type: "company", title: t, percent: p, skipDividend: skip }));
     const specials = [
-      { key: "freeze", title: "Заморозка цен", desc: "До конца этого события цены не меняются." },
+      { key: "freeze", title: "Заморозка цен", desc: "До следующего события цены стоят на месте." },
       { key: "buyback", title: "Принудительный выкуп", desc: "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене." },
       { key: "extra_turn", title: "Дополнительный ход", desc: "Игрок, при котором наступило это событие, получает ещё один ход подряд." },
       { key: "audit", title: "Аудит", desc: "Каждый игрок с отрицательным балансом немедленно продаёт акции или объявляет банкротство." },
       { key: "double_dividend", title: "Дивидендный сезон", desc: "Все дивиденды и рента до следующего события удваиваются." },
       { key: "tax", title: "Налоговая проверка", desc: "Каждый игрок платит банку 2% от своего текущего чистого капитала." },
-      { key: "freeze", title: "Заморозка цен", desc: "До конца этого события цены не меняются." },
+      { key: "freeze", title: "Заморозка цен", desc: "До следующего события цены стоят на месте." },
       { key: "buyback", title: "Принудительный выкуп", desc: "Банк выкупает по 10% у каждого владельца одной случайной компании по текущей цене." },
       { key: "extra_turn", title: "Дополнительный ход", desc: "Игрок, при котором наступило это событие, получает ещё один ход подряд." },
       { key: "audit", title: "Аудит", desc: "Каждый игрок с отрицательным балансом немедленно продаёт акции или объявляет банкротство." },
@@ -528,12 +624,18 @@
     addLog(room, `🎬 Сценарий «${sc.title}»: ${sc.intro} Цель: ${sc.goal}`, "header");
   }
   // Сценарные новости и слухи на этом событии (вызывается из marketEvent).
-  function runScenarioScript(room) {
+  function runScenarioScript(room, ev) {
     const sc = room.scenario && scenarioById(room.scenario.id);
     if (!sc) return;
     (sc.script || []).filter((e) => e.event === room.eventCount).forEach((e) => {
-      if (e.warn) addLog(room, `📌 Слухи: ${e.warn}`, "news");
-      if (e.card) applyNewsCard(room, e.card, "Сценарий");
+      if (e.warn) {
+        addLog(room, `📌 Слухи: ${e.warn}`, "news");
+        if (ev) ev.scenario.push({ rumor: true, title: e.warn });
+      }
+      if (e.card) {
+        const info = applyNewsCard(room, e.card, "Сценарий");
+        if (ev && info) ev.scenario.push(info);
+      }
     });
   }
   // Уклон долгосрочного тренда компании на этом событии по сценарию.
@@ -571,6 +673,10 @@
         lastNegInfoEvent: -100, lastPrEvent: -100, lastSqueezeEvent: -100, squeezedOut: false, fullyOwned: false,
         trendFactor: 1,
         priceHistory: [{ t: 0, p: Math.round(TIER_PRICE[c.tier]) }],
+        // Правила 3: своя фаза и длина волны у циклических компаний, счётчик
+        // событий подряд «на грани» банкротства и число банкротств за партию.
+        cyclePhase: Math.random() * 12, cyclePeriod: 8 + Math.floor(Math.random() * 5),
+        distress: 0, bankruptcies: 0,
       };
     });
     const realEstate = {};
@@ -627,6 +733,9 @@
       nwHist: {},
       pstats: {},
       rulesV: RULES_VERSION,
+      decisions: [], // правила 3: решения совета директоров {id, playerId, ticker, kind, ...}
+      nextDecisionId: 1,
+      lastEvent: null, // правила 3: разобранное последнее событие для карточки события
       createdAt: Date.now(),
       kickVote: null, // {targetId, initiatorId, startedAt, voters:{playerId:true}}
       reactions: [], // {id, playerId, emoji, ts} — короткоживущие реакции за столом, чистятся по TTL на клиенте
@@ -962,8 +1071,11 @@
   // кубиков, чтобы рынок жил и между крупными биржевыми событиями (не только раз в 3 хода).
   function ambientJitter(room) {
     if (room.frozen) return;
+    const v3 = rulesV3(room);
     COMPANIES.forEach((c) => {
-      const jitter = Math.random() * 3 - 1.5; // -1.5%..+1.5% до множителя волатильности тикера
+      // -1.5%..+1.5% до множителя волатильности тикера; в правилах 3 размах по
+      // характеру компании: стабильные почти не дёргаются, рискованные — вдвое сильнее.
+      const jitter = (Math.random() * 3 - 1.5) * (v3 ? profileOf(c).noise / 2.5 : 1);
       applyPriceDelta(room, c.ticker, jitter);
     });
   }
@@ -1207,28 +1319,47 @@
   // Компании, которые ещё торгуются: поглощённые при слиянии (merged) из игры выходят.
   function liveCompanies(room) { return COMPANIES.filter((c) => !room.companies[c.ticker].merged); }
 
+  // Карта новостей для карточки события (room.lastEvent): что за новость и о ком.
+  function newsInfo(card, prefix) {
+    return {
+      type: card.type, title: card.title, desc: card.desc || NEWS_DESC[card.title] || "",
+      percent: card.percent == null ? null : card.percent, sector: card.sector || null, key: card.key || null,
+      scenario: !!prefix,
+    };
+  }
   // Розыгрыш карты новостей: карта колоды на событии или сценарная новость
   // (prefix «Сценарий» — в ленте «📌 Сценарий · …»). Карта точечной новости с ticker бьёт по
-  // этой компании, без него — по случайной из живых.
+  // этой компании, без него — по случайной из живых. Возвращает разбор карты
+  // (newsInfo) для карточки события или null, если новость не о ком.
   function applyNewsCard(room, card, prefix) {
     const pre = prefix ? prefix + " · " : "";
     if (card.type === "global") {
-      COMPANIES.forEach((c) => { applyPriceDelta(room, c.ticker, card.percent); nudgeTrend(room, c.ticker, card.percent); });
+      // Правила 3: общая новость бьёт по компании по её beta — стабильных
+      // задевает вполовину, растущие и рискованные реагируют сильнее рынка.
+      const v3 = rulesV3(room);
+      COMPANIES.forEach((c) => {
+        const pct = v3 ? card.percent * profileOf(c).beta : card.percent;
+        applyPriceDelta(room, c.ticker, pct); nudgeTrend(room, c.ticker, pct);
+      });
       addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Глобальная] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}% всем компаниям`, "news");
+      return newsInfo(card, prefix);
     } else if (card.type === "sector") {
       COMPANIES.filter((c) => c.sector === card.sector).forEach((c) => { applyPriceDelta(room, c.ticker, card.percent); nudgeTrend(room, c.ticker, card.percent); });
       addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Отраслевая, ${card.sector}] ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%`, "news");
+      return newsInfo(card, prefix);
     } else if (card.type === "company") {
       const live = liveCompanies(room);
       const fixed = card.ticker ? live.find((x) => x.ticker === card.ticker) : null;
-      if (card.ticker && !fixed) return; // компанию поглотили при слиянии — новость не о ком
+      if (card.ticker && !fixed) return null; // компанию поглотили при слиянии — новость не о ком
       const c = fixed || live[Math.floor(Math.random() * live.length)];
       applyPriceDelta(room, c.ticker, card.percent);
       nudgeTrend(room, c.ticker, card.percent);
       if (card.skipDividend) room.companies[c.ticker].skipDividendUntil = room.eventCount + 1;
       addLog(room, `${prefix ? "📌" : "📰"} ${pre}[Точечная] ${c.name} (${c.ticker}) — ${card.title}: ${card.percent > 0 ? "+" : ""}${card.percent}%${card.skipDividend ? " (дивиденды пропущены на 1 ход)" : ""}`, "news");
+      return Object.assign(newsInfo(card, prefix), { ticker: c.ticker, name: c.name, skipDividend: !!card.skipDividend });
     } else if (card.type === "special") {
       addLog(room, `🃏 ${pre}[Особая] ${card.title}: ${card.desc}`, "news");
+      const info = newsInfo(card, prefix);
       if (card.key === "freeze") {
         room.frozen = true;
       } else if (card.key === "buyback") {
@@ -1244,6 +1375,7 @@
             addLog(room, `🏦 Банк выкупил 10% ${c.ticker} у ${p.name} за ${fmt(proceeds)}.`, "buyback");
           }
         });
+        info.ticker = c.ticker; info.name = c.name;
       } else if (card.key === "extra_turn") {
         room.extraTurnPending = true;
       } else if (card.key === "audit") {
@@ -1258,7 +1390,9 @@
           settleDebt(room, p);
         });
       }
+      return info;
     }
+    return null;
   }
 
   function marketEvent(room) {
@@ -1271,12 +1405,20 @@
     // следующую карту, а «Переложить в конец» двинул бы невиданную.
     room.pendingInsider = null;
     addLog(room, `— Биржевое событие #${room.eventCount} —`, "header");
+    const v3 = rulesV3(room);
+    // Правила 3: разбор события для карточки в клиенте (room.lastEvent) —
+    // главная новость, кубик, скачки, банкротства, решения совета директоров.
+    const ev = v3 ? { n: room.eventCount, card: null, scenario: [], vol: null, jumps: [], distress: [], bankrupt: [], decisions: [] } : null;
+    // Не принятые до этого события решения совета директоров — по умолчанию.
+    if (v3) expireBoardDecisions(room);
 
     const roll = 1 + Math.floor(Math.random() * 6);
     let volPct = 0;
     if (roll <= 2) volPct = -5; else if (roll >= 5) volPct = 5;
-    COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, volPct));
+    // Правила 3: кубик сдвигает компанию по её beta (стабильные — вполовину).
+    COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, v3 ? volPct * profileOf(c).beta : volPct));
     addLog(room, `Кубик волатильности: ${roll} → база ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям (фактически сильнее у волатильных тикеров)`, "vol");
+    if (ev) ev.vol = { roll, pct: volPct };
 
     processLoans(room);
     processRealEstate(room);
@@ -1293,8 +1435,9 @@
 
     // Сценарий (applyScenario): сценарные новости этого события и слухи — до
     // карты колоды, чтобы выпавшая «Заморозка цен» не отменила сценарный крах.
-    runScenarioScript(room);
-    applyNewsCard(room, card);
+    runScenarioScript(room, ev);
+    const info = applyNewsCard(room, card);
+    if (ev) ev.card = info;
 
     // У каждой компании — свой фоновый долгосрочный тренд (trendFactor), который
     // блуждает независимо от разовых карт/кубика: часть компаний на дистанции
@@ -1302,10 +1445,24 @@
     // среднем (лёгкий бычий уклон рынка в целом), но аддитивно, а не умножением
     // на текущую цену — так не повторяется эффект систематического сноса к полу,
     // из-за которого раньше вводили плоскую коррекцию к единой цене тира.
+    // Правила 3: вместо одинакового для всех блуждания — собственное движение
+    // компании по её характеру (ownMove), тренд идёт вместе с ценой.
     if (!room.frozen) {
       liveCompanies(room).forEach((c) => {
         const comp = room.companies[c.ticker];
         if (comp.trendFactor == null) comp.trendFactor = 1;
+        if (v3) {
+          const mv = ownMove(room, c, comp);
+          const vol = TIER_VOL[c.tier] || 1;
+          applyPriceDelta(room, c.ticker, mv.pct);
+          comp.trendFactor = clamp(comp.trendFactor * (1 + (mv.pct * vol) / 100) + scenarioDrift(room, c), 0.3, 4);
+          if (mv.jump) {
+            const real = Math.round(mv.jump * vol);
+            ev.jumps.push({ ticker: c.ticker, name: c.name, pct: real });
+            addLog(room, `🎲 ${c.name} (${c.ticker}): резкий ${real > 0 ? "взлёт" : "обвал"} ${real > 0 ? "+" : "−"}${Math.abs(real)}%.`, "news");
+          }
+          return;
+        }
         const drift = -0.015 + Math.random() * 0.035 + scenarioDrift(room, c); // в среднем ~+0.25% за событие; сценарий добавляет уклон
         comp.trendFactor = clamp(comp.trendFactor + drift, 0.3, 4);
       });
@@ -1330,26 +1487,354 @@
     }
 
     resolveShorts(room, eventBeforeThis);
-    payHolderDividends(room);
+    if (v3 && !room.tutorial) checkCompanyDistress(room, ev);
+    const divPaid = payHolderDividends(room);
+    if (ev) ev.dividends = divPaid || {};
+    if (v3) offerBoardDecisions(room, ev);
+    if (ev) room.lastEvent = ev;
     room.turn = 1;
     recordNetWorths(room);
   }
 
+  // Приблизительно нормальный шум со средним 0 и разбросом 1.
+  function gauss() { return (Math.random() + Math.random() + Math.random() - 1.5) * 2; }
+  // Собственное движение компании за событие по её характеру (правила 3), в %
+  // до множителя волатильности тира: уклон + шум + волна циклических + скачок
+  // рискованных. Угасающая перестаёт дешеветь, дойдя до trendMin.
+  function ownMove(room, c, comp) {
+    const pr = profileOf(c);
+    // В обучении без шума и скачков: тренер обещает, что карта новостей сдвинет цену.
+    let pct = room.tutorial ? 0 : pr.noise * gauss();
+    if (pr.drift && !(pr.drift < 0 && pr.trendMin && comp.trendFactor <= pr.trendMin)) pct += pr.drift;
+    if (pr.cycleAmp) {
+      const period = comp.cyclePeriod || 10;
+      pct += pr.cycleAmp * Math.cos((2 * Math.PI * ((room.eventCount || 0) + (comp.cyclePhase || 0))) / period);
+    }
+    let jump = 0;
+    if (pr.jumpChance && !room.tutorial && Math.random() < pr.jumpChance) {
+      jump = Math.random() < 0.5 ? pr.jumpUp : pr.jumpDown;
+      pct += jump;
+    }
+    return { pct, jump };
+  }
+  // Цена, ниже которой компания «на грани» банкротства (правила 3).
+  function distressPrice(c) { return TIER_PRICE[c.tier] * COMPANY_DISTRESS_PCT; }
+  // Проверка «на грани» после события: COMPANY_BANKRUPT_EVENTS событий подряд
+  // ниже порога — банкротство. Предупреждение в ленте после первого.
+  function checkCompanyDistress(room, ev) {
+    liveCompanies(room).forEach((c) => {
+      const comp = room.companies[c.ticker];
+      if (comp.price >= distressPrice(c)) { comp.distress = 0; return; }
+      comp.distress = (comp.distress || 0) + 1;
+      if (comp.distress >= COMPANY_BANKRUPT_EVENTS) {
+        const lost = companyBankruptcy(room, c);
+        if (ev) ev.bankrupt.push({ ticker: c.ticker, name: c.name, lost, relistPrice: Math.round(room.companies[c.ticker].price) });
+      } else {
+        if (ev) ev.distress.push({ ticker: c.ticker, name: c.name, threshold: Math.round(distressPrice(c)) });
+        addLog(room, `⚠️ ${c.name} (${c.ticker}) на грани банкротства: цена ниже ${fmt(distressPrice(c))}. Не поднимется к следующему событию — компания обанкротится, акции сгорят.`, "bankrupt");
+      }
+    });
+  }
+  // Банкротство компании (правила 3): пакеты всех держателей сгорают, открытые
+  // шорты по ней выигрывают, решения совета по ней снимаются; компания после
+  // реструктуризации возвращается на биржу по COMPANY_RELIST_PCT стартовой цены,
+  // все акции снова у банка. Возвращает, кто сколько потерял.
+  function companyBankruptcy(room, c) {
+    const comp = room.companies[c.ticker];
+    const lost = [];
+    room.players.forEach((p) => {
+      const pct = p.holdings[c.ticker] || 0;
+      if (pct <= 0) return;
+      const value = comp.price * (pct / 100);
+      removeCostBasisProportional(p, c.ticker, pct);
+      p.holdings[c.ticker] = 0;
+      stat(room, p.id, "companyBankrupt", value, c.ticker);
+      jr(room, p.id, "cbank", { t: c.ticker, pct, v: Math.round(value) });
+      lost.push({ id: p.id, name: p.name, pct, value: Math.round(value) });
+    });
+    room.shorts = (room.shorts || []).filter((sh) => {
+      if (sh.ticker !== c.ticker) return true;
+      const p = room.players.find((x) => x.id === sh.playerId);
+      if (p) {
+        p.cash += sh.deposit * 2;
+        addLog(room, `📉 Шорт ${p.name} по ${sh.ticker} сыграл на банкротстве — банк выплатил ${fmt(sh.deposit * 2)}.`, "short");
+      }
+      return false;
+    });
+    room.decisions = (room.decisions || []).filter((d) => d.ticker !== c.ticker);
+    const price = TIER_PRICE[c.tier] * COMPANY_RELIST_PCT;
+    comp.prevPrice = comp.price;
+    comp.price = price;
+    comp.trendFactor = Math.max(comp.trendFactor || 0, 0.8);
+    comp.distress = 0;
+    comp.bankruptcies = (comp.bankruptcies || 0) + 1;
+    comp.relistedEvent = room.eventCount;
+    comp.fullyOwned = false;
+    comp.squeezedOut = false;
+    recordPriceHistory(room, c.ticker, price);
+    const who = lost.length ? ` Сгорели пакеты: ${lost.map((l) => `${l.name} ${l.pct}% (${fmt(l.value)})`).join(", ")}.` : "";
+    addLog(room, `💥 Банкротство ${c.name} (${c.ticker})!${who} После реструктуризации компания вернулась на биржу по ${fmt(price)}, все акции снова у банка.`, "bankrupt");
+    return lost;
+  }
+
+  // ---------------------------------------------------------------------
+  // Решения совета директоров (правила 3). Владельцу контрольного пакета
+  // (>50%) на событии с шансом BOARD_DECISION_CHANCE приходит карточка с
+  // вариантами; компания «на грани» банкротства — всегда (rescue). Решить
+  // можно в любой момент до следующего события, не дожидаясь своего хода;
+  // не решил — на событии применяется вариант по умолчанию (def, всегда
+  // бесплатный). costPct — доля цены компании (100%), costTierPct — доля
+  // стартовой цены тира. Боты решают сразу (botBoardChoice).
+  // ---------------------------------------------------------------------
+  const BOARD_DECISIONS = {
+    dividend: {
+      title: "Спецдивиденд", def: "invest",
+      text: "Год закрыт с прибылью выше плана. Раздать её акционерам или вложить в развитие?",
+      options: [
+        { key: "pay", label: "Раздать акционерам", hint: "Всем держателям 10% стоимости их пакета деньгами, цена −8%" },
+        { key: "invest", label: "Вложить в развитие", hint: "Цена +6% надолго" },
+      ],
+    },
+    expansion: {
+      title: "Выход на новый рынок", def: "skip", costPct: 0.06,
+      text: "Менеджмент просит денег на экспансию. Успех поднимет компанию, провал — опустит.",
+      options: [
+        { key: "go", label: "Вложить {cost}", hint: "65%: цена +22% · 35%: цена −10%", pay: true },
+        { key: "skip", label: "Отказаться", hint: "Ничего не меняется" },
+      ],
+    },
+    strike: {
+      title: "Профсоюз требует прибавки", def: "refuse", costPct: 0.04,
+      text: "Рабочие грозят забастовкой, если зарплаты не поднимут.",
+      options: [
+        { key: "pay", label: "Поднять зарплаты: {cost}", hint: "Забастовки не будет", pay: true },
+        { key: "refuse", label: "Отказать", hint: "50%: забастовка, цена −15% · 50%: обошлось" },
+      ],
+    },
+    takeover: {
+      title: "Предложение о поглощении", def: "refuse",
+      text: "Конкурент хочет купить ваш пакет целиком с премией 25% к рынку.",
+      options: [
+        { key: "sell", label: "Продать пакет за {gain}", hint: "Без комиссии банка. Контроль потеряете, цена +8%" },
+        { key: "refuse", label: "Оставить себе", hint: "Ничего не меняется" },
+      ],
+    },
+    scandal: {
+      title: "Скандал в прессе", def: "admit", costPct: 0.05,
+      text: "Журналисты нашли нарушения на заводе компании.",
+      options: [
+        { key: "hush", label: "Замять: {cost}", hint: "70%: тихо · 30%: всплывёт — цена −20%, репутация −8", pay: true },
+        { key: "admit", label: "Признать и исправить", hint: "Цена −8%, репутация +3" },
+      ],
+    },
+    buyback: {
+      title: "Обратный выкуп акций", def: "skip", costPct: 0.05,
+      text: "Финансовый директор предлагает выкупить акции с рынка — цена вырастет.",
+      options: [
+        { key: "buy", label: "Выкупить: {cost}", hint: "Цена +10% надолго", pay: true },
+        { key: "skip", label: "Не сейчас", hint: "Ничего не меняется" },
+      ],
+    },
+    rescue: {
+      title: "Компания на грани банкротства", def: "leave", costTierPct: 0.2,
+      text: "Цена ниже порога. Не поднимется к следующему событию — компания обанкротится, ваш пакет сгорит.",
+      options: [
+        { key: "save", label: "Спасти: {cost}", hint: "Цена поднимется до {rescue}, угроза снята", pay: true },
+        { key: "leave", label: "Не спасать", hint: "Рискнуть: вдруг цена поднимется сама" },
+      ],
+    },
+  };
+  const BOARD_RESCUE_PCT = 0.5;
+  const BOARD_TAKEOVER_PREMIUM = 1.25;
+  // Изменение цены решением совета: ровно на pct (без множителя тира) и даже
+  // при «Заморозке цен» — это решение компании, а не колебание рынка.
+  // trendPart — какая доля изменения закрепляется в долгосрочном тренде.
+  function corpMove(room, ticker, pct, trendPart) {
+    const comp = room.companies[ticker];
+    const meta = companyByTicker(ticker);
+    if (!comp || !meta || comp.merged) return;
+    comp.prevPrice = comp.price;
+    comp.price = Math.max(TIER_PRICE[meta.tier] * 0.1, comp.price * (1 + pct / 100));
+    recordPriceHistory(room, ticker, comp.price);
+    if (trendPart) comp.trendFactor = clamp((comp.trendFactor || 1) * (1 + (pct / 100) * trendPart), 0.3, 4);
+  }
+  function makeBoardDecision(room, p, c, kind) {
+    const def = BOARD_DECISIONS[kind];
+    const price = room.companies[c.ticker].price;
+    const cost = def.costTierPct ? Math.round(TIER_PRICE[c.tier] * def.costTierPct) : def.costPct ? Math.round(price * def.costPct) : 0;
+    const gainPerPct = kind === "takeover" ? (price * BOARD_TAKEOVER_PREMIUM) / 100 : 0;
+    const gain = Math.round(gainPerPct * (p.holdings[c.ticker] || 0));
+    const fill = (t) => t.replace("{cost}", fmt(cost)).replace("{gain}", fmt(gain)).replace("{rescue}", fmt(TIER_PRICE[c.tier] * BOARD_RESCUE_PCT));
+    return {
+      id: room.nextDecisionId++, playerId: p.id, ticker: c.ticker, name: c.name, kind,
+      title: def.title, text: def.text, def: def.def, cost, gainPerPct, createdEvent: room.eventCount,
+      options: def.options.map((o) => ({ key: o.key, label: fill(o.label), hint: fill(o.hint), cost: o.pay ? cost : 0 })),
+    };
+  }
+  // Новые решения на событии: одно на игрока; компания «на грани» — в первую очередь.
+  function offerBoardDecisions(room, ev) {
+    if (room.tutorial) return;
+    if (!Array.isArray(room.decisions)) room.decisions = [];
+    if (!room.nextDecisionId) room.nextDecisionId = 1;
+    activePlayers(room).forEach((p) => {
+      if (room.decisions.some((d) => d.playerId === p.id)) return;
+      const mine = liveCompanies(room).filter((c) => (p.holdings[c.ticker] || 0) > 50);
+      if (!mine.length) return;
+      const distressed = mine.find((c) => (room.companies[c.ticker].distress || 0) > 0);
+      let c, kind;
+      if (distressed) { c = distressed; kind = "rescue"; }
+      else {
+        if (Math.random() >= BOARD_DECISION_CHANCE) return;
+        c = mine[Math.floor(Math.random() * mine.length)];
+        const kinds = ["dividend", "expansion", "strike", "takeover", "scandal", "buyback"].filter((k) => k !== p.lastBoardKind);
+        kind = kinds[Math.floor(Math.random() * kinds.length)];
+      }
+      const d = makeBoardDecision(room, p, c, kind);
+      room.decisions.push(d);
+      p.lastBoardKind = kind;
+      addLog(room, `🏛 Совет директоров ${c.name} ждёт решения ${p.name}: «${d.title}».`, "decision");
+      if (ev) ev.decisions.push({ id: d.id, playerId: p.id, ticker: c.ticker, name: c.name, title: d.title });
+      if (p.isBot) applyBoardDecision(room, p, d, botBoardChoice(room, p, d), false);
+    });
+  }
+  // Выбор бота: деньги на руках против выгоды для пакета.
+  function botBoardChoice(room, p, d) {
+    const pct = p.holdings[d.ticker] || 0;
+    const rich = (k) => p.cash >= d.cost * k;
+    switch (d.kind) {
+      case "rescue": return rich(2) ? "save" : "leave";
+      case "dividend": return p.cash < 15000 ? "pay" : "invest";
+      case "expansion": return rich(5) && pct >= 60 ? "go" : "skip";
+      case "strike": return rich(6) ? "pay" : "refuse";
+      case "takeover": return p.cash < 8000 || Math.random() < 0.2 ? "sell" : "refuse";
+      case "scandal": return rich(5) && Math.random() < 0.5 ? "hush" : "admit";
+      case "buyback": return rich(5) && pct >= 60 ? "buy" : "skip";
+      default: return d.def;
+    }
+  }
+  // Применить вариант решения (auto — по умолчанию, решение не принято вовремя).
+  function applyBoardDecision(room, p, d, key, auto) {
+    room.decisions = (room.decisions || []).filter((x) => x.id !== d.id);
+    const opt = d.options.find((o) => o.key === key) || d.options.find((o) => o.key === d.def);
+    const comp = room.companies[d.ticker];
+    if (!opt || !comp || comp.merged) return null;
+    if (opt.cost > 0) { p.cash -= opt.cost; stat(room, p.id, "boardSpend", opt.cost, d.ticker); }
+    const lucky = (ch) => Math.random() < ch;
+    let out = "";
+    switch (`${d.kind}:${opt.key}`) {
+      case "dividend:pay": {
+        const parts = [];
+        activePlayers(room).forEach((h) => {
+          const amt = comp.price * ((h.holdings[d.ticker] || 0) / 100) * 0.1;
+          if (amt >= 1) { h.cash += amt; stat(room, h.id, "divIn", amt); parts.push(`${h.name} +${fmt(amt)}`); }
+        });
+        corpMove(room, d.ticker, -8, 0.5);
+        out = `спецдивиденд: ${parts.join(", ") || "некому"}; цена −8%`;
+        break;
+      }
+      case "dividend:invest": corpMove(room, d.ticker, 6, 1); out = "прибыль вложена в развитие, цена +6%"; break;
+      case "expansion:go":
+        if (lucky(0.65)) { corpMove(room, d.ticker, 22, 1); out = "экспансия удалась, цена +22%"; }
+        else { corpMove(room, d.ticker, -10, 1); out = "экспансия провалилась, цена −10%"; }
+        break;
+      case "strike:pay": out = "зарплаты подняты, забастовки не будет"; break;
+      case "strike:refuse":
+        if (lucky(0.5)) { corpMove(room, d.ticker, -15, 0.5); out = "началась забастовка, цена −15%"; }
+        else out = "профсоюз отступил";
+        break;
+      case "takeover:sell": {
+        const pct = p.holdings[d.ticker] || 0;
+        const amt = d.gainPerPct * pct;
+        removeCostBasisProportional(p, d.ticker, pct);
+        p.holdings[d.ticker] = 0;
+        p.cash += amt;
+        stat(room, p.id, "boardIncome", amt, d.ticker);
+        jr(room, p.id, "sell", { t: d.ticker, pct, got: Math.round(amt), how: "takeover" });
+        corpMove(room, d.ticker, 8, 0.5);
+        checkFullOwnership(room, d.ticker);
+        out = `пакет ${pct}% продан конкуренту за ${fmt(amt)}, цена +8%`;
+        break;
+      }
+      case "takeover:refuse": out = "пакет остаётся у владельца"; break;
+      case "scandal:hush":
+        if (lucky(0.3)) { corpMove(room, d.ticker, -20, 0.5); adjustReputation(room, p, -8, "скандал всплыл"); out = "скандал всплыл: цена −20%, репутация −8"; }
+        else out = "скандал удалось замять";
+        break;
+      case "scandal:admit": corpMove(room, d.ticker, -8, 0.3); adjustReputation(room, p, 3, "честное признание"); out = "нарушения признаны: цена −8%, репутация +3"; break;
+      case "buyback:buy": corpMove(room, d.ticker, 10, 1); out = "акции выкуплены, цена +10%"; break;
+      case "buyback:skip": out = "выкупа не будет"; break;
+      case "rescue:save": {
+        const meta = companyByTicker(d.ticker);
+        const target = TIER_PRICE[meta.tier] * BOARD_RESCUE_PCT;
+        if (comp.price < target) corpMove(room, d.ticker, (target / comp.price - 1) * 100, 0);
+        comp.trendFactor = Math.max(comp.trendFactor || 0, 0.6);
+        comp.distress = 0;
+        out = `компания спасена, цена ${fmt(comp.price)}`;
+        break;
+      }
+      case "rescue:leave": out = "компания осталась на грани"; break;
+      default: out = "без изменений";
+    }
+    jr(room, p.id, "board", { t: d.ticker, kind: d.kind, opt: opt.key, auto: !!auto });
+    addLog(room, `🏛 ${p.name} · ${d.name}: «${opt.label}»${auto ? " — по умолчанию, решение не принято вовремя" : ""}. Итог: ${out}.`, "decision");
+    return out;
+  }
+  // Решение игрока (действие decideBoard). Не на своём ходу тоже можно — кроме
+  // момента, когда соперник решает по броску на эту же компанию.
+  function decideBoard(room, playerId, decisionId, optionKey) {
+    if (!room || room.phase !== "roll") return { error: "Сейчас недоступно." };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    const d = (room.decisions || []).find((x) => x.id === Number(decisionId));
+    if (!d || d.playerId !== playerId) return { error: "Решение не найдено или уже принято." };
+    const opt = d.options.find((o) => o.key === optionKey);
+    if (!opt) return { error: "Нет такого варианта." };
+    if ((p.holdings[d.ticker] || 0) <= 50) {
+      room.decisions = room.decisions.filter((x) => x.id !== d.id);
+      return { error: "Пакет больше не контрольный — решение снято.", stillChanged: true };
+    }
+    if (room.pendingRoll && room.pendingRoll.ticker === d.ticker && room.pendingRoll.playerId !== playerId) {
+      return { error: "Соперник сейчас решает по броску на эту компанию — подождите." };
+    }
+    if (opt.cost > 0 && p.cash < opt.cost) return { error: `Не хватает наличных: нужно ${fmt(opt.cost)}.` };
+    const out = applyBoardDecision(room, p, d, optionKey, false);
+    return { ok: true, outcome: out };
+  }
+  // На событии: не принятые решения — по умолчанию; потерявшим контроль — снять.
+  function expireBoardDecisions(room) {
+    const pending = (room.decisions || []).slice();
+    pending.forEach((d) => {
+      const p = room.players.find((x) => x.id === d.playerId);
+      if (!p || p.bankrupt || (p.holdings[d.ticker] || 0) <= 50) {
+        room.decisions = room.decisions.filter((x) => x.id !== d.id);
+        return;
+      }
+      applyBoardDecision(room, p, d, d.def, true);
+    });
+  }
+
   // Дивиденды держателям (правила 2, HOLDER_DIVIDEND_PCT): от банка, по пакетам, одной строкой в ленте.
+  // Правила 3: ставка по характеру компании (divRatePct) — стабильные и
+  // угасающие платят больше, растущие и рискованные меньше.
+  function divRate(room, ticker) {
+    return HOLDER_DIVIDEND_PCT * (rulesV3(room) ? profileOf(companyByTicker(ticker)).divMult : 1);
+  }
   function payHolderDividends(room) {
-    if (!rulesV2(room) || !(HOLDER_DIVIDEND_PCT > 0)) return;
+    if (!rulesV2(room) || !(HOLDER_DIVIDEND_PCT > 0)) return null;
     const parts = [];
+    const paid = {};
     activePlayers(room).forEach((p) => {
       let sum = 0;
       for (const t in p.holdings) {
         const c = room.companies[t];
         if (!c || c.merged || !(p.holdings[t] > 0)) continue;
         if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) continue;
-        sum += c.price * (p.holdings[t] / 100) * HOLDER_DIVIDEND_PCT;
+        sum += c.price * (p.holdings[t] / 100) * divRate(room, t);
       }
-      if (sum >= 1) { p.cash += sum; stat(room, p.id, "divIn", sum); parts.push(`${p.name} +${fmt(sum)}`); }
+      if (sum >= 1) { p.cash += sum; stat(room, p.id, "divIn", sum); parts.push(`${p.name} +${fmt(sum)}`); paid[p.id] = Math.round(sum); }
     });
     if (parts.length) addLog(room, `💵 Дивиденды держателям: ${parts.join(", ")}.`, "dividend");
+    return paid;
   }
 
   function afterRollAction(room) {
@@ -3389,6 +3874,8 @@
       for (let k = i + 1; k < J.length; k++) {
         const e = J[k];
         if ((e.k === "sell" || e.k === "tradeOut") && e.t === t && e.pct > 0) return { px: e.got / (e.pct / 100), sold: true, r: e.r, ev: e.ev };
+        // Правила 3: компания обанкротилась — пакет сгорел.
+        if (e.k === "cbank" && e.t === t) return { px: 0, sold: false, burnt: true, r: e.r, ev: e.ev };
       }
       return { px: priceNow(t), sold: false };
     }
@@ -3418,7 +3905,7 @@
         const x = exitOf(e.t, i);
         const value = Math.round((e.pct / 100) * x.px);
         const pnl = value - e.cost;
-        const how = x.sold ? `продали в раунде ${x.r} за ${fmt(value)}` : `к концу партии доля стоит ${fmt(value)}`;
+        const how = x.burnt ? `в раунде ${x.r} компания обанкротилась, доля сгорела` : x.sold ? `продали в раунде ${x.r} за ${fmt(value)}` : `к концу партии доля стоит ${fmt(value)}`;
         const what = e.k === "tradeIn" ? `${e.pct}% ${coName(e.t)} у ${e.from || "игрока"}` : `${e.pct}% ${coName(e.t)}`;
         if (pnl <= -thr) mistakes.push({ key: "buy:" + e.t, ev: e.ev, r: e.r, cost: -pnl, title: `Покупка ${what}`, text: `${round(e)}: купили за ${fmt(e.cost)}, ${how}.` });
         else if (pnl >= thr) best.push({ key: "buy:" + e.t, ev: e.ev, r: e.r, gain: pnl, title: `Покупка ${what}`, text: `${round(e)}: купили за ${fmt(e.cost)}, ${how}.` });
@@ -3484,12 +3971,15 @@
       { label: "Рента за чужие города", amount: st.rentOut || 0 },
       { label: "Проценты по кредиту", amount: st.interest || 0 },
       { label: "Налог на недвижимость", amount: st.reTax || 0 },
+      { label: "Сгорело при банкротстве компаний", amount: st.companyBankrupt || 0, count: J.filter((e) => e.k === "cbank").length },
+      { label: "Решения совета директоров", amount: st.boardSpend || 0, count: J.filter((e) => e.k === "board").length },
     ].filter((x) => x.amount > 0);
     const income = [
       { label: "Плата держателям от соперников", amount: st.feeIn || 0 },
       { label: "Дивиденды", amount: st.divIn || 0 },
       { label: "Выкуп ваших долей", amount: st.forcedIn || 0 },
       { label: "Рента с городов", amount: st.rentIn || 0 },
+      { label: "Продажа пакета конкуренту", amount: st.boardIncome || 0 },
     ].filter((x) => x.amount > 0);
 
     // Советы — по самым заметным привычкам за партию, не больше двух.
@@ -3530,6 +4020,7 @@
 
   function buildStatePayload(room, youId) {
     const me = room.players.find((x) => x.id === youId);
+    const v3 = rulesV3(room);
     return {
       type: "state",
       you: youId,
@@ -3617,7 +4108,7 @@
       } : null,
       // Правила 2 (rulesV2): меры бесплатны с перезарядкой — сколько событий
       // ждать каждой; покупка вне броска; комиссия банка при продаже.
-      rulesV: rulesV2(room) ? 2 : 1,
+      rulesV: rulesV3(room) ? 3 : rulesV2(room) ? 2 : 1,
       myMeasureCooldowns: me && rulesV2(room) ? Object.fromEntries(["negativeInfo", "insider", "espionage", "discredit", "personalPr", "investigate"].map((k) => [k, measureCooldownLeft(room, me, k)])) : null,
       measureCooldown: rulesV2(room) ? MEASURE_COOLDOWN : 0,
       directBuy: me && rulesV2(room) ? { used: directBuyUsed(room, me), maxPct: DIRECT_BUY_MAX_PCT, markupPct: Math.round(DIRECT_BUY_MARKUP * 100) } : null,
@@ -3652,7 +4143,18 @@
         lastNegInfoEvent: room.companies[c.ticker].lastNegInfoEvent,
         lastPrEvent: room.companies[c.ticker].lastPrEvent,
         priceHistory: room.companies[c.ticker].priceHistory || [],
+        // Правила 3: характер компании, ставка дивидендов, угроза банкротства.
+        profile: v3 ? (c.profile || "stable") : null,
+        divRatePct: rulesV2(room) ? Math.round(divRate(room, c.ticker) * 1000) / 10 : 0,
+        distress: v3 ? room.companies[c.ticker].distress || 0 : 0,
+        distressPrice: v3 ? Math.round(distressPrice(c)) : 0,
+        bankruptcies: room.companies[c.ticker].bankruptcies || 0,
       })),
+      // Правила 3: разбор последнего события (карточка события), мои решения
+      // совета директоров и чьи решения ещё ждут (без вариантов).
+      lastEvent: v3 ? room.lastEvent || null : null,
+      myDecisions: v3 && me ? (room.decisions || []).filter((d) => d.playerId === me.id) : [],
+      pendingDecisions: v3 ? (room.decisions || []).map((d) => ({ id: d.id, playerId: d.playerId, ticker: d.ticker, title: d.title })) : [],
       players: room.players.map((p) => {
         const revealed = p.id === youId || isRevealed(room, youId, p.id);
         const reveal = !revealed ? null : room.reveals.find((r) => r.spyId === youId && r.targetId === p.id);
@@ -3720,5 +4222,7 @@
     DEFAULT_MAX_TURNS_PER_PLAYER, roundsForTurnsPerPlayer, applyGameLength,
     FEE_CURVE_K, FEE_CURVE_P, FEE_CURVE_N_EXP, FEE_CURVE_N_MAX,
     buildStatePayload,
+    COMPANY_PROFILES, rulesV3, profileOf, decideBoard, offerBoardDecisions, expireBoardDecisions, applyBoardDecision, makeBoardDecision,
+    companyBankruptcy, checkCompanyDistress, distressPrice, divRate, BOARD_DECISIONS, NEWS_DESC,
   };
 });

@@ -1682,7 +1682,7 @@ test("сильные боты: покупают максимум доступн�
 // ---------------------------------------------------------------------
 function v2game(names, bots) {
   const r = E.freshRoom("V");
-  assert.equal(r.rulesV, 2, "новая комната — правила 2");
+  assert.ok(r.rulesV >= 2, "новая комната — правила 2 и новее");
   names.forEach((n) => E.addPlayer(r, n, "", "", 0, "default", !!bots));
   const res = E.startGame(r, r.hostPlayerId);
   assert.ok(!res.error, "startGame: " + res.error);
@@ -1813,7 +1813,9 @@ test("правила 2: дивиденды держателям, комисси�
   E.marketEvent(r);
   const D = E.HOLDER_DIVIDEND_PCT;
   assert.ok(D > 0, "дивиденды включены");
-  const expected = r.companies.AAPL.price * 0.2 * D + r.companies.KO.price * 0.1 * D;
+  // Правила 3: ставка по характеру компании (divRate); в правилах 2 — ровно D.
+  const expected = r.companies.AAPL.price * 0.2 * E.divRate(r, "AAPL") + r.companies.KO.price * 0.1 * E.divRate(r, "KO");
+  if (!E.rulesV3(r)) assert.ok(Math.abs(E.divRate(r, "AAPL") - D) < 1e-9);
   assert.ok(Math.abs((A.cash - a0) - expected) < 1, `дивиденды ${A.cash - a0} ≈ ${expected}`);
   assert.equal(B.cash, b0, "без акций — без дивидендов");
   assert.ok(r.log.some((e) => /Дивиденды держателям: A \+/.test(e.text)));
@@ -1860,6 +1862,184 @@ test("правила 2: боты торгуют между собой; стар�
   assert.equal(old.pendingRoll.fee, undefined, "плата не списана при броске");
   assert.ok(E.skipRoll(old, P(old, "A").id).error, "пропустить нельзя — нужно купить или отказаться");
   return [r, old];
+});
+
+// ---------------------------------------------------------------------
+// Правила 3 (rulesV3): характеры компаний, банкротство компании, решения
+// совета директоров, разбор события для карточки события
+// ---------------------------------------------------------------------
+function quietCard(r) { r.deckData[r.deckOrder[r.deckPos]] = { type: "global", title: "Тихий день", percent: 0 }; }
+test("правила 3: у каждой компании характер, растущая дорожает, угасающая дешевеет", () => {
+  const r = v2game(["A", "B"]);
+  assert.equal(r.rulesV, 3, "новая комната — правила 3");
+  E.COMPANIES.forEach((c) => assert.ok(E.COMPANY_PROFILES[c.profile], `характер у ${c.ticker}: ${c.profile}`));
+  const kinds = new Set(E.COMPANIES.map((c) => c.profile));
+  assert.equal(kinds.size, 5, "все пять характеров в игре");
+  // Шум 0 (gauss при random 0.5), без скачков, кубик 4 — без общего сдвига: остаются уклоны.
+  fixRandom(0.5);
+  const g0 = r.companies.NVDA.price, f0 = r.companies.IBM.price, s0 = r.companies.KO.price;
+  for (let i = 0; i < 10; i++) { quietCard(r); E.marketEvent(r); }
+  assert.ok(r.companies.NVDA.price > g0 * 1.12, `рост: ${g0} → ${r.companies.NVDA.price}`);
+  assert.ok(r.companies.IBM.price < f0 * 0.92, `угасание: ${f0} → ${r.companies.IBM.price}`);
+  assert.ok(Math.abs(r.companies.KO.price / s0 - 1) < 0.06, `стабильная почти на месте: ${s0} → ${r.companies.KO.price}`);
+  // Дивиденды по характеру: стабильная и угасающая платят больше растущей.
+  assert.ok(E.divRate(r, "KO") > E.divRate(r, "NVDA") && E.divRate(r, "IBM") > E.divRate(r, "KO"));
+  const st = E.buildStatePayload(r, P(r, "A").id);
+  const ko = st.companies.find((c) => c.ticker === "KO");
+  assert.equal(ko.profile, "stable");
+  assert.ok(ko.divRatePct > 3, "ставка дивидендов в состоянии: " + ko.divRatePct);
+  assert.equal(st.rulesV, 3);
+  // Старая комната (правила 2) — без характеров и карточки события.
+  const old = v2game(["A", "B"]); old.rulesV = 2;
+  quietCard(old); E.marketEvent(old);
+  const so = E.buildStatePayload(old, P(old, "A").id);
+  assert.equal(so.lastEvent, null);
+  assert.equal(so.companies[0].profile, null);
+  assert.equal(so.rulesV, 2);
+  return [r, old];
+});
+test("правила 3: карточка события — главная новость, кубик, дивиденды", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A");
+  A.holdings.KO = 20;
+  r.deckData[r.deckOrder[r.deckPos]] = { type: "sector", title: "Технологический прорыв", sector: "Технологии", percent: 20 };
+  E.marketEvent(r);
+  const ev = r.lastEvent;
+  assert.equal(ev.n, r.eventCount);
+  assert.equal(ev.card.type, "sector");
+  assert.equal(ev.card.title, "Технологический прорыв");
+  assert.equal(ev.card.desc, E.NEWS_DESC["Технологический прорыв"], "пояснение к карте");
+  assert.equal(ev.card.percent, 20);
+  assert.ok(ev.vol && ev.vol.roll >= 1 && ev.vol.roll <= 6);
+  assert.ok(ev.dividends[A.id] > 0, "дивиденды держателю в разборе");
+  const st = E.buildStatePayload(r, A.id);
+  assert.equal(st.lastEvent.card.title, "Технологический прорыв");
+  // Точечная новость — с компанией.
+  r.deckData[r.deckOrder[r.deckPos]] = { type: "company", title: "Прорывной продукт", percent: 20, ticker: "KO" };
+  E.marketEvent(r);
+  assert.equal(r.lastEvent.card.ticker, "KO");
+  assert.equal(r.lastEvent.card.name, "Coca-Cola");
+  return r;
+});
+test("правила 3: компания на грани — предупреждение, потом банкротство и возврат на биржу", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  A.holdings.VKCO = 30; B.holdings.VKCO = 10;
+  A.costBasis = { VKCO: 3000 };
+  fixRandom(0.5);
+  const thr = E.distressPrice(E.companyByTicker("VKCO"));
+  r.companies.VKCO.price = thr * 0.5;
+  r.companies.VKCO.trendFactor = 0.15;
+  // Шорт B по VK — выиграет на банкротстве.
+  r.shorts.push({ id: 99, playerId: B.id, ticker: "VKCO", deposit: 1000, priceAtBet: thr, placedEventCount: r.eventCount + 1 });
+  quietCard(r); E.marketEvent(r);
+  assert.equal(r.companies.VKCO.distress, 1, "первое событие ниже порога — предупреждение");
+  assert.equal(A.holdings.VKCO, 30, "акции пока целы");
+  assert.ok(r.lastEvent.distress.some((d) => d.ticker === "VKCO"));
+  assert.ok(r.log.some((e) => /VK \(VKCO\) на грани банкротства/.test(e.text)));
+  // Владельцу контрольного пакета пришло бы «спасти» — здесь контроля нет.
+  assert.equal(r.decisions.length, 0);
+  const b0 = B.cash;
+  quietCard(r); E.marketEvent(r);
+  const bk = r.lastEvent.bankrupt.find((x) => x.ticker === "VKCO");
+  assert.ok(bk, "второе событие ниже порога — банкротство");
+  assert.equal(A.holdings.VKCO, 0, "пакет A сгорел");
+  assert.equal(B.holdings.VKCO, 0, "пакет B сгорел");
+  assert.equal(A.costBasis.VKCO, 0, "себестоимость списана");
+  assert.deepEqual(bk.lost.map((l) => [l.name, l.pct]), [["A", 30], ["B", 10]]);
+  assert.ok(Math.abs(r.companies.VKCO.price - E.TIER_PRICE.C * 0.6) < 1, "вернулась на биржу по 60% стартовой");
+  assert.equal(r.companies.VKCO.distress, 0);
+  assert.equal(r.companies.VKCO.bankruptcies, 1);
+  assert.ok(B.cash - b0 >= 2000, "шорт на банкротстве выплачен вдвое");
+  assert.ok(!r.shorts.some((s) => s.ticker === "VKCO"));
+  assert.ok(r.log.some((e) => /💥 Банкротство VK/.test(e.text)));
+  // Разбор партии: сгоревший пакет — в расходах.
+  const an = E.analyzeGame(r, A.id);
+  assert.ok(an.costs.some((c) => c.label === "Сгорело при банкротстве компаний" && c.amount > 0), JSON.stringify(an.costs));
+  return r;
+});
+test("правила 3: решения совета — только владельцу >50%, с ценой, по умолчанию на событии", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  A.holdings.NVDA = 60; B.holdings.NVDA = 20;
+  // Шанс решения 35%: random 0.1 — решение приходит, вид — первый из списка.
+  fixRandom(0.1);
+  quietCard(r); E.marketEvent(r);
+  assert.equal(r.decisions.length, 1, "решение пришло владельцу контроля");
+  const d = r.decisions[0];
+  assert.equal(d.playerId, A.id);
+  assert.equal(d.ticker, "NVDA");
+  assert.ok(r.lastEvent.decisions.some((x) => x.id === d.id));
+  // Видно только владельцу, остальным — что решение ждёт.
+  assert.equal(E.buildStatePayload(r, A.id).myDecisions.length, 1);
+  assert.equal(E.buildStatePayload(r, B.id).myDecisions.length, 0);
+  assert.equal(E.buildStatePayload(r, B.id).pendingDecisions[0].ticker, "NVDA");
+  assert.ok(E.decideBoard(r, B.id, d.id, d.options[0].key).error, "чужое решение не принять");
+  assert.ok(E.decideBoard(r, A.id, d.id, "нет-такого").error);
+  // Платный вариант без денег — ошибка.
+  const buyback = E.makeBoardDecision(r, A, E.companyByTicker("NVDA"), "buyback");
+  r.decisions = [buyback];
+  const cash = A.cash;
+  A.cash = 10;
+  assert.ok(/Не хватает наличных/.test(E.decideBoard(r, A.id, buyback.id, "buy").error));
+  A.cash = cash;
+  const p0 = r.companies.NVDA.price;
+  assert.ok(!E.decideBoard(r, A.id, buyback.id, "buy").error);
+  assert.equal(Math.round(cash - A.cash), buyback.cost, "списана цена выкупа");
+  assert.ok(Math.abs(r.companies.NVDA.price / p0 - 1.1) < 1e-9, "цена +10%");
+  assert.equal(r.decisions.length, 0, "решение снято");
+  // Спецдивиденд: всем держателям по 10% пакета, цена −8%.
+  const div = E.makeBoardDecision(r, A, E.companyByTicker("NVDA"), "dividend");
+  r.decisions = [div];
+  const p1 = r.companies.NVDA.price, b0 = B.cash;
+  assert.ok(!E.decideBoard(r, A.id, div.id, "pay").error);
+  assert.ok(Math.abs((B.cash - b0) - p1 * 0.2 * 0.1) < 1, "B получил 10% своего пакета");
+  // Поглощение: пакет продан с премией, контроль потерян.
+  const tk = E.makeBoardDecision(r, A, E.companyByTicker("NVDA"), "takeover");
+  r.decisions = [tk];
+  const p2 = r.companies.NVDA.price, a2 = A.cash;
+  assert.ok(!E.decideBoard(r, A.id, tk.id, "sell").error);
+  assert.equal(A.holdings.NVDA, 0);
+  assert.ok(Math.abs((A.cash - a2) - p2 * 0.6 * 1.25) < 1, "продано с премией 25%");
+  // Не принятое решение — на следующем событии по умолчанию (бесплатный вариант).
+  A.holdings.KO = 70;
+  const strike = E.makeBoardDecision(r, A, E.companyByTicker("KO"), "strike");
+  r.decisions = [strike];
+  const a3 = A.cash;
+  fixRandom(0.9);
+  quietCard(r); E.marketEvent(r);
+  assert.ok(r.log.some((e) => /Coca-Cola: «Отказать» — по умолчанию/.test(e.text)), "по умолчанию — «Отказать»");
+  assert.ok(A.cash >= a3, "вариант по умолчанию бесплатный");
+  // Потерял контроль до решения — решение снимается.
+  const lost = E.makeBoardDecision(r, A, E.companyByTicker("KO"), "buyback");
+  r.decisions = [lost];
+  A.holdings.KO = 40;
+  assert.ok(/больше не контрольный/.test(E.decideBoard(r, A.id, lost.id, "buy").error));
+  assert.equal(r.decisions.length, 0);
+  return r;
+});
+test("правила 3: компания на грани у владельца — спасение; бот решает сам", () => {
+  const r = v2game(["A", "Бот"]);
+  const A = P(r, "A"), bot = P(r, "Бот");
+  bot.isBot = true;
+  A.holdings.AFLT = 55; bot.holdings.RKT = 60;
+  fixRandom(0.5);
+  ["AFLT", "RKT"].forEach((t) => { r.companies[t].price = E.distressPrice(E.companyByTicker(t)) * 0.6; r.companies[t].trendFactor = 0.2; });
+  quietCard(r); E.marketEvent(r);
+  const d = r.decisions.find((x) => x.playerId === A.id);
+  assert.ok(d && d.kind === "rescue" && d.ticker === "AFLT", "спасение — владельцу компании на грани");
+  // Бот решил сразу: денег много — спас.
+  assert.ok(!r.decisions.some((x) => x.playerId === bot.id), "бот не оставляет решений");
+  assert.equal(r.companies.RKT.distress, 0, "бот спас свою компанию");
+  assert.ok(r.companies.RKT.price >= E.TIER_PRICE.C * 0.5 - 1);
+  const a0 = A.cash;
+  assert.ok(!E.decideBoard(r, A.id, d.id, "save").error);
+  assert.equal(Math.round(a0 - A.cash), Math.round(E.TIER_PRICE.C * 0.2));
+  assert.equal(r.companies.AFLT.distress, 0);
+  quietCard(r); E.marketEvent(r);
+  assert.ok(!r.lastEvent.bankrupt.length, "спасённые не обанкротились");
+  assert.equal(A.holdings.AFLT, 55);
+  return r;
 });
 
 // ---------------------------------------------------------------------

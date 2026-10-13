@@ -305,11 +305,19 @@
     </details>
     <details class="tips">
       <summary>Цены акций</summary>
-      <div class="muted rules-p">Цена компании — стоимость всех 100% её акций. Класс A стартует с $40 000 и колеблется слабо, B — с $20 000, C — с $8 000 и самый волатильный. Покупка поднимает цену (+2% за каждые 10%), продажа банку снижает. На каждом биржевом событии компания платит держателям дивиденды — 3% своей цены, по долям.</div>
+      <div class="muted rules-p">Цена компании — стоимость всех 100% её акций. Класс A стартует с $40 000 и колеблется слабо, B — с $20 000, C — с $8 000 и самый волатильный. Покупка поднимает цену (+2% за каждые 10%), продажа банку снижает. На каждом биржевом событии компания платит держателям дивиденды по долям: обычно 3% своей цены, у стабильных и угасающих больше, у растущих и рискованных меньше.</div>
+    </details>
+    <details class="tips">
+      <summary>Характер компании</summary>
+      <div class="muted rules-p">У каждой компании свой характер — он виден в списке биржи и в карточке компании. 🛡️ Стабильная: цена почти не двигается, дивиденды щедрые. 🚀 Рост: дорожает быстрее рынка, но сильно качается, дивиденды скромные. 🔄 Циклическая: несколько событий растёт, потом столько же падает. 🎲 Рискованная: резкие скачки в обе стороны. 🍂 Угасающая: медленно дешевеет, зато платит большие дивиденды. Общие новости и кубик сильнее бьют по растущим и рискованным, слабее — по стабильным.</div>
+    </details>
+    <details class="tips">
+      <summary>Банкротство компании</summary>
+      <div class="muted rules-p">Если цена компании ниже 30% стартовой, она «на грани»: об этом скажет карточка события. Не поднимется к следующему событию — компания банкротится, акции всех держателей сгорают, а шорты по ней выигрывают. После реструктуризации компания возвращается на биржу по 60% стартовой цены, все её акции снова у банка. Спасти её может владелец контрольного пакета — решением совета директоров.</div>
     </details>
     <details class="tips">
       <summary>Раунды и биржевые события</summary>
-      <div class="muted rules-p">Каждые несколько ходов (настройка партии) наступает биржевое событие: кубик волатильности двигает весь рынок на ±5%, разыгрывается карта новостей — глобальная, отраслевая, по одной компании или особая, — начисляются проценты по кредитам, рента и налоги. Одно событие — один раунд.</div>
+      <div class="muted rules-p">Каждые несколько ходов (настройка партии) наступает биржевое событие: кубик волатильности двигает весь рынок на ±5%, разыгрывается карта новостей — глобальная, отраслевая, по одной компании или особая, — начисляются проценты по кредитам, рента и налоги. Одно событие — один раунд. Что произошло, показывает карточка события: крупно — новость, мелко — что из неё вышло для рынка и для вас. Открыть её снова можно кнопкой с новостью вверху стола.</div>
     </details>
     <details class="tips">
       <summary>Продажа и сделки</summary>
@@ -322,6 +330,10 @@
     <details class="tips">
       <summary>Контрольный пакет (больше 50%)</summary>
       <div class="muted rules-p">Открывает спецдействия во вкладке «Влияние»: PR-кампанию (+10% к цене), вброс негатива о чужой компании (−15%), инсайд (подсмотреть карту новостей), шорт. При доле больше 75% — выкуп миноритариев, при 100% двух компаний одного сектора — слияние. Негатив, инсайд, шпионаж, дискредитация, расследование и личный PR бесплатны, но каждая мера доступна раз в 3 события; PR-кампания компании и шорт — за деньги.</div>
+    </details>
+    <details class="tips">
+      <summary>Решения совета директоров</summary>
+      <div class="muted rules-p">Владельцу контрольного пакета на биржевом событии иногда приходит решение совета директоров: спецдивиденд или развитие, экспансия, забастовка, предложение о поглощении, скандал, обратный выкуп акций, спасение компании на грани банкротства. У каждого варианта свои последствия — для цены, ваших денег, репутации; часть исходов случайна. Решить можно в любой момент до следующего события, не дожидаясь своего хода. Не решили — совет выберет бесплатный вариант по умолчанию.</div>
     </details>
     <details class="tips">
       <summary>Шпионаж и репутация</summary>
@@ -811,6 +823,14 @@ const SECTOR_CLASS = {
   "Финансы и сырьё": "sec-finance",
 };
 function tickerAbbr(ticker){ return TICKER_ABBR[ticker] || String(ticker).slice(0,2); }
+// Характер компании (правила 3, engine.js COMPANY_PROFILES): «🚀 рост».
+// В старых партиях без характеров — волатильность, как раньше.
+function companyProfile(c){ return c && c.profile && GameEngine.COMPANY_PROFILES ? GameEngine.COMPANY_PROFILES[c.profile] || null : null; }
+function profileTagText(c){
+  const pr = companyProfile(c);
+  if(c && c.distress) return `<b class="co-distress">на грани банкротства</b>`;
+  return pr ? `${pr.icon} ${escapeHtml(pr.label.toLowerCase())}` : `${escapeHtml(String(c.volLabel||"").toLowerCase())} волатильность`;
+}
 function sectorClassOf(ticker){
   const c = GameEngine.companyByTicker ? GameEngine.companyByTicker(ticker) : null;
   return SECTOR_CLASS[c ? c.sector : ""] || "";
@@ -2614,6 +2634,7 @@ function localDispatch(obj){
     case "buyBank": result = GameEngine.buyBank(); break;
     case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
     case "buyDirect": result = GameEngine.buyDirect(localRoom, viewAs, obj.ticker, obj.pct); break;
+    case "decideBoard": result = GameEngine.decideBoard(localRoom, viewAs, obj.id, obj.option); break;
     case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price, obj.wantTicker, obj.wantPct); break;
     case "respondTrade": result = GameEngine.respondTrade(localRoom, viewAs, obj.id, obj.accept); break;
     case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
@@ -2841,7 +2862,7 @@ function detectNotifications(prev, msg){
   if(nowFP && nowFP.targetId === msg.you && (!prevFP || prevFP.targetId !== msg.you || prevFP.ticker !== nowFP.ticker)){
     // Это штраф бросающему за отказ от покупки, а не выкуп его доли (доли у него нет).
     showToast({ kind:"warn", icon:"crown", title:"Вам назначили принудительную цену выкупа",
-      text: msg.rulesV === 2 ? `За попадание на ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}. После оплаты можно купить долю.` : `За отказ от покупки ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}.`,
+      text: msg.rulesV >= 2 ? `За попадание на ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}. После оплаты можно купить долю.` : `За отказ от покупки ${nowFP.ticker} контролирующий акционер назначил выкуп ${fmt(nowFP.amount)}.`,
       onClick: ()=> openTab("turn") });
   }
 
@@ -2903,6 +2924,14 @@ function detectNotifications(prev, msg){
 // которую можно закрыть — она не блокирует остальной интерфейс.
 // ---------------------------------------------------------------------
 let lastSeenMarketEventCount = null;
+// Состояние перед последним событием — чтобы карточку события можно было
+// открыть ещё раз с той же сводкой (кто сильнее изменился, ваш капитал).
+let lastEventSnap = null;
+function reopenLastEvent(){
+  if(!latest) return;
+  const snap = lastEventSnap && lastEventSnap.n === latest.eventCount && lastEventSnap.room === latest.room ? lastEventSnap.prev : null;
+  openMarketEventModal(latest, snap);
+}
 function detectMarketEventPopup(prev, msg){
   if(!msg || msg.eventCount == null) return;
   if(!prev || prev.phase === "lobby" || msg.phase === "lobby"){
@@ -2919,6 +2948,7 @@ function detectMarketEventPopup(prev, msg){
   }
   if(msg.eventCount > (prev.eventCount||0) && msg.eventCount !== lastSeenMarketEventCount){
     lastSeenMarketEventCount = msg.eventCount;
+    lastEventSnap = { n: msg.eventCount, room: msg.room, prev };
     // В обучении сводка нужна всегда: на ней стоит шаг «Биржевое событие».
     if(eventSummaryEnabled() || msg.tutorial) openMarketEventModal(msg, prev);
     else showToast({ kind:"warn", icon:"bolt", title:`Биржевое событие №${msg.eventCount}`, text:"Цены обновлены — подробности во вкладке «Лента».", onClick: ()=> openTab("log") });
@@ -2976,6 +3006,8 @@ function scenarioNewsLineHtml(text){
   return `<div class="scn-line">${escapeHtml(body)}${where ? ` <span class="scn-where">${escapeHtml(where)}</span>` : ""}</div>`;
 }
 function openMarketEventModal(msg, prev){
+  // Правила 3: карточка события — главная новость крупно, последствия мелко.
+  if(msg.lastEvent && msg.lastEvent.n === msg.eventCount && msg.lastEvent.card){ openEventCardModal(msg, prev); return; }
   const tagLabel = `Событие ${msg.eventCount}`;
   const entries = (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag !== "header" && e.tag !== "turn");
   const card = document.getElementById("marketEventModalCard");
@@ -3056,6 +3088,187 @@ function openMarketEventModal(msg, prev){
   document.getElementById("marketEventOverlay").style.display = "flex";
   modalFocusIn("marketEventOverlay", "marketEventModalCard");
   if(window.Anim) Anim.eventCardIn(card); // переворот карточки, строки по очереди
+}
+// ---------------------------------------------------------------------
+// Карточка события (правила 3, engine.js room.lastEvent). Одна карточка:
+// тип новости, заголовок, пояснение и крупный процент; ниже мелким шрифтом —
+// что из этого вышло: кто сильнее всего изменился, кубик, скачки рискованных,
+// банкротства, дивиденды, ваш капитал. Решение совета директоров, если оно
+// ваше, — отдельной карточкой с вариантами. Полная лента — под «Все записи».
+// ---------------------------------------------------------------------
+const EVENT_KIND = {
+  global: { label: "Весь рынок", icon: "globe" },
+  sector: { label: "Отрасль", icon: "layers" },
+  company: { label: "Компания", icon: "target" },
+  special: { label: "Особое событие", icon: "star" },
+};
+const SPECIAL_EVENT_ICON = { freeze: "snow", buyback: "bank", extra_turn: "dice", audit: "search", double_dividend: "coins", tax: "percent" };
+function signedPctText(n, digits){
+  const v = Math.abs(Number(n) || 0);
+  const t = (digits ? v.toFixed(digits) : String(Math.round(v))).replace(".", ",");
+  return `${n > 0 ? "+" : n < 0 ? "−" : ""}${t}%`;
+}
+function eventCardMainHtml(card){
+  const kind = EVENT_KIND[card.type] || EVENT_KIND.special;
+  const special = card.type === "special";
+  const tone = special ? "special" : card.percent > 0 ? "up" : card.percent < 0 ? "down" : "flat";
+  const where = card.type === "sector" ? card.sector : card.type === "company" ? (card.name || "") : card.type === "global" ? "" : (card.name ? `${card.name}` : "");
+  const sec = card.type === "sector" ? (SECTOR_CLASS[card.sector] || "") : "";
+  const art = card.type === "company" && card.ticker ? logoHtml(card.ticker, 56)
+    : `<span class="ev-art ${sec}">${ico(special ? (SPECIAL_EVENT_ICON[card.key] || "star") : kind.icon)}</span>`;
+  const big = !special && card.percent != null ? `<div class="ev-big ${tone}">${signedPctText(card.percent)}</div>` : "";
+  return `<div class="ev-card-top">
+      ${art}
+      <div class="ev-kind"><span>${escapeHtml(kind.label)}</span>${where ? `<b>${escapeHtml(where)}</b>` : ""}</div>
+      ${big}
+    </div>
+    <h2 class="ev-title">${escapeHtml(card.title || "Событие")}</h2>
+    ${card.desc ? `<p class="ev-desc">${escapeHtml(card.desc)}</p>` : ""}
+    ${card.skipDividend ? `<p class="ev-desc ev-desc-sm">Дивиденды по компании пропущены до следующего события.</p>` : ""}`;
+}
+function eventConsequencesHtml(msg, prev, ev){
+  const rows = [];
+  const row = (icon, html, cls)=> rows.push(`<div class="ev-cons-row${cls ? " " + cls : ""}">${ico(icon, "ico-sm")}<span>${html}</span></div>`);
+  // Кто сильнее всего изменился за событие — чипами, по нажатию карточка компании.
+  if(prev && prev.companies){
+    const before = {};
+    prev.companies.forEach(c=> before[c.ticker] = c.price);
+    // Обанкротившаяся компания вернулась на биржу по новой цене — её «рост» не движение рынка.
+    const relisted = new Set((ev.bankrupt || []).map(b=> b.ticker));
+    const movers = (msg.companies||[]).filter(c=> before[c.ticker] && !relisted.has(c.ticker))
+      .map(c=>({ c, pct: (c.price - before[c.ticker]) / before[c.ticker] * 100 }))
+      .filter(m=> Math.abs(m.pct) >= 0.5)
+      .sort((x,y)=> Math.abs(y.pct) - Math.abs(x.pct)).slice(0, 6);
+    if(movers.length){
+      rows.push(`<div class="ev-movers">${movers.map(m=>`<button type="button" class="ev-chip ${m.pct > 0 ? "up" : "down"}" onclick="closeMarketEventModal();openCompanyModal('${m.c.ticker}')">${logoHtml(m.c.ticker, 18)}<span>${escapeHtml(m.c.name)}</span><b>${signedPctText(m.pct, 1)}</b></button>`).join("")}</div>`);
+    }
+  }
+  (ev.bankrupt || []).forEach(b=>{
+    const mine = (b.lost || []).find(l=> l.id === you);
+    const others = (b.lost || []).filter(l=> l.id !== you).map(l=> `${escapeHtml(l.name)} ${l.pct}%`);
+    row("alert", `<b>Банкротство ${escapeHtml(b.name)}.</b> ${mine ? `Ваш пакет ${mine.pct}% сгорел (${fmt(mine.value)}). ` : ""}${others.length ? `Сгорели пакеты: ${others.join(", ")}. ` : ""}Компания вернулась на биржу по ${fmt(b.relistPrice)}, акции снова у банка.`, "bad");
+  });
+  const meNow = (msg.players||[]).find(p=>p.id===you);
+  (ev.distress || []).forEach(d=>{
+    const mine = meNow && meNow.holdings ? (meNow.holdings[d.ticker] || 0) : 0;
+    row("alert", `<b>${escapeHtml(d.name)} на грани банкротства</b>: цена ниже ${fmt(d.threshold)}. Не поднимется к следующему событию — акции сгорят${mine ? `, в том числе ваши ${mine}%` : ""}.`, "warn");
+  });
+  if(ev.vol){
+    row("dice", ev.vol.pct ? `Кубик ${ev.vol.roll}: рынок ${signedPctText(ev.vol.pct)} — стабильные компании меньше, растущие и рискованные сильнее.` : `Кубик ${ev.vol.roll}: рынок без общего сдвига.`);
+  }
+  if((ev.jumps || []).length){
+    row("bolt", `Скачки рискованных: ${ev.jumps.map(j=> `${escapeHtml(j.name)} ${signedPctText(j.pct)}`).join(", ")}.`);
+  }
+  const div = ev.dividends || {};
+  const myDiv = div[you];
+  const nDiv = Object.keys(div).length;
+  if(myDiv) row("coins", `Дивиденды: вам +${fmt(myDiv)}${nDiv > 1 ? `, ещё ${nDiv - 1} ${pluralRu(nDiv - 1, "игроку", "игрокам", "игрокам")}` : ""}.`);
+  else if(nDiv) row("coins", `Дивиденды получили ${nDiv} ${pluralRu(nDiv, "игрок", "игрока", "игроков")}.`);
+  // Решения совета директоров соперников и ботов на этом событии — из ленты.
+  const tagLabel = `Событие ${msg.eventCount}`;
+  (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag === "decision" && /Итог:/.test(String(e.text||"")))
+    .forEach(e=> row("vote", escapeHtml(String(e.text).replace(/^🏛\s*/, ""))));
+  if(prev && prev.players){
+    const was = (prev.players||[]).find(p=>p.id===you), now = (msg.players||[]).find(p=>p.id===you);
+    if(was && now && Number.isFinite(was.netWorth) && Number.isFinite(now.netWorth)){
+      const d = now.netWorth - was.netWorth;
+      if(Math.abs(d) >= 1) row(d >= 0 ? "chart" : "trend-down", `Ваш капитал за событие: <b class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : "−"}${fmt(Math.abs(d))}</b>.`);
+    }
+  }
+  return rows.length ? `<div class="ev-cons"><div class="ev-cons-title">Что изменилось</div>${rows.join("")}</div>` : "";
+}
+// Карточка решения совета директоров: в сводке события и в отдельном окне.
+function boardDecisionHtml(s, d){
+  const me = (s.players||[]).find(p=>p.id===you);
+  const cash = me ? me.cash : 0;
+  const defOpt = d.options.find(o=> o.key === d.def);
+  return `<div class="board-dec" data-dec="${d.id}">
+    <div class="board-dec-head">${logoHtml(d.ticker, 32)}<div class="board-dec-headtext"><div class="board-dec-eyebrow">${ico("vote","ico-sm")} Совет директоров · ${escapeHtml(d.name)}</div><div class="board-dec-title">${escapeHtml(d.title)}</div></div></div>
+    <p class="board-dec-text">${escapeHtml(d.text)}</p>
+    <div class="board-dec-opts">${d.options.map(o=>{
+      const short = o.cost > 0 && cash < o.cost;
+      return `<button type="button" class="board-opt" onclick="doDecideBoard(${d.id},'${o.key}',this)"${short ? " disabled" : ""}><b>${escapeHtml(o.label)}</b><span>${short ? "Не хватает наличных" : escapeHtml(o.hint)}</span></button>`;
+    }).join("")}</div>
+    ${defOpt ? `<div class="board-dec-note">${ico("clock","ico-sm")} Не решите до следующего события — будет «${escapeHtml(defOpt.label)}».</div>` : ""}
+  </div>`;
+}
+function doDecideBoard(id, option, btn){
+  if(btn){ const box = btn.closest(".board-dec"); if(box) box.querySelectorAll("button").forEach(b=> b.disabled = true); }
+  send({ type: "decideBoard", id, option });
+}
+// После решения карточка в открытом окне заменяется итогом из ленты.
+function refreshBoardDecisionCards(s){
+  document.querySelectorAll(".market-event-modal .board-dec[data-dec]").forEach(box=>{
+    const id = Number(box.dataset.dec);
+    const still = (s.myDecisions||[]).find(d=> d.id === id);
+    if(still){ box.querySelectorAll("button").forEach(b=>{ const o = still.options.find(x=> b.getAttribute("onclick").includes(`'${x.key}'`)); const me = s.players.find(p=>p.id===you); b.disabled = !!(o && o.cost > 0 && me && me.cash < o.cost); }); return; }
+    const name = box.querySelector(".board-dec-eyebrow") ? box.querySelector(".board-dec-eyebrow").textContent.replace(/^.*·\s*/, "").trim() : "";
+    const me = s.players.find(p=>p.id===you);
+    const line = [...(s.log||[])].reverse().find(e=> e.tag === "decision" && me && String(e.text||"").includes(`${me.name} · ${name}:`) && /Итог:/.test(String(e.text||"")));
+    box.removeAttribute("data-dec");
+    box.classList.add("done");
+    box.innerHTML = `<div class="board-dec-eyebrow">${ico("check","ico-sm")} Решение принято</div><p class="board-dec-text">${escapeHtml(line ? String(line.text).replace(/^🏛\s*/, "") : "Совет директоров выполнит ваше решение.")}</p>`;
+  });
+}
+function openEventCardModal(msg, prev){
+  const ev = msg.lastEvent;
+  const card = document.getElementById("marketEventModalCard");
+  if(!card) return;
+  const tagLabel = `Событие ${msg.eventCount}`;
+  const entries = (msg.log||[]).filter(e=> e.turnTag === tagLabel && e.tag !== "header" && e.tag !== "turn");
+  // Сценарные новости и слухи — плашкой над карточкой, как раньше.
+  const scenarioNews = entries.filter(e=> /^📌/.test(String(e.text||"")));
+  const evScn = scenarioNews.length && msg.settings && msg.settings.scenario ? GameEngine.scenarioById(msg.settings.scenario) : null;
+  const scenarioNewsHtml = scenarioNews.length ? `<div class="event-scenario">
+      ${evScn ? `<div class="event-scenario-title">${ico("news","ico-sm")} Сценарий «${escapeHtml(evScn.title)}»</div>` : ""}
+      ${scenarioNews.map(e=> scenarioNewsLineHtml(String(e.text))).join("")}
+    </div>` : "";
+  const leftNow = roundsLeftOf(msg);
+  const byLimit = msg.phase === "ended" && !!msg.maxRounds && (msg.roundNumber || 1) > msg.maxRounds;
+  const finaleText = byLimit ? "Последнее событие — побеждает самый богатый"
+    : leftNow === 1 ? "Последний раунд"
+    : leftNow != null && leftNow <= FINAL_ROUNDS ? `Финал: осталось ${leftNow} ${pluralRu(leftNow, "раунд", "раунда", "раундов")}`
+    : "";
+  const finaleHtml = finaleText ? `<div class="event-finale-note">${ico("flag","ico-sm")}<span>${finaleText}</span></div>` : "";
+  const c = ev.card;
+  const tone = c.type === "special" ? "special" : c.percent > 0 ? "up" : c.percent < 0 ? "down" : "flat";
+  const mine = (msg.myDecisions||[]).filter(d=> msg.phase !== "ended");
+  const logHtml = entries.length ? `<details class="ev-log"><summary>Все записи события (${entries.length})</summary><div class="market-event-list">${entries.map(e=> feedEntryHtml(Object.assign({}, e, {turnTag:""}), "log-entry")).join("")}</div></details>` : "";
+  card.innerHTML = `
+    <div class="market-event-body">
+      <div class="ev-eyebrow">${ico("bolt","ico-sm")}<span>${byLimit ? "Последний раунд завершён" : "Раунд завершён"} · биржевое событие №${msg.eventCount}</span>${hintBtn("event", "Каждое событие разыгрывается карта новостей, кубик сдвигает рынок, у каждой компании свой характер: стабильные почти не двигаются, растущие дорожают, циклические ходят волнами, рискованные скачут и могут обанкротиться.")}</div>
+      ${scenarioNewsHtml}
+      <article class="ev-card ${tone}">
+        ${eventCardMainHtml(c)}
+        ${eventConsequencesHtml(msg, prev, ev)}
+      </article>
+      ${finaleHtml}
+      ${mine.map(d=> boardDecisionHtml(msg, d)).join("")}
+      ${logHtml}
+    </div>
+    <button type="button" class="market-event-close-btn" onclick="closeMarketEventModal()">${byLimit ? "К итогам партии" : "Продолжить"}</button>
+  `;
+  card.setAttribute("aria-modal", msg.tutorial ? "false" : "true");
+  document.getElementById("marketEventOverlay").style.display = "flex";
+  modalFocusIn("marketEventOverlay", "marketEventModalCard");
+  if(window.Anim) Anim.eventCardIn(card);
+}
+// Решение совета директоров вне сводки события — из чипа над кнопкой хода.
+function openBoardDecisionModal(id){
+  if(!latest) return;
+  const d = (latest.myDecisions||[]).find(x=> x.id === id);
+  const card = document.getElementById("marketEventModalCard");
+  if(!d || !card) return;
+  card.innerHTML = `<div class="market-event-body">${boardDecisionHtml(latest, d)}</div>
+    <button type="button" class="market-event-close-btn secondary" onclick="closeMarketEventModal()">Решить позже</button>`;
+  card.setAttribute("aria-modal", "true");
+  document.getElementById("marketEventOverlay").style.display = "flex";
+  modalFocusIn("marketEventOverlay", "marketEventModalCard");
+}
+function boardDecisionChipHtml(s){
+  const list = s.myDecisions || [];
+  if(!list.length || s.phase !== "roll") return "";
+  return list.map(d=> `<button type="button" class="board-dec-chip" onclick="openBoardDecisionModal(${d.id})">${logoHtml(d.ticker, 28)}<span class="bdc-text"><b>Совет директоров ждёт решения</b><span>${escapeHtml(d.name)} · ${escapeHtml(d.title)}</span></span>${ico("chev-right","ico-sm")}</button>`).join("");
 }
 function closeMarketEventModal(){
   const ov = document.getElementById("marketEventOverlay");
@@ -3485,7 +3698,7 @@ function renderMarketTable(s){
     const ctrlName = controller ? (controller.id===you ? "вы" : controller.name) : "";
     const ctrlBadge = controller ? `<span class="badge control" style="--seat:${seatColor(s, controller.id)}" title="Контроль: ${escapeHtml(ctrlName)}">${ico("crown","ico-sm")} <span>${escapeHtml(ctrlName)}</span></span>` : "";
     tr.innerHTML = `
-      <td><span class="co-cell">${logoHtml(c.ticker,34)}<span class="co-name"><div class="co-title"><b>${escapeHtml(c.name)}</b>${ctrlBadge}</div><span>${c.ticker}${mine?` · <b class="co-mine">у вас ${mine}%</b>`:""} · ${escapeHtml(String(c.volLabel||"").toLowerCase())} волатильность</span></span></span></td>
+      <td><span class="co-cell">${logoHtml(c.ticker,34)}<span class="co-name"><div class="co-title"><b>${escapeHtml(c.name)}</b>${ctrlBadge}</div><span>${c.ticker}${mine?` · <b class="co-mine">у вас ${mine}%</b>`:""} · ${profileTagText(c)}</span></span></span></td>
       <td><span class="sector-tag">${escapeHtml(c.sector)}</span></td>
       <td class="price">${fmt(c.price)}</td>
       <td>${deltaPill(c.price, c.prevPrice)}</td>
@@ -3531,7 +3744,7 @@ function revealLeftLabel(s, p, capital){
 // Правила 2 (engine.js, measureCooldownLeft): меры бесплатны, каждая раз в
 // s.measureCooldown событий; в прежних — за деньги. Подпись и блокировка кнопки.
 function measureBtn(s, key, verb, cost){
-  if(s.rulesV !== 2) return { label: `${verb} · ${fmt(cost)}`, disabled: "" };
+  if(!(s.rulesV >= 2)) return { label: `${verb} · ${fmt(cost)}`, disabled: "" };
   const left = (s.myMeasureCooldowns || {})[key] || 0;
   return left > 0
     ? { label: `${verb} · через ${left} ${pluralRu(left, "событие", "события", "событий")}`, disabled: "disabled" }
@@ -3661,6 +3874,8 @@ function render(){
 
   if(countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
 
+  // Открытая сводка события: принятое решение совета — итогом на месте карточки.
+  refreshBoardDecisionCards(s);
   // market table
   recordPriceHistory(s);
   renderMarketPlayerChips(s);
@@ -4366,7 +4581,7 @@ function renderControlPanel(s){
   const firstDiscreditCost = firstDiscreditTarget != null ? (discreditCosts[firstDiscreditTarget]||0) : 0;
   const noTargets = otherPlayers.length===0 ? "disabled" : "";
 
-  if(s.rulesV === 2) html += `<div class="influence-note">${ico("clock")}<span>Меры бесплатны, каждая — раз в ${s.measureCooldown || 3} ${pluralRu(s.measureCooldown || 3, "событие", "события", "событий")}. PR-кампания и шорт — за деньги.</span></div>`;
+  if(s.rulesV >= 2) html += `<div class="influence-note">${ico("clock")}<span>Меры бесплатны, каждая — раз в ${s.measureCooldown || 3} ${pluralRu(s.measureCooldown || 3, "событие", "события", "событий")}. PR-кампания и шорт — за деньги.</span></div>`;
   // --- Контрольный пакет ---
   html += `<div class="influence-group">${ico("crown","ico-sm")} Контрольный пакет${myControlled.length?` · ${myControlled.map(c=>`${escapeHtml(c.name)} ${me.holdings[c.ticker]}%`).join(", ")}`:""}</div>`;
   if(myControlled.length === 0){
@@ -4430,7 +4645,7 @@ function renderControlPanel(s){
   html += card("search", "Шпионаж", "на 2 события", "Раскрывает акции и недвижимость цели на 2 события. Шанс выше против игроков с низкой репутацией. Провал — вас поймают, репутация −8.",
     `<div class="row-inline"><select id="spyTarget" aria-label="Цель шпионажа" ${noTargets}>${targetOpts}</select>
       <button type="button" onclick="doCtrlEspionage()" ${noTargets || spyB.disabled}>${spyB.label}</button></div>${measureResultBadgeHtml("espionage")}`);
-  html += card("alert", "Дискредитация", "−15 репутации", s.rulesV === 2 ? "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10." : "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10. Чем выше репутация цели, тем дороже.",
+  html += card("alert", "Дискредитация", "−15 репутации", s.rulesV >= 2 ? "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10." : "Успех (55%) — репутация цели −15. Провал — атака вскроется, ваша репутация −10. Чем выше репутация цели, тем дороже.",
     `<div class="row-inline"><select id="discreditTarget" aria-label="Цель дискредитации" ${noTargets} onchange="onDiscreditTargetChange()">${targetOpts}</select>
       <button type="button" id="discreditBtn" onclick="doCtrlDiscredit()" ${noTargets || disB.disabled}>${disB.label}</button></div>${measureResultBadgeHtml("discredit")}`);
   if(!s.frozen){
@@ -4567,6 +4782,12 @@ function statusRowHtml(s){
   const extras = [];
   const scn = s.settings && s.settings.scenario ? GameEngine.scenarioById(s.settings.scenario) : null;
   if(scn) extras.push(`<span class="rep-badge scn-badge">${ico("news","ico-sm")} ${escapeHtml(scn.title)}${hintBtn("scenario", `<b>${escapeHtml(scn.title)}</b> (${scn.year}). ${escapeHtml(scn.intro)} Цель: ${escapeHtml(scn.goal)}`)}</span>`);
+  // Правила 3: последняя новость рынка — кнопкой, снова открывает карточку события.
+  const lev = s.lastEvent && s.lastEvent.card && s.lastEvent.n === s.eventCount && s.phase === "roll" ? s.lastEvent.card : null;
+  if(lev){
+    const pct = lev.type !== "special" && lev.percent != null ? ` <b class="${lev.percent > 0 ? "up" : "down"}">${signedPctText(lev.percent)}</b>` : "";
+    extras.push(`<button type="button" class="rep-badge ev-news-badge" onclick="reopenLastEvent()" title="Открыть карточку события">${ico("news","ico-sm")} <span>${escapeHtml(lev.title)}</span>${pct}</button>`);
+  }
   if(s.frozen) extras.push(`<span class="rep-badge">${ico("snow","ico-sm")} Цены заморожены</span>`);
   if((s.dividendMultiplier||1) > 1) extras.push(`<span class="rep-badge rep-mid">${ico("coins","ico-sm")} Выплаты ×${s.dividendMultiplier}</span>`);
   // Партия с лимитом: последние FINAL_ROUNDS раунда — метка финала первой в
@@ -4898,7 +5119,7 @@ function forcedPriceWaitingPopupHtml(s){
       ${logoHtml(meta.ticker,48)}
       <div class="sheet-head-main">
         <div class="sheet-title">Назначьте цену выкупа</div>
-        <div class="sheet-sub">${escapeHtml(roller?roller.name:"Игрок")} ${meta.rulesV === 2 ? "попал(а) на" : "отказывается от доли в"} ${escapeHtml(c?c.name:meta.ticker)}</div>
+        <div class="sheet-sub">${escapeHtml(roller?roller.name:"Игрок")} ${meta.rulesV >= 2 ? "попал(а) на" : "отказывается от доли в"} ${escapeHtml(c?c.name:meta.ticker)}</div>
       </div>
     </div>
     <div class="sheet-box sheet-note">Справедливая ≈ <b class="mono">${fmt(fair)}</b> · максимум <b class="mono">${fmt(capPrice)}</b>${hintBtn("forced-price", `${meta.feeCurve ? "Справедливая цена растёт быстрее вашей доли: чем больше компании у вас, тем дороже выкуп. " : ""}Цена больше 4 справедливых: репутация −12, и с вероятностью 50% антимонопольная служба изымет часть пакета.`)}</div>
@@ -5408,7 +5629,7 @@ function rollPopupHtml(s){
   // Подсказка «?» у полосы держателей: как считается плата за отказ (кривая
   // engine.js FEE_CURVE_*) и шанс, что выплату пропустят (зависит от тира).
   const refuseRules = [];
-  const v2 = meta.rulesV === 2;
+  const v2 = meta.rulesV >= 2;
   if(v2 && meta.ownersCount > 0){
     refuseRules.push(`Попали на компанию с держателями — платите им сразу, это обязательно. Плата растёт быстрее их доли (сейчас ${meta.totalOwnedPct}%).`);
     refuseRules.push(`Своя доля снижает плату на ${s.landingFeeDiscountPct || 10}% за каждый процент, с ${Math.round(100 / (s.landingFeeDiscountPct || 10))}% — не платите.`);
@@ -5677,7 +5898,7 @@ function renderStage(s){
     if(fullSig !== popupSig){ popupSig = fullSig; popupArmedAt = performance.now() + 400; }
     popup.style.display = "flex"; popup.innerHTML = html; popup.classList.toggle("above-dock", !!aboveDock);
   };
-  const offersSig = ()=> "offers:" + s.pendingTrades.filter(t=>t.toId===you).map(t=>t.id).join(",");
+  const offersSig = ()=> "offers:" + s.pendingTrades.filter(t=>t.toId===you).map(t=>t.id).join(",") + ":dec:" + (s.myDecisions||[]).map(d=>d.id).join(",");
 
   if(!me){
     cornerStatus.innerHTML = `<div class="g-top"><div class="g-round">Загрузка…</div></div>`;
@@ -5697,7 +5918,13 @@ function renderStage(s){
       ${p ? `<span class="pchip-av" style="--seat:${seatColor(s, p.id)}">${avatarInner(p)}</span>` : ""}
       <span>${text}</span>${spin ? `<span class="spinner" aria-hidden="true"></span>` : ""}
     </div>`;
-  const incomingHtml = ()=> s.pendingTrades.some(t=>t.toId===you) ? `<div class="popup-card popup-wide">${tradeOffersHtml(s)}</div>` : "";
+  // Решения совета директоров (правила 3) — чипом в том же листе, что и
+  // входящие сделки: и в свой ход над кнопкой хода, и пока ходят другие.
+  const incomingHtml = ()=>{
+    const dec = boardDecisionChipHtml(s);
+    const offers = s.pendingTrades.some(t=>t.toId===you) ? tradeOffersHtml(s) : "";
+    return dec || offers ? `<div class="popup-card popup-wide${dec && !offers ? " popup-slim" : ""}">${dec}${offers}</div>` : "";
+  };
 
   if(s.phase === "ended"){
     cornerAction.innerHTML = "";
@@ -6216,9 +6443,10 @@ function refreshCompanyModal(){
     </div>
     <div style="display:flex;align-items:baseline;gap:10px;margin:16px 0 4px;"><span class="mono" style="font-size:28px;">${fmt(c.price)}</span>${deltaPill(c.price, c.prevPrice)}</div>
     <div class="full-chart-wrap"><div class="fc-tooltip" id="fcTooltip"></div>${chart.svg}<div class="full-chart-minmax"><span>мин ${fmt(chart.min)}</span><span>макс ${fmt(chart.max)}</span></div></div>
+    ${companyProfileNoteHtml(c)}
     <div class="company-modal-stats">
       <div class="cap-mini"><span>У игроков</span><b>${c.owned.toFixed(0)}%</b></div>
-      <div class="cap-mini"><span>Волатильность</span><b>${escapeHtml(c.volLabel||"")}</b></div>
+      ${c.divRatePct ? `<div class="cap-mini"><span>Дивиденды за событие</span><b>${String(c.divRatePct).replace(".", ",")}%</b></div>` : `<div class="cap-mini"><span>Волатильность</span><b>${escapeHtml(c.volLabel||"")}</b></div>`}
       <div class="cap-mini"><span>Контроль</span><b>${controller ? escapeHtml(controller.id===you?"вы":controller.name) : "нет"}</b></div>
       <div class="cap-mini"><span>У вас</span><b>${myHolding ? `${myHolding}% · ${fmtShort(c.price*myHolding/100)}` : "—"}</b></div>
       ${myPnl ? `<div class="cap-mini" style="grid-column:1/-1;"><span>Прибыль/убыток по пакету</span><b class="${myPnl.pnl>=0?'up':'down'}">${myPnl.pnl>=0?"▲ +":"▼ −"}${fmt(Math.abs(myPnl.pnl))} (${myPnl.pnl>=0?"+":""}${myPnl.pnlPct.toFixed(1).replace(".", ",")}%)</b></div>` : ""}
@@ -6228,6 +6456,14 @@ function refreshCompanyModal(){
   initFullChartInteractivity();
 }
 
+// Характер компании и угроза банкротства — плашкой под графиком (правила 3).
+function companyProfileNoteHtml(c){
+  const pr = companyProfile(c);
+  let html = "";
+  if(c.distress) html += `<div class="co-profile bad">${ico("alert")}<div><b>На грани банкротства</b><span>Цена ниже ${fmt(c.distressPrice)}. Не поднимется к следующему событию — компания обанкротится, все пакеты сгорят. Владелец контрольного пакета может её спасти.</span></div></div>`;
+  if(pr) html += `<div class="co-profile"><span class="co-profile-ico" aria-hidden="true">${pr.icon}</span><div><b>${escapeHtml(pr.label)}</b><span>${escapeHtml(pr.desc)}${c.bankruptcies ? ` Банкротств за партию: ${c.bankruptcies}.` : ""}</span></div></div>`;
+  return html;
+}
 function doCtrlNegativeInfo(){
   const el = document.getElementById("negTarget");
   if(!el || !el.value) return;
