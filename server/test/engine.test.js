@@ -1632,6 +1632,18 @@ test("разбор: журнал не уходит клиентам и не пи
   assert.deepEqual(t.nwHist, {}, "обучение без истории капитала");
   return [r, t];
 });
+test("вход посреди партии помечается lateJoin, вход в лобби и переподключение — нет", () => {
+  const r = lobby(["A"]);
+  assert.ok(!P(r, "A").lateJoin, "в лобби — обычный вход");
+  E.addPlayer(r, "B", "", "", 0, "default", false);
+  E.startGame(r, r.hostPlayerId);
+  E.addPlayer(r, "C", "", "", 0, "default", false);
+  assert.equal(P(r, "C").lateJoin, true, "подсел посреди партии");
+  P(r, "B").connected = false;
+  E.addPlayer(r, "B", "", "", 0, "default", false);
+  assert.ok(!P(r, "B").lateJoin, "переподключение — не поздний вход");
+  return r;
+});
 test("сильные боты: покупают максимум доступного, настройка переживает реванш", () => {
   const r = game(["A", "B"], true);
   const A = P(r, "A");

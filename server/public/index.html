@@ -2060,7 +2060,8 @@ function connectOnline(room, auth, opts){
   mode = "online";
   wantOnline = true;
   roomCode = room; myName = auth.username;
-  reconnectInfo = { room, auth };
+  // «Быстрая игра» до ответа сервера: комнаты ещё нет — повтор снова с quick.
+  reconnectInfo = { room, auth, opts: room ? null : opts };
   // Каждый обработчик привязан к своему сокету: события устаревшего сокета
   // (или пришедшие после выхода из онлайна) игнорируются.
   const sock = new WebSocket(wsUrl());
@@ -2081,7 +2082,7 @@ function connectOnline(room, auth, opts){
     if(msg.type === "joined"){
       joined = true;
       // «Быстрая игра»: комнату выбрал сервер — переподключаемся уже в неё.
-      if(msg.room){ roomCode = msg.room; if(reconnectInfo) reconnectInfo.room = msg.room; }
+      if(msg.room){ roomCode = msg.room; if(reconnectInfo){ reconnectInfo.room = msg.room; reconnectInfo.opts = null; } }
       const firstJoin = joinPending; // вход из списка комнат, а не восстановление партии
       setJoinPending(false);
       you = msg.playerId;
@@ -2192,7 +2193,7 @@ function scheduleReconnect(){
   const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
   reconnectTimer = setTimeout(()=>{
     reconnectTimer = null;
-    if(wantOnline && reconnectInfo) connectOnline(reconnectInfo.room, reconnectInfo.auth);
+    if(wantOnline && reconnectInfo) connectOnline(reconnectInfo.room, reconnectInfo.auth, reconnectInfo.opts);
   }, delay);
 }
 // Возврат в приложение (телефон был заблокирован, вкладка в фоне): сокет мог
@@ -2201,7 +2202,7 @@ document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState !== "visible" || !wantOnline || !reconnectInfo || reconnectTimer) return;
   if(!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING){
     reconnectAttempts = 0;
-    connectOnline(reconnectInfo.room, reconnectInfo.auth);
+    connectOnline(reconnectInfo.room, reconnectInfo.auth, reconnectInfo.opts);
   }
 });
 function stopReconnect(){

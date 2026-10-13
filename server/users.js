@@ -494,9 +494,9 @@ const GAME_KEY_RE = /^[A-Za-z0-9:._-]{1,80}$/;
 function claimAnalysisKey(key, gameKey) {
   const rec = Object.prototype.hasOwnProperty.call(users, key) ? users[key] : null;
   if (!rec) return { error: "Аккаунт не найден.", code: "session" };
+  if (traderActiveRec(rec)) return { ok: true, trader: true };
   gameKey = String(gameKey || "");
   if (!GAME_KEY_RE.test(gameKey)) return { error: "Неизвестная партия.", code: "bad_game" };
-  if (traderActiveRec(rec)) return { ok: true, trader: true };
   const day = mskDay(Date.now());
   const a = rec.analysis && typeof rec.analysis === "object" ? rec.analysis : {};
   if (a.day === day && a.game === gameKey) return { ok: true, again: true };

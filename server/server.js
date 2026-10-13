@@ -75,7 +75,9 @@ function scheduleRoomBots(room, delay) {
   if (!room.players.some((p) => !p.isBot && p.connected && !p.kicked)) return;
   botTimers.set(room.code, setTimeout(() => {
     botTimers.delete(room.code);
-    if (rooms.get(room.code) !== room || room.phase !== "roll") return;
+    // Комнату заменила новая партия под тем же кодом — шагаем уже в ней.
+    if (rooms.get(room.code) !== room) return scheduleRoomBots(rooms.get(room.code));
+    if (room.phase !== "roll") return;
     let res;
     try { res = engine.botStep(room); } catch (e) { console.error("botStep:", e); return; }
     if (res.acted) { syncAccountPoints(room); broadcast(room); }
@@ -128,7 +130,8 @@ function startQuickRoom(room) {
   if (rooms.get(room.code) !== room || !room.quick || room.phase !== "lobby") return;
   if (!humansIn(room).some((p) => p.connected)) return; // все ушли — комнату уберёт sweepRooms
   let n = 0;
-  while (room.players.length < QUICK_SEATS) {
+  // Кто не в сети, в партию не попадёт (engine.startGame) — места считаем без них.
+  while (room.players.filter((p) => p.isBot || p.connected).length < QUICK_SEATS) {
     const name = QUICK_BOT_NAMES.find((x) => !room.players.some((p) => p.name === x)) || `Бот ${++n}`;
     if (engine.addPlayer(room, name, "", "🤖", 0, "default", true).error) break;
   }
@@ -149,7 +152,9 @@ function settleRoomLeague(room) {
   const withBots = room.players.some((p) => p.isBot);
   gr.ranking.forEach((row, i) => {
     const p = room.players.find((x) => x.id === row.id);
-    if (!p || p.isBot || p.kicked) return;
+    // Вошёл посреди партии (engine.addPlayer, lateJoin) — в лигу не идёт:
+    // иначе можно подсесть к почти законченной партии ради очков за место.
+    if (!p || p.isBot || p.kicked || p.lateJoin) return;
     if (gr.noPointsReason) { room.leagueResults[p.id] = { counted: false, code: gr.noPointsReason }; return; }
     const res = users.recordLeagueGame(p.name, i + 1, withBots);
     if (res) room.leagueResults[p.id] = res;
@@ -468,7 +473,9 @@ function handleMessage(ws, raw) {
         if (!conn.accountUsername) return sendTo(conn.ws, { type: "analysis", error: "Войдите в аккаунт, чтобы открыть разбор.", code: "session" });
         if (!room.analysisOpened || typeof room.analysisOpened !== "object") room.analysisOpened = {};
         if (!room.analysisOpened[conn.playerId]) {
-          const claim = users.claimAnalysisKey(users.usernameKey(conn.accountUsername), `${room.code}:${room.createdAt || 0}`);
+          // Код комнаты может быть кириллицей и с пробелами — в ключ идёт хэш.
+          const gameKey = crypto.createHash("sha1").update(`${room.code}:${room.createdAt || 0}`).digest("hex").slice(0, 32);
+          const claim = users.claimAnalysisKey(users.usernameKey(conn.accountUsername), "on-" + gameKey);
           if (claim.error) return sendTo(conn.ws, { type: "analysis", error: claim.error, code: claim.code });
           room.analysisOpened[conn.playerId] = true;
           roomsDirty = true;
@@ -507,7 +514,13 @@ function handleMessage(ws, raw) {
     case "ctrlDiscredit": return runWithResult(conn, ws, "discredit", engine.ctrlDiscredit(room, conn.playerId, msg.target));
     case "ctrlInvestigate": return runWithResult(conn, ws, "investigate", engine.ctrlInvestigate(room, conn.playerId));
     case "personalPr": return runWithResult(conn, ws, "personalPr", engine.personalPr(room, conn.playerId));
-    case "startKickVote": return runKick(conn, engine.startKickVote(room, conn.playerId, msg.target));
+    case "startKickVote": {
+      // Ботами онлайн ходит сервер — они не тормозят партию. Исключить бота
+      // одним голосом значило бы убрать богатых соперников перед финалом.
+      const target = room.players.find((p) => p.id === msg.target);
+      if (target && target.isBot) return sendError(conn, "Ботов исключать нельзя — ими ходит сервер.");
+      return runKick(conn, engine.startKickVote(room, conn.playerId, msg.target));
+    }
     case "voteKick": return runKick(conn, engine.voteKick(room, conn.playerId, msg.target, !!msg.yes));
     case "cancelKickVote": return run(conn, engine.cancelKickVote(room, conn.playerId));
     case "reaction": return run(conn, engine.sendReaction(room, conn.playerId, msg.emoji));
@@ -597,6 +610,9 @@ function handleNewGame(conn) {
   }
   const fresh = engine.newGameKeepPlayers(room);
   if (room.isPrivate) fresh.isPrivate = true; // реванш остаётся закрытым
+  // Шаг ботов прежней партии ещё ждёт своего таймера — новая начнёт свой.
+  clearTimeout(botTimers.get(room.code));
+  botTimers.delete(room.code);
   rooms.set(room.code, fresh);
   for (const [, c] of connections) {
     if (c.roomCode === room.code) {

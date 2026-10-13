@@ -239,6 +239,9 @@ async function main() {
     prevCur = cur;
   }
   check(botTurnsDone >= 2, "server bots play their turns online: " + botTurnsDone);
+  q1.send(JSON.stringify({ type: "startKickVote", target: [...botIds][0] }));
+  const kickErr = await waitMsg(q1, (m) => m.type === "error" && /Ботов исключать нельзя/.test(m.message));
+  check(!!kickErr, "bots cannot be kicked online");
   q1.terminate(); q2.terminate();
 
   // --- лимит неудачных входов (HTTP) ----------------------------------------

@@ -1370,6 +1370,8 @@
     } else {
       const startingCash = room.settings?.startingCash || STARTING_CASH;
       player = { id: room.nextPlayerId++, name, gender, avatar, points: initialPoints != null ? initialPoints : 0, equippedBoardSkin: equippedBoardSkin || "default", cash: startingCash, holdings: {}, costBasis: {}, bankrupt: false, connected: true, reputation: REPUTATION_START, loan: null, isBot: !!isBot };
+      // Вошёл посреди партии: в лигу недели такая партия не идёт (server.js).
+      if (room.phase === "roll") player.lateJoin = true;
       room.players.push(player);
       room.turnOrder.push(player.id);
       addLog(room, `${isBot ? "🤖 Бот" : "Игрок"} «${name}» присоединился со стартовым капиталом ${fmt(startingCash)}.`, "player");
