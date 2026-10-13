@@ -100,7 +100,7 @@ function makeCtx(S, me) {
     // --- стоимость мер (внутренние функции движка или копии формул) ---
     cost: {
       espionage: () => (I.espionageCost ? I.espionageCost(room, me) : clamp(Math.round(ctx.nw() * 0.05), 6000, 45000)),
-      negativeInfo: () => (I.negativeInfoCost ? I.negativeInfoCost(room, me) : clamp(Math.round(ctx.nw() * 0.06), 8000, 55000)),
+      negativeInfo: (t) => (I.negativeInfoCost ? I.negativeInfoCost(room, me, t) : clamp(Math.round(ctx.nw() * 0.06), 8000, 55000)),
       insiderPeek: () => (I.insiderPeekCost ? I.insiderPeekCost(room, me) : clamp(Math.round(ctx.nw() * 0.03), 4000, 28000)),
       shortDeposit: () => (I.shortDepositCost ? I.shortDepositCost(room, me) : clamp(Math.round(ctx.nw() * 0.04), 4000, 32000)),
       discredit: (target) => (I.discreditCost ? I.discreditCost(room, me, target)
@@ -113,7 +113,7 @@ function makeCtx(S, me) {
       },
       investigate: () => (E.investigationCost ? E.investigationCost(room, me) : 5000),
       publicIpo: () => Math.max(5000, Math.round(Math.max(0, ctx.nw()) * 0.08)),
-      pr: (t) => ctx.price(t) * 0.05,
+      pr: (t) => (I.prCampaignCost ? I.prCampaignCost(room, t) : ctx.price(t) * 0.05),
     },
 
     // Продать акции банку, чтобы набрать need наличных: одна продажа ≤25% одного

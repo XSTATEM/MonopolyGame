@@ -25,7 +25,7 @@ const ACTION_TYPES = new Set([
   "setForcedPrice", "payForcedPrice", "ctrlNegativeInfo", "ctrlPrCampaign", "ctrlInsiderPeek", "ctrlInsiderResolve",
   "ctrlSqueezeOut", "ctrlShort", "ctrlPublicIPO", "ctrlMergeCompanies", "takeLoan", "repayLoan",
   "buyRealEstateFromRoll", "upgradeRealEstateFromRoll", "payRealEstateRentFromRoll",
-  "ctrlEspionage", "ctrlDiscredit", "ctrlInvestigate", "personalPr", "declareBankruptcy",
+  "ctrlEspionage", "ctrlDiscredit", "ctrlInvestigate", "personalPr", "declareBankruptcy", "buyDirect",
 ]);
 const MAX_PHASE_ACTIONS = 8; // действий профиля за одну фазу хода (до броска / бросок / после)
 

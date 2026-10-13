@@ -83,6 +83,33 @@
   const FEE_CURVE_P = 1;
   const FEE_CURVE_N_EXP = 3.5;
   const FEE_CURVE_N_MAX = 6.5;
+
+  // ---------------------------------------------------------------------
+  // Испытания правил 13.10 (tools/sim, --override). По умолчанию — как было.
+  // ---------------------------------------------------------------------
+  // Плата держателям при ПОКУПКЕ доли на чужой компании. "refuse" — платит
+  // только отказавшийся (покупка 1% снимала плату целиком); "reduce" — каждый
+  // купленный процент снижает плату на FEE_REDUCE_PER_PCT, от 10% — без
+  // платы; "always" — плата всегда, как рента, покупка — сверх неё
+  // (ставку тогда умножает FEE_ALWAYS_MULT).
+  const FEE_RULE = "refuse";
+  const FEE_REDUCE_PER_PCT = 0.10;
+  const FEE_ALWAYS_MULT = 1;
+  // Покупка вне броска: раз в ход до DIRECT_BUY_MAX_PCT любой компании у
+  // банка с наценкой DIRECT_BUY_MARKUP.
+  const DIRECT_BUY = false;
+  const DIRECT_BUY_MAX_PCT = 5;
+  const DIRECT_BUY_MARKUP = 0.20;
+  const DIRECT_BUY_PER_EVENT = false; // true — раз в биржевое событие, а не раз в ход
+  // Дивиденды держателям: на каждом событии компания платит держателям эту
+  // долю своей цены (пропорционально пакету). Деньги — от банка.
+  const HOLDER_DIVIDEND_PCT = 0;
+  // Цена мер влияния. "networth" — доля капитала игрока, как было; "company"
+  // — в 2–3 раза дешевле, меры по компании — от её цены; "cooldown" —
+  // бесплатно, каждая мера раз в MEASURE_COOLDOWN событий.
+  const MEASURE_COST_MODE = "networth";
+  const MEASURE_COOLDOWN = 3;
+  const MEASURE_SCALE = 0.4;
   // Длительность партии по умолчанию — в своих ходах на игрока (решение владельца,
   // 2026-10-11: «до банкротства», ≈100 своих ходов у каждого). Это страховочный
   // лимит, а не цель: обычно партия кончается последним выжившим раньше
@@ -734,17 +761,52 @@
   // копейки). Проценты и clamp-диапазоны подобраны так, чтобы в начале игры
   // (когда netWorth близок к стартовому капиталу) стоимость была близка к старым
   // фиксированным значениям, а к концу игры росла вместе с капиталом игрока.
-  function espionageCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.05), 6000, 45000); }
-  function negativeInfoCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.06), 8000, 55000); }
-  function insiderPeekCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.03), 4000, 28000); }
+  // Мера по капиталу: доля netWorth в пределах; "company" — та же формула ×MEASURE_SCALE.
+  function nwMeasureCost(room, p, share, lo, hi) {
+    if (MEASURE_COST_MODE === "cooldown") return 0;
+    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
+    return clamp(Math.round(netWorth(room, p) * share * k), Math.round(lo * k), Math.round(hi * k));
+  }
+  function espionageCost(room, p) { return nwMeasureCost(room, p, 0.05, 6000, 45000); }
+  // ticker — цель (режим "company": 5% её цены); без него — для самой дорогой.
+  function negativeInfoCost(room, p, ticker) {
+    if (MEASURE_COST_MODE === "company") {
+      const price = ticker && room.companies[ticker] ? room.companies[ticker].price : Math.max(...COMPANIES.map((c) => room.companies[c.ticker].price));
+      return Math.max(1000, Math.round(price * 0.05));
+    }
+    return nwMeasureCost(room, p, 0.06, 8000, 55000);
+  }
+  function prCampaignCost(room, ticker) {
+    if (MEASURE_COST_MODE === "cooldown") return 0;
+    return room.companies[ticker].price * (MEASURE_COST_MODE === "company" ? 0.025 : 0.05);
+  }
+  function insiderPeekCost(room, p) { return nwMeasureCost(room, p, 0.03, 4000, 28000); }
+  // Режим "cooldown": сколько событий ещё ждать до меры key (0 — можно).
+  function measureCooldownLeft(room, p, key) {
+    if (MEASURE_COST_MODE !== "cooldown") return 0;
+    const last = p.measureUsed && p.measureUsed[key];
+    return last == null ? 0 : Math.max(0, last + MEASURE_COOLDOWN - (room.eventCount || 0));
+  }
+  function measureCooldownError(room, p, key) {
+    const left = measureCooldownLeft(room, p, key);
+    return left ? `Мера будет доступна через ${plural(left, "событие", "события", "событий")}.` : null;
+  }
+  function noteMeasure(room, p, key) {
+    if (MEASURE_COST_MODE !== "cooldown") return;
+    (p.measureUsed || (p.measureUsed = {}))[key] = room.eventCount || 0;
+  }
   function shortDepositCost(room, p) { return clamp(Math.round(netWorth(room, p) * 0.04), 4000, 32000); }
   function discreditCost(room, p, target) {
     const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
-    return clamp(Math.round(netWorth(room, p) * 0.05) + targetRep * 250, 6000, 80000);
+    if (MEASURE_COST_MODE === "cooldown") return 0;
+    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
+    return clamp(Math.round((netWorth(room, p) * 0.05 + targetRep * 250) * k), Math.round(6000 * k), Math.round(80000 * k));
   }
   function personalPrCostFor(room, p) {
+    if (MEASURE_COST_MODE === "cooldown") return 0;
+    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
     const uses = p.personalPrCount || 0;
-    return Math.max(5000 + 3000 * uses, Math.round(netWorth(room, p) * 0.03));
+    return Math.round(Math.max(5000 + 3000 * uses, netWorth(room, p) * 0.03) * k);
   }
   // Стоимость принудительного выкупа миноритариев зависит от чужих (обычно
   // скрытых от игрока) долей, поэтому итоговую сумму считаем на сервере и
@@ -1272,8 +1334,26 @@
     }
 
     resolveShorts(room, eventBeforeThis);
+    payHolderDividends(room);
     room.turn = 1;
     recordNetWorths(room);
+  }
+
+  // Дивиденды держателям (HOLDER_DIVIDEND_PCT): от банка, по пакетам, одной строкой в ленте.
+  function payHolderDividends(room) {
+    if (!(HOLDER_DIVIDEND_PCT > 0)) return;
+    const parts = [];
+    activePlayers(room).forEach((p) => {
+      let sum = 0;
+      for (const t in p.holdings) {
+        const c = room.companies[t];
+        if (!c || c.merged || !(p.holdings[t] > 0)) continue;
+        if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) continue;
+        sum += c.price * (p.holdings[t] / 100) * HOLDER_DIVIDEND_PCT;
+      }
+      if (sum >= 1) { p.cash += sum; stat(room, p.id, "divIn", sum); parts.push(`${p.name} +${fmt(sum)}`); }
+    });
+    if (parts.length) addLog(room, `💵 Дивиденды держателям: ${parts.join(", ")}.`, "dividend");
   }
 
   function afterRollAction(room) {
@@ -1812,6 +1892,27 @@
     return room.companies[ticker].price * (pct / 100) * (1 + bankFeePct(p.reputation));
   }
 
+  // Плата держателям при покупке на чужой компании (FEE_RULE): сумма — от той
+  // же ставки, что и плата за отказ (refuseRollAmount), со скидкой за купленные %.
+  // Карта «выплата не проводится» освобождает и от неё.
+  function holdersFeeOnBuy(room, payer, ticker, pct) {
+    const none = { amount: 0, owners: [], totalPct: 0 };
+    const factor = FEE_RULE === "always" ? FEE_ALWAYS_MULT : FEE_RULE === "reduce" ? Math.max(0, 1 - pct * FEE_REDUCE_PER_PCT) : 0;
+    if (!(factor > 0)) return none;
+    const c = room.companies[ticker];
+    if (c.skipDividendUntil && c.skipDividendUntil >= room.eventCount) return none;
+    const owners = room.players.filter((o) => !o.bankrupt && o.id !== payer.id && (o.holdings[ticker] || 0) > 0);
+    if (!owners.length) return none;
+    const totalPct = owners.reduce((sum, o) => sum + o.holdings[ticker], 0);
+    return { amount: Math.round(refuseRollAmount(room, ticker, totalPct) * factor), owners, totalPct };
+  }
+  function payHoldersFeeOnBuy(room, payer, ticker, fee) {
+    if (!fee.amount) return;
+    payer.cash -= fee.amount;
+    fee.owners.forEach((o) => { const share = fee.amount * (o.holdings[ticker] / fee.totalPct); o.cash += share; stat(room, o.id, "feeIn", share); });
+    stat(room, payer.id, "feeOut", fee.amount);
+    addLog(room, `${payer.name} заплатил держателям ${ticker} ${fmt(fee.amount)} при покупке.`, "dividend");
+  }
   function buyFromRoll(room, playerId, pctRaw) {
     if (!room || room.phase !== "roll" || !room.pendingRoll) return { error: "Нет активного броска." };
     if (room.pendingRoll.playerId !== playerId) return { error: "Сейчас не ваш ход." };
@@ -1825,11 +1926,13 @@
     if (owned + pct > 100) return { error: "У банка недостаточно свободных акций этой компании." };
     const feePct = bankFeePct(p.reputation);
     const cost = rollBuyCost(room, p, ticker, pct);
-    if (p.cash < cost) return { error: "Недостаточно наличных." };
+    const holdersFee = holdersFeeOnBuy(room, p, ticker, pct);
+    if (p.cash < cost + holdersFee.amount) return { error: holdersFee.amount ? `Недостаточно наличных: покупка ${fmt(cost)} и плата держателям ${fmt(holdersFee.amount)}.` : "Недостаточно наличных." };
     p.cash -= cost;
     p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
     addCostBasis(p, ticker, pct, cost);
     jr(room, p.id, "buy", { t: ticker, pct, cost: Math.round(cost) });
+    payHoldersFeeOnBuy(room, p, ticker, holdersFee);
     applyPriceDelta(room, ticker, 2 * (pct / 10));
     addLog(room, `${p.name} купил ${pct}% ${ticker} по броску кубиков за ${fmt(cost)}${feePct > 0 ? ` (вкл. комиссию банка ${(feePct * 100).toFixed(1)}% из-за репутации)` : ""}. Новая цена: ${fmt(room.companies[ticker].price)}.`, "trade", [p.id]);
     checkFullOwnership(room, ticker);
@@ -2094,6 +2197,40 @@
     // Правило: напрямую у банка акции покупаются только по результату броска кубиков
     // (см. buyFromRoll) — так рынок остаётся привязан к перемещению по столу.
     return { error: "Покупка у банка возможна только по результату броска кубиков." };
+  }
+
+  // Покупка вне броска (DIRECT_BUY): раз в ход до DIRECT_BUY_MAX_PCT любой
+  // компании у банка с наценкой. Как покупка по броску, двигает цену вверх.
+  function buyDirect(room, playerId, ticker, pctRaw) {
+    if (!DIRECT_BUY) return { error: "Покупка вне броска выключена." };
+    const err = requireOwnTurn(room, playerId);
+    if (err) return { error: err };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    const c = room.companies[ticker];
+    if (!c) return { error: "Неизвестная компания." };
+    if (c.merged) return { error: "Компания поглощена при слиянии — её акций больше нет." };
+    const key = DIRECT_BUY_PER_EVENT ? `${room.eventCount}:${p.id}` : `${room.eventCount}:${room.turn}:${p.id}`;
+    if (!room.directBuyKeys || typeof room.directBuyKeys !== "object") room.directBuyKeys = {};
+    if (room.directBuyKeys[p.id] === key) return { error: DIRECT_BUY_PER_EVENT ? "Покупка вне броска — раз в событие." : "Покупка вне броска — раз в ход." };
+    let pct = Math.round(Number(pctRaw));
+    if (!Number.isFinite(pct) || pct <= 0) pct = DIRECT_BUY_MAX_PCT;
+    pct = Math.max(1, Math.min(DIRECT_BUY_MAX_PCT, pct));
+    const free = Math.floor(100 - totalOwnedPct(room, ticker));
+    if (free < 1) return { error: "Свободных акций этой компании нет." };
+    pct = Math.min(pct, free);
+    const cost = c.price * (pct / 100) * (1 + DIRECT_BUY_MARKUP) * (1 + bankFeePct(p.reputation));
+    if (p.cash < cost) return { error: "Недостаточно наличных." };
+    p.cash -= cost;
+    p.holdings[ticker] = (p.holdings[ticker] || 0) + pct;
+    addCostBasis(p, ticker, pct, cost);
+    jr(room, p.id, "buy", { t: ticker, pct, cost: Math.round(cost) });
+    room.directBuyKeys[p.id] = key;
+    applyPriceDelta(room, ticker, 2 * (pct / 10));
+    addLog(room, `${p.name} купил ${pct}% ${ticker} у банка вне броска за ${fmt(cost)} (наценка ${Math.round(DIRECT_BUY_MARKUP * 100)}%).`, "trade", [p.id]);
+    checkFullOwnership(room, ticker);
+    checkEndGame(room);
+    return { ok: true };
   }
 
   function sellBank(room, playerId, ticker, pctRaw) {
@@ -2454,9 +2591,12 @@
     if (target.merged) return { error: "Компания поглощена при слиянии — её акций больше нет." };
     if (mine.includes(ticker)) return { error: "Действует только против чужой компании." };
     if (room.eventCount - target.lastNegInfoEvent < 2) return { error: "Эту компанию уже атаковали недавно — раз в 2 события." };
-    const cost = negativeInfoCost(room, p);
+    const cd = measureCooldownError(room, p, "negativeInfo");
+    if (cd) return { error: cd };
+    const cost = negativeInfoCost(room, p, ticker);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "negativeInfo");
     target.lastNegInfoEvent = room.eventCount;
     applyPriceDelta(room, ticker, -15);
     addLog(room, `📉 ${p.name} вбросил негативную информацию о ${ticker} за ${fmt(cost)}: −15%.`, "control");
@@ -2471,9 +2611,12 @@
     if ((p.holdings[ticker] || 0) <= 50) return { error: "Нужен контрольный пакет (>50%) этой компании." };
     const c = room.companies[ticker];
     if (room.eventCount === c.lastPrEvent) return { error: "PR-кампания по этой компании уже проведена в это событие." };
-    const cost = c.price * 0.05;
-    if (p.cash < cost) return { error: "Недостаточно наличных для PR-кампании (5% капитализации)." };
+    const cd = measureCooldownError(room, p, "pr");
+    if (cd) return { error: cd };
+    const cost = prCampaignCost(room, ticker);
+    if (p.cash < cost) return { error: `Недостаточно наличных для PR-кампании (${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "pr");
     c.lastPrEvent = room.eventCount;
     applyPriceDelta(room, ticker, 10);
     addLog(room, `📈 ${p.name} провёл PR-кампанию/байбэк ${ticker} за ${fmt(cost)}: +10%.`, "control");
@@ -2488,9 +2631,12 @@
     if (controlledTickers(room, p.id).length === 0) return { error: "Нужен контрольный пакет (>50%) хотя бы одной компании." };
     if (room.insiderUsedEvent[p.id] === room.eventCount) return { error: "Инсайд уже использован в это событие." };
     if (room.pendingInsider) return { error: "Кто-то уже подсматривает карту — дождитесь решения." };
+    const cd = measureCooldownError(room, p, "insider");
+    if (cd) return { error: cd };
     const cost = insiderPeekCost(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "insider");
     room.insiderUsedEvent[p.id] = room.eventCount;
     if (room.deckPos >= room.deckOrder.length) { room.deckOrder = shuffle(room.deckOrder); room.deckPos = 0; }
     const idx = room.deckOrder[room.deckPos];
@@ -2816,9 +2962,12 @@
     if (!p || p.bankrupt) return { error: "Недоступно." };
     if (!target || target.bankrupt || target.id === p.id) return { error: "Некорректная цель." };
     if (room.spyCooldown[targetId] === room.eventCount) return { error: "За эту цель уже брались в это событие — попробуйте после следующего." };
+    const cd = measureCooldownError(room, p, "espionage");
+    if (cd) return { error: cd };
     const cost = espionageCost(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "espionage");
     room.spyCooldown[targetId] = room.eventCount;
     p.lastDirtyActionEvent = room.eventCount;
     const targetRep = target.reputation == null ? REPUTATION_START : target.reputation;
@@ -2845,9 +2994,12 @@
     if (!p || p.bankrupt) return { error: "Недоступно." };
     if (!target || target.bankrupt || target.id === p.id) return { error: "Некорректная цель." };
     if (room.discreditCooldown[targetId] === room.eventCount) return { error: "Эту цель уже дискредитировали в это событие." };
+    const cd = measureCooldownError(room, p, "discredit");
+    if (cd) return { error: cd };
     const cost = discreditCost(room, p, target);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "discredit");
     room.discreditCooldown[targetId] = room.eventCount;
     p.lastDirtyActionEvent = room.eventCount;
     const success = Math.random() < 0.55;
@@ -2875,9 +3027,12 @@
     if (room.eventCount === p.personalPrLastEvent) return { error: "Личный PR уже использован в это событие." };
     const rep = p.reputation == null ? REPUTATION_START : p.reputation;
     if (rep >= 100) return { error: "Репутация уже максимальна." };
+    const cd = measureCooldownError(room, p, "personalPr");
+    if (cd) return { error: cd };
     const cost = personalPrCostFor(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "personalPr");
     p.personalPrCount = (p.personalPrCount || 0) + 1;
     p.personalPrLastEvent = room.eventCount;
     adjustReputation(room, p, 4, "личный PR");
@@ -2890,9 +3045,11 @@
   // капитала и репутации самой цели (богаче и репутабельнее — доступнее
   // качественное расследование). Раскрывает самый старый нераскрытый случай.
   function investigationCost(room, player) {
+    if (MEASURE_COST_MODE === "cooldown") return 0;
+    const k = MEASURE_COST_MODE === "company" ? MEASURE_SCALE : 1;
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
     const base = clamp(Math.round(netWorth(room, player) * 0.04), 5000, 50000);
-    return Math.max(3000, Math.round(base - rep * 40));
+    return Math.round(Math.max(3000, base - rep * 40) * k);
   }
   function investigationChance(room, player) {
     const rep = player.reputation == null ? REPUTATION_START : player.reputation;
@@ -2906,9 +3063,12 @@
     const incidents = room.spyIncidents.filter((i) => i.targetId === playerId).sort((a, b) => a.eventCount - b.eventCount);
     if (!incidents.length) return { error: "Нет нераскрытых случаев против вас — расследовать нечего." };
     const incident = incidents[0];
+    const cd = measureCooldownError(room, p, "investigate");
+    if (cd) return { error: cd };
     const cost = investigationCost(room, p);
     if (p.cash < cost) return { error: `Недостаточно наличных (нужно ${fmt(cost)}).` };
     p.cash -= cost;
+    noteMeasure(room, p, "investigate");
     const success = Math.random() < investigationChance(room, p);
     room.spyIncidents = room.spyIncidents.filter((i) => i.id !== incident.id);
     if (success) {
@@ -3353,7 +3513,7 @@
     settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
     addPlayer, setConnected, leaveLobby, newGameKeepPlayers, startGame, updateRoomSettings, setMaxRounds, deleteRoom, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade,
-    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct,
+    setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, holdersFeeOnBuy, prCampaignCost,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort, ctrlPublicIPO, ctrlMergeCompanies,
     declareBankruptcy, forceEvent,
     adjustReputation, bankFeePct, loanTerms, takeLoan, repayLoan, processLoans,

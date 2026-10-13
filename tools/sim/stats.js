@@ -47,7 +47,7 @@ function aggregate(records, opts) {
   // --- профили и места ---
   const byProfile = {};
   const prof = (name) => (byProfile[name] = byProfile[name] || {
-    appearances: 0, wins: 0, nw: [], rank: [], bankrupt: 0, lowCash: [], loans: 0, controlled: [], cities: [], actions: {}, errors: {},
+    appearances: 0, wins: 0, nw: [], cash: [], rank: [], bankrupt: 0, lowCash: [], loans: 0, controlled: [], cities: [], actions: {}, errors: {},
   });
   const seatWins = Array.from({ length: players }, () => 0);
   valid.forEach((r) => {
@@ -55,6 +55,7 @@ function aggregate(records, opts) {
       const b = prof(p.profile);
       b.appearances++;
       b.nw.push(p.nw);
+      if (Number.isFinite(p.cash)) b.cash.push(p.cash);
       b.rank.push(p.rank);
       if (p.bankrupt) b.bankrupt++;
       b.lowCash.push(p.lowCash);
@@ -76,6 +77,7 @@ function aggregate(records, opts) {
       appearances: b.appearances,
       win: rate(b.wins, b.appearances),
       finalNetWorth: describe(b.nw),
+      finalCash: describe(b.cash),
       avgRank: r3(b.rank.reduce((s, x) => s + x, 0) / Math.max(1, b.rank.length)),
       bankruptRate: rate(b.bankrupt, b.appearances),
       lowCashShare: describe(b.lowCash),
