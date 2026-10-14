@@ -549,7 +549,7 @@
       <div id="marketHeatmap" hidden></div>
       <div class="table-scroll" id="marketTableWrap">
       <table id="marketTable">
-        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th class="col-spark" title="История цены с начала сессии">График</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
+        <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th class="col-spark" title="История цены с начала сессии">График</th><th>У игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
       </table>
       </div>
@@ -3873,8 +3873,7 @@ function renderMarketTable(s){
       <td class="price">${fmt(c.price)}</td>
       <td>${deltaPill(c.price, c.prevPrice)}</td>
       <td class="col-spark">${sparklineSvg(c.ticker, c.price, delta)}</td>
-      <td><span class="vol-badge vol-${c.volLabel==='Низкая'?'low':c.volLabel==='Высокая'?'high':'med'}">${escapeHtml(c.volLabel||"")}</span></td>
-      <td><span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="muted">${c.owned>0?`у игроков ${c.owned.toFixed(0)}%`:"свободна"}</span></td>
+      <td>${c.owned >= 0.5 ? `<span class="owned-bar"><span class="owned-fill" style="width:${c.owned}%"></span></span> <span class="mono owned-pct">${c.owned.toFixed(0)}%</span>` : ""}</td>
     `;
     body.appendChild(tr);
   });
@@ -4324,7 +4323,10 @@ function computeAvatarsHtml(s){
   const now = Date.now();
   // Партия с лимитом: место по капиталу кружком перед именем (1–3 — медали,
   // как на экране итогов). Выбывшие мест не получают; пока все вровень — мест нет.
-  const standings = s.phase === "roll" ? capitalStandings(s) : null;
+  // Кружки мест — только в финальных раундах: в начале партии разница в
+  // несколько долларов и «места» ничего не значат (как строка места у капитала).
+  const leftR = roundsLeftOf(s);
+  const standings = s.phase === "roll" && leftR != null && leftR <= FINAL_ROUNDS ? capitalStandings(s) : null;
   const places = standings ? standings.places : {};
   const chips = s.players.map(p=>{
     const isTurn = p.id === s.currentPlayerId && s.phase === "roll" && !p.bankrupt;
@@ -6464,25 +6466,6 @@ function refreshRealEstateModal(){
     ${actionsHtml}
   `;
 }
-// Сглаженная кривая через точки (Catmull-Rom -> кубические Безье) — вместо
-// ломаной линии, для более "инвесторского" вида графика (как в биржевых приложениях).
-function catmullRomPath(pts){
-  if(pts.length < 2) return "";
-  if(pts.length === 2) return `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} L${pts[1][0].toFixed(1)},${pts[1][1].toFixed(1)}`;
-  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} `;
-  for(let i=0;i<pts.length-1;i++){
-    const p0 = pts[i-1] || pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i+1];
-    const p3 = pts[i+2] || p2;
-    const cp1x = p1[0] + (p2[0]-p0[0])/6;
-    const cp1y = p1[1] + (p2[1]-p0[1])/6;
-    const cp2x = p2[0] - (p3[0]-p1[0])/6;
-    const cp2y = p2[1] - (p3[1]-p1[1])/6;
-    d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} `;
-  }
-  return d;
-}
 function fullChartSvg(ticker, color){
   const w = 440, h = 140, pad = 6;
   const hist = priceHistoryClient[ticker] || [];
@@ -6491,10 +6474,15 @@ function fullChartSvg(ticker, color){
     return { svg: `<svg id="fcSvg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" data-points="[]"><line x1="${pad}" y1="${h/2}" x2="${w-pad}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,4" opacity=".6"/></svg>`, min: only, max: only };
   }
   const min = Math.min(...hist), max = Math.max(...hist);
-  const span = (max - min) || 1;
+  // Масштаб не меньше ±6% от середины: иначе колебание на 1–2% растягивалось
+  // на всю высоту и выглядело обвалом или взлётом (скилл dataviz — не
+  // преувеличивать). Линия — отрезками: сглаживание выносило её за min/max.
+  const mid = (min + max) / 2, minSpan = Math.max(1, mid * 0.12);
+  const lo = max - min >= minSpan ? min : mid - minSpan / 2;
+  const span = max - min >= minSpan ? (max - min) : minSpan;
   const step = (w - pad*2) / (hist.length - 1);
-  const pts = hist.map((v,i)=>[pad + i*step, h - pad - ((v-min)/span) * (h - pad*2), v]);
-  const pathD = catmullRomPath(pts.map(p=>[p[0],p[1]]));
+  const pts = hist.map((v,i)=>[pad + i*step, h - pad - ((v-lo)/span) * (h - pad*2), v]);
+  const pathD = "M" + pts.map(p=> `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" L");
   const last = pts[pts.length-1];
   const areaD = `${pathD} L${last[0].toFixed(1)},${(h-pad).toFixed(1)} L${pts[0][0].toFixed(1)},${(h-pad).toFixed(1)} Z`;
   const gridLines = [0.25,0.5,0.75].map(f=>{
@@ -6588,9 +6576,12 @@ function refreshCompanyModal(){
   const s = latest;
   const c = (s.companies||[]).find(x=>x.ticker===openModalTicker);
   if(!c){ closeCompanyModal(); return; }
-  const delta = c.price - c.prevPrice;
   const controller = s.players.find(p=>p.id===c.controllerId);
-  const color = delta>0 ? "#7FD1A3" : delta<0 ? "#EE8A6E" : "#BDB1A1";
+  // Цвет графика — по изменению за весь показанный период, а не за последний
+  // шаг: иначе рост на 20% с небольшим откатом в конце рисовался красным.
+  const hist = priceHistoryClient[c.ticker] || [];
+  const trend = hist.length > 1 ? hist[hist.length - 1] - hist[0] : c.price - c.prevPrice;
+  const color = trend>0 ? "#7FD1A3" : trend<0 ? "#EE8A6E" : "#BDB1A1";
   const chart = fullChartSvg(c.ticker, color);
   const me = s.players.find(p=>p.id===you);
   const myHolding = me ? (me.holdings[c.ticker]||0) : 0;
@@ -6609,15 +6600,11 @@ function refreshCompanyModal(){
       </div>`;
     }
   } else {
-    const nCells = GameEngine.BOARD.flat().filter(x=>x===c.ticker).length;
     const db = s.directBuy; // правила 2 (engine.js, buyDirect): раз в ход, с наценкой
     const free = Math.floor(100 - c.owned);
-    actionsHtml += `<div class="sheet-note">${nCells} ${pluralRu(nCells, "клетка", "клетки", "клеток")} на поле${hintBtn("company-cells", db
-      ? `Купить долю у банка можно, когда фишка попадёт на клетку этой компании, или вне броска: раз в ход до ${db.maxPct}% с наценкой ${db.markupPct}%.`
-      : "Купить долю у банка можно, когда фишка попадёт на одну из клеток этой компании.")}</div>`;
     if(db && s.currentPlayerId === you && free >= 1 && !c.merged){
       if(db.used){
-        actionsHtml += `<div class="sheet-note">${ico("clock","ico-sm")} Покупка вне броска уже была в этот ход</div>`;
+        actionsHtml += `<button type="button" class="secondary block" disabled>${ico("clock","ico-sm")} Вне броска — в следующий ход</button>`;
       } else {
         const dMax = Math.min(db.maxPct, free);
         const dUnit = c.price/100 * (1 + db.markupPct/100) * (1 + (s.bankFeePct||0));
@@ -6642,25 +6629,33 @@ function refreshCompanyModal(){
       <button type="button" class="secondary block" onclick="doSellStock('${c.ticker}', pctSliderVal('cmSellSlider_${c.ticker}'));">Продать</button>
     </div>`;
   }
+  // Цифры — только те, что есть: без «Контроль: нет» и «У вас: —». Свой пакет и
+  // его доход — одной строкой, «у соперников» — без вашей доли.
+  const nCells = GameEngine.BOARD.flat().filter(x=>x===c.ticker).length;
+  const statsCells = [];
+  if(myHolding){
+    const pnlTxt = myPnl ? ` <span class="${myPnl.pnl>=0?'up':'down'}">${myPnl.pnl>=0?"▲ +":"▼ −"}${fmtShort(Math.abs(myPnl.pnl))} (${myPnl.pnl>=0?"+":"−"}${Math.abs(myPnl.pnlPct).toFixed(1).replace(".", ",")}%)</span>` : "";
+    statsCells.push(`<div class="cap-mini" style="grid-column:1/-1;"><span>Ваш пакет</span><b>${myHolding}% · ${fmtShort(c.price*myHolding/100)}${pnlTxt}</b></div>`);
+  }
+  if(othersPct >= 1) statsCells.push(`<div class="cap-mini"><span>У соперников</span><b>${othersPct}%</b></div>`);
+  if(controller && controller.id !== you) statsCells.push(`<div class="cap-mini"><span>Контроль</span><b>${escapeHtml(controller.name)}</b></div>`);
+  else if(controller) statsCells.push(`<div class="cap-mini"><span>Контроль</span><b>у вас</b></div>`);
+  if(c.divRatePct) statsCells.push(`<div class="cap-mini"><span>Дивиденды</span><b>${String(c.divRatePct).replace(".", ",")}% за событие</b></div>`);
   document.getElementById("companyModalCard").innerHTML = `
     <div class="company-modal-head">
       ${logoHtml(c.ticker,48)}
       <div style="min-width:0;">
         <h2>${escapeHtml(c.name)}</h2>
-        <div class="muted">${c.ticker} · ${escapeHtml(c.sector)}</div>
+        <div class="muted">${c.ticker} · ${escapeHtml(c.sector)} · ${nCells} ${pluralRu(nCells, "клетка", "клетки", "клеток")}${hintBtn("company-cells", s.directBuy
+          ? `Купить долю у банка можно, когда фишка попадёт на одну из ${nCells} клеток этой компании, или вне броска: раз в ход до ${s.directBuy.maxPct}% с наценкой ${s.directBuy.markupPct}%.`
+          : `Купить долю у банка можно, когда фишка попадёт на одну из ${nCells} клеток этой компании.`)}</div>
       </div>
       <button type="button" class="company-modal-close" aria-label="Закрыть" onclick="closeCompanyModal()">${ico("x")}</button>
     </div>
-    <div style="display:flex;align-items:baseline;gap:10px;margin:16px 0 4px;"><span class="mono" style="font-size:28px;">${fmt(c.price)}</span>${deltaPill(c.price, c.prevPrice)}</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin:16px 0 4px;"><span class="mono num-big" style="font-size:28px;">${fmt(c.price)}</span>${deltaPill(c.price, c.prevPrice)}</div>
     <div class="full-chart-wrap"><div class="fc-tooltip" id="fcTooltip"></div>${chart.svg}<div class="full-chart-minmax"><span>мин ${fmt(chart.min)}</span><span>макс ${fmt(chart.max)}</span></div></div>
     ${companyProfileNoteHtml(c)}
-    <div class="company-modal-stats">
-      <div class="cap-mini"><span>У игроков</span><b>${c.owned.toFixed(0)}%</b></div>
-      ${c.divRatePct ? `<div class="cap-mini"><span>Дивиденды за событие</span><b>${String(c.divRatePct).replace(".", ",")}%</b></div>` : `<div class="cap-mini"><span>Волатильность</span><b>${escapeHtml(c.volLabel||"")}</b></div>`}
-      <div class="cap-mini"><span>Контроль</span><b>${controller ? escapeHtml(controller.id===you?"вы":controller.name) : "нет"}</b></div>
-      <div class="cap-mini"><span>У вас</span><b>${myHolding ? `${myHolding}% · ${fmtShort(c.price*myHolding/100)}` : "—"}</b></div>
-      ${myPnl ? `<div class="cap-mini" style="grid-column:1/-1;"><span>Прибыль/убыток по пакету</span><b class="${myPnl.pnl>=0?'up':'down'}">${myPnl.pnl>=0?"▲ +":"▼ −"}${fmt(Math.abs(myPnl.pnl))} (${myPnl.pnl>=0?"+":""}${myPnl.pnlPct.toFixed(1).replace(".", ",")}%)</b></div>` : ""}
-    </div>
+    <div class="company-modal-stats">${statsCells.join("")}</div>
     ${actionsHtml}
   `;
   initFullChartInteractivity();
@@ -6671,7 +6666,8 @@ function companyProfileNoteHtml(c){
   const pr = companyProfile(c);
   let html = "";
   if(c.distress) html += `<div class="co-profile bad">${ico("alert")}<div><b>На грани банкротства</b><span>Цена ниже ${fmt(c.distressPrice)}. Не поднимется к следующему событию — компания обанкротится, все пакеты сгорят. Владелец контрольного пакета может её спасти.</span></div></div>`;
-  if(pr) html += `<div class="co-profile"><span class="co-profile-ico" aria-hidden="true">${ico(pr.icon)}</span><div><b>${escapeHtml(pr.label)}</b><span>${escapeHtml(pr.desc)}${c.bankruptcies ? ` Банкротств за партию: ${c.bankruptcies}.` : ""}</span></div></div>`;
+  // Характер — одной строкой, описание за «?».
+  if(pr) html += `<div class="co-profile compact"><span class="co-profile-ico" aria-hidden="true">${ico(pr.icon)}</span><b>${escapeHtml(pr.label)}</b>${c.bankruptcies ? `<span class="co-profile-meta">банкротств: ${c.bankruptcies}</span>` : ""}${hintBtn("profile-" + pr.label, escapeHtml(pr.desc))}</div>`;
   return html;
 }
 function doCtrlNegativeInfo(){

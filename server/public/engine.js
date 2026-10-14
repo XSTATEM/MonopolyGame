@@ -1423,7 +1423,7 @@
     if (roll <= 2) volPct = -5; else if (roll >= 5) volPct = 5;
     // Правила 3: кубик сдвигает компанию по её beta (стабильные — вполовину).
     COMPANIES.forEach((c) => applyPriceDelta(room, c.ticker, v3 ? volPct * profileOf(c).beta : volPct));
-    addLog(room, `Кубик волатильности: ${roll} → база ${volPct > 0 ? "+" : ""}${volPct}% всем компаниям (фактически сильнее у волатильных тикеров)`, "vol");
+    addLog(room, `Кубик рынка: ${roll} → ${volPct > 0 ? "+" : volPct < 0 ? "−" : ""}${Math.abs(volPct)}% всем компаниям`, "vol");
     if (ev) ev.vol = { roll, pct: volPct };
 
     processLoans(room);
@@ -1920,15 +1920,15 @@
       if (room.extraTurnPending && p && !p.bankrupt) {
         room.extraTurnPending = false;
         room.turnIndex = myIdx;
-        addLog(room, `${p ? p.name : "?"} получил(а) дополнительный ход за это событие!`, "turn");
+        addLog(room, `${p ? p.name : "?"}: дополнительный ход за это событие.`, "turn");
       } else {
         room.extraTurnPending = false;
         room.turnIndex = nextIdx;
-        addLog(room, `${p ? p.name : "?"} завершил(а) ход. Ход переходит дальше.`, "turn");
       }
     } else {
+      // «X завершил(а) ход. Ход в раунде: N/M» не пишем: следующий бросок и так
+      // это показывает, а лента состояла наполовину из таких строк.
       room.turnIndex = nextIdx;
-      addLog(room, `${p ? p.name : "?"} завершил(а) ход. Ход в раунде: ${room.turn}/${roundLen}.`, "turn");
     }
     checkEndGame(room);
     return { ok: true };
@@ -2385,17 +2385,17 @@
     const p = room.players.find((x) => x.id === playerId);
     const turnSalary = room.settings?.turnSalary ?? TURN_SALARY;
     p.cash += turnSalary;
-    const salaryNote = ` (+${fmt(turnSalary)} зарплата)`;
+    const salaryNote = turnSalary ? ` · +${fmt(turnSalary)}` : "";
     if (isRealEstateCell(cell)) {
       const cityId = cityIdFromCell(cell);
       room.pendingRoll = { playerId, row, col, ticker: null, realEstateId: cityId };
-      addLog(room, `${p.name}: бросок строка ${row}, столбец ${col} → недвижимость в г. ${cityById(cityId).name}.${salaryNote}`, "roll");
+      addLog(room, `${p.name} → ${cityById(cityId).name}${salaryNote}`, "roll");
     } else {
       room.pendingRoll = { playerId, row, col, ticker: cell, realEstateId: null };
       // Компания под единоличным контролем соперника — с этого момента идёт срок
       // его решения о цене выкупа (ставит pendingRoll.controllerWaitSince).
       controllerWaitLeftMs(room, rollController(room, room.pendingRoll));
-      addLog(room, `${p.name}: бросок строка ${row}, столбец ${col} → ${companyByTicker(cell).name} (${cell}).${salaryNote}`, "roll");
+      addLog(room, `${p.name} → ${companyByTicker(cell).name}${salaryNote}`, "roll");
       // Правила 2: плата держателям — сразу и обязательно.
       if (rulesV2(room)) {
         chargeLandingFee(room, p);
@@ -2484,7 +2484,7 @@
     owners.forEach((o) => { const share = amount * (o.holdings[ticker] / totalPct); o.cash += share; stat(room, o.id, "feeIn", share); });
     stat(room, payer.id, "feeOut", amount);
     jr(room, payer.id, "fee", { t: ticker, paid: amount, own: payer.holdings[ticker] || 0 });
-    addLog(room, `${payer.name} заплатил(а) держателям ${ticker} ${fmt(amount)}${discount < 1 ? ` (скидка ${Math.round((1 - discount) * 100)}% за свою долю)` : ""}.`, "dividend");
+    addLog(room, `${payer.name}: плата держателям ${ticker} ${fmt(amount)}${discount < 1 ? ` (скидка ${Math.round((1 - discount) * 100)}% за свою долю)` : ""}`, "dividend");
     roll.fee = { settled: true, paid: amount, reason: "paid", discount };
     settleDebt(room, payer);
   }
@@ -2524,7 +2524,7 @@
       return { ok: true };
     }
     jr(room, payer.id, "refuse", Object.assign(refuseInfo(room, payer, ticker), { paid: 0 }));
-    addLog(room, `${payer.name} не стал(а) покупать ${ticker}.`, "turn");
+    addLog(room, `${payer.name}: без покупки ${ticker}.`, "turn");
     afterRollAction(room);
     return { ok: true };
   }
@@ -2712,7 +2712,7 @@
       const price = realEstatePrice(room, roll.realEstateId) * (1 + bankFeePct(p.reputation));
       jr(room, p.id, "reSkip", { city: roll.realEstateId, cost: Math.round(price), afford: p.cash >= price });
     }
-    addLog(room, `${p.name} пропустил действие.`, "turn");
+    addLog(room, `${p.name}: без покупки.`, "turn");
     afterRollAction(room);
     return { ok: true };
   }
@@ -3627,6 +3627,8 @@
   //     бонус за репутацию "чистых рук", не чаще раза в 3 события.
   function processReputationRecovery(room) {
     const CLEAN_STREAK_EVENTS = 3;
+    // Бонус «чистых рук» — одной строкой на всех, а не строкой на каждого.
+    const clean = [];
     activePlayers(room).forEach((p) => {
       const rep = p.reputation == null ? REPUTATION_START : p.reputation;
       if (rep < REPUTATION_START && !p.loan) {
@@ -3637,9 +3639,10 @@
       if (room.eventCount - lastDirty >= CLEAN_STREAK_EVENTS && room.eventCount - lastCleanBonus >= CLEAN_STREAK_EVENTS) {
         p.lastCleanBonusEvent = room.eventCount;
         adjustReputation(room, p, 2, "репутация «чистых рук»");
-        addLog(room, `${p.name} получил(а) бонус к репутации за отсутствие грязных методов.`, "reputation");
+        clean.push(p.name);
       }
     });
+    if (clean.length) addLog(room, `Репутация +2 за честную игру: ${clean.join(", ")}.`, "reputation");
   }
 
   // Рыночный дрейф городов — раз в биржевое событие. Также начисляется пассивная

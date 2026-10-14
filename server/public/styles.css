@@ -132,7 +132,9 @@ a{color:var(--accent);}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
 .muted{color:var(--text-2);}
 .up{color:var(--up);} .down{color:var(--down);}
-.price,.net,.mono{font-family:var(--font-mono);font-weight:700;font-variant-numeric:tabular-nums;}
+/* word-spacing: в моноширинном шрифте пробел между разрядами (fmt ставит
+   неразрывный) шириной с цифру — «$41  397» распадалось на два числа. */
+.price,.net,.mono{font-family:var(--font-mono);font-weight:700;font-variant-numeric:tabular-nums;word-spacing:-0.3em;}
 h1,h2,h3{font-weight:800;letter-spacing:-.01em;}
 h2{font-size:13px;margin:0 0 12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.08em;}
 
@@ -200,10 +202,6 @@ button.chip{min-height:36px;}
 .badge.online{background:var(--up-bg);color:var(--up);}
 .points-badge{background:var(--warn-bg);color:var(--warn);}
 .sector-tag{font-size:12px;padding:2px 9px;border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--line);color:var(--text-2);white-space:nowrap;}
-.vol-badge{font-size:11.5px;padding:2px 9px;border-radius:var(--r-pill);white-space:nowrap;font-weight:700;border:1px solid var(--line-strong);color:var(--text-2);}
-.vol-badge.vol-low{color:var(--accent);}
-.vol-badge.vol-med{color:var(--warn);}
-.vol-badge.vol-high{color:var(--down);}
 .delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--font-mono);font-weight:700;font-size:12.5px;border-radius:var(--r-pill);padding:3px 8px;white-space:nowrap;}
 .delta.up{color:var(--up);background:var(--up-bg);}
 .delta.down{color:var(--down);background:var(--down-bg);}
@@ -749,7 +747,7 @@ main{margin:0;padding:0;}
 .cap-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;border-radius:var(--r-lg);overflow:hidden;background:var(--line);border:1px solid var(--line);}
 .cap-strip > div{background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0;}
 .cap-strip .cs-label{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);white-space:nowrap;}
-.cap-strip .cs-val{font-family:var(--font-mono);font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+.cap-strip .cs-val{font-family:var(--font-mono);font-size:15px;font-weight:700;word-spacing:-0.3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
 .cap-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .rep-badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .rep-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);background:var(--surface-2);color:var(--text-2);border:1px solid var(--line);}
@@ -983,9 +981,9 @@ tr.active-row td{background:color-mix(in srgb, var(--stage-accent) 10%, transpar
   #marketTable td:nth-child(3){grid-area:price;text-align:right;font-size:15px;}
   #marketTable td:nth-child(4){grid-area:delta;text-align:right;}
   #marketTable td:nth-child(5){grid-area:spark;align-self:center;}
-  #marketTable td:nth-child(6){display:none;}
-  #marketTable td:nth-child(7){grid-area:own;margin-top:8px;display:flex;align-items:center;gap:8px;font-size:12px;}
-  #marketTable td:nth-child(7) .owned-bar{flex:1;width:auto;}
+  #marketTable td:nth-child(6){grid-area:own;margin-top:8px;display:flex;align-items:center;gap:8px;font-size:12px;}
+  #marketTable td:nth-child(6):empty{display:none;}
+  #marketTable td:nth-child(6) .owned-bar{flex:1;width:auto;}
   #marketTable tr.empty-row{display:block;}
 }
 
@@ -2069,3 +2067,10 @@ button.rep-badge.ev-news-badge{min-height:28px;max-width:100%;padding:4px 10px;f
 .lobby-chat-count{min-height:22px;padding:0 8px;font-size:12px;}
 .join-box .lobby-leave{display:flex;width:100%;justify-content:center;gap:6px;margin-top:10px;color:var(--down);border-color:transparent;}
 #lobbyPlayers .lobby-player-row:last-child{margin-bottom:0;}
+
+/* Карточка компании: характер одной строкой, описание — за «?» */
+.co-profile.compact{align-items:center;gap:8px;}
+.co-profile.compact b{font-size:14px;}
+.co-profile.compact .co-profile-meta{font-size:12px;color:var(--text-2);}
+.co-profile.compact .hint-q{margin-left:auto;}
+.cap-mini b .up, .cap-mini b .down{font-weight:700;}
