@@ -2089,6 +2089,65 @@ test("правила 3: поглощение — по пакету на моме
   return r;
 });
 
+test("сделка «Купить»: просьба продать акции соперника, бот отвечает с причиной", () => {
+  const r = v2game(["A", "Бот", "C"]);
+  const A = P(r, "A"), bot = P(r, "Бот"), C = P(r, "C");
+  bot.isBot = true;
+  bot.holdings.NVDA = 30; C.holdings.KO = 20;
+  r.companies.NVDA.price = 20000;
+  // Купить дешевле рынка +10% — отказ с причиной, видной только участникам.
+  assert.ok(!E.proposeTrade(r, A.id, bot.id, "NVDA", 10, 2000, null, 0, "buy").error);
+  assert.equal(r.pendingTrades[0].kind, "buy");
+  assert.ok(E.proposeTrade(r, A.id, bot.id, "NVDA", 10, 2100, null, 0, "buy").error, "дубль просьбы — нельзя");
+  let st = E.botStep(r);
+  assert.equal(st.type, "respondTrade");
+  assert.equal(A.holdings.NVDA || 0, 0, "не продал");
+  const dec = r.log.find((e) => /Бот отклонил предложение A по NVDA: просит не меньше \$2\s200/.test(e.text));
+  assert.ok(dec, "причина отказа: " + r.log.slice(-3).map((e) => e.text).join(" | "));
+  assert.deepEqual(dec.visibleTo, [A.id, bot.id], "только участникам");
+  // От рынка +10% — продаёт; деньги и акции переходят.
+  const a0 = A.cash, b0 = bot.cash;
+  assert.ok(!E.proposeTrade(r, A.id, bot.id, "NVDA", 10, 2200, null, 0, "buy").error);
+  E.botStep(r);
+  assert.equal(A.holdings.NVDA, 10);
+  assert.equal(bot.holdings.NVDA, 20);
+  assert.equal(a0 - A.cash, 2200);
+  assert.equal(bot.cash - b0, 2200);
+  assert.equal(Math.round(A.costBasis.NVDA), 2200, "себестоимость — цена сделки");
+  // Без нужного пакета бот теряет контроль — просит рынок +60%.
+  bot.holdings.MSFT = 55; r.companies.MSFT.price = 40000;
+  assert.equal(E.botSellDecision(r, bot, "MSFT", 10, 4400).accept, false);
+  assert.ok(/теряет контроль/.test(E.botSellDecision(r, bot, "MSFT", 10, 4400).reason));
+  assert.equal(E.botSellDecision(r, bot, "MSFT", 10, 6400).accept, true);
+  assert.equal(E.botSellDecision(r, bot, "TSLA", 5, 99999).accept, false, "нет акций — не продаёт");
+  // Человеку: принять просьбу купить — продаёт свои акции.
+  assert.ok(!E.proposeTrade(r, A.id, C.id, "KO", 10, 2500, null, 0, "buy").error);
+  const tr = r.pendingTrades.find((x) => x.toId === C.id);
+  const c0 = C.cash;
+  assert.ok(!E.respondTrade(r, C.id, tr.id, true).error);
+  assert.equal(C.holdings.KO, 10);
+  assert.equal(A.holdings.KO, 10);
+  assert.equal(C.cash - c0, 2500);
+  // Нет денег — предложить нельзя; нет акций у продавца — отказ при ответе.
+  A.cash = 100;
+  assert.ok(/Не хватает наличных/.test(E.proposeTrade(r, A.id, C.id, "KO", 5, 1000, null, 0, "buy").error));
+  A.cash = 50000;
+  assert.ok(!E.proposeTrade(r, A.id, C.id, "AAPL", 5, 1000, null, 0, "buy").error);
+  const tr2 = r.pendingTrades.find((x) => x.toId === C.id && x.ticker === "AAPL");
+  assert.ok(/нет столько акций/.test(E.respondTrade(r, C.id, tr2.id, true).error));
+  return r;
+});
+test("бот объясняет отказ купить: сколько готов заплатить", () => {
+  const r = v2game(["A", "Бот"]);
+  const A = P(r, "A"), bot = P(r, "Бот");
+  bot.isBot = true;
+  A.holdings.KO = 20; r.companies.KO.price = 20000;
+  assert.ok(!E.proposeTrade(r, A.id, bot.id, "KO", 10, 3000).error);
+  E.botStep(r);
+  assert.ok(r.log.some((e) => /Бот отклонил предложение A по KO: готов заплатить не больше \$2\s000/.test(e.text)), r.log.slice(-2).map((e) => e.text).join(" | "));
+  return r;
+});
+
 // ---------------------------------------------------------------------
 // Прогон
 // ---------------------------------------------------------------------

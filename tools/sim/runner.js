@@ -51,7 +51,7 @@ const LOG_COUNTERS = [
   ["reSetBonus", "realestate", "за комплект"],
   ["reTax", "realestate", "налог на недвижимость"],
   ["reTaxMissed", "realestate", "не может заплатить налог"],
-  ["cleanHandsBonus", "reputation", "грязных методов"],
+  ["cleanHandsBonus", "reputation", "за честную игру"], // одна строка на событие, а не на игрока
   ["extraTurn", "turn", "дополнительный ход"],
   ["deckReshuffle", "deck", null],
   ["cardGlobal", "news", "[Глобальная]"],
