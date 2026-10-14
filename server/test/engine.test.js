@@ -1847,6 +1847,7 @@ test("правила 2: боты торгуют между собой; стар�
   const r = v2game(["A", "B"], true);
   const A = P(r, "A"), B = P(r, "B");
   A.holdings.AAPL = 8; B.holdings.AAPL = 45; B.cash = 1e6;
+  r.projectOffers = []; // проекты правил 4 здесь ни при чём: бот не должен тратить на них ход
   fixRandom(0.01); // план хода: покупка вне броска и сделка
   let proposed = false, accepted = false, aBefore = 0;
   for (let i = 0; i < 6 && !accepted; i++) {
@@ -1874,7 +1875,7 @@ test("правила 2: боты торгуют между собой; стар�
 function quietCard(r) { r.deckData[r.deckOrder[r.deckPos]] = { type: "global", title: "Тихий день", percent: 0 }; }
 test("правила 3: у каждой компании характер, растущая дорожает, угасающая дешевеет", () => {
   const r = v2game(["A", "B"]);
-  assert.equal(r.rulesV, 3, "новая комната — правила 3");
+  assert.ok(r.rulesV >= 3, "новая комната — правила 3 и новее");
   E.COMPANIES.forEach((c) => assert.ok(E.COMPANY_PROFILES[c.profile], `характер у ${c.ticker}: ${c.profile}`));
   const kinds = new Set(E.COMPANIES.map((c) => c.profile));
   assert.equal(kinds.size, 5, "все пять характеров в игре");
@@ -2145,6 +2146,99 @@ test("бот объясняет отказ купить: сколько гото
   assert.ok(!E.proposeTrade(r, A.id, bot.id, "KO", 10, 3000).error);
   E.botStep(r);
   assert.ok(r.log.some((e) => /Бот отклонил предложение A по KO: готов заплатить не больше \$2\s000/.test(e.text)), r.log.slice(-2).map((e) => e.text).join(" | "));
+  return r;
+});
+
+// ---------------------------------------------------------------------
+// Правила 4: инвестпроекты, растущая плата, советник
+// ---------------------------------------------------------------------
+test("правила 4: проект — вложение, доход каждое событие, конец срока; в капитале остаток", () => {
+  const r = v2game(["A", "B"]);
+  assert.equal(r.rulesV, 4);
+  const A = P(r, "A");
+  assert.ok(r.projectOffers.length >= 2, "к началу партии уже есть предложения");
+  const offer = r.projectOffers[0];
+  A.cash = 300000; // дорогой проект может стоить больше стартовых денег
+  const a0 = A.cash, nw0 = E.netWorth(r, A);
+  assert.ok(!E.buyProject(r, A.id, offer.id).error);
+  assert.equal(A.cash, a0 - offer.cost);
+  assert.ok(Math.abs(E.netWorth(r, A) - nw0) < 1, "вложение не меняет капитал: проект стоит остаток вложения");
+  assert.ok(!r.projectOffers.some((o) => o.id === offer.id), "проект снят с витрины");
+  assert.ok(E.buyProject(r, A.id, offer.id).error, "дважды не купить");
+  assert.ok(E.buyProject(r, P(r, "B").id, r.projectOffers[0].id).error, "не в свой ход — нельзя");
+  fixRandom(0.5);
+  for (let i = 0; i < offer.events; i++) { quietCard(r); const c0 = A.cash; E.marketEvent(r); assert.ok(A.cash - c0 >= offer.income - 1e-6, `доход на событии ${i + 1}`); }
+  assert.equal((A.projects || []).length, 0, "срок вышел — проект снят");
+  assert.ok(r.log.some((e) => e.text.startsWith(`Проект «${offer.name}» завершён`) && e.visibleTo && e.visibleTo[0] === A.id));
+  const pay = E.buildStatePayload(r, A.id);
+  assert.ok(Array.isArray(pay.projectOffers) && pay.projectOffers.length > 0, "новые предложения на событиях");
+  return r;
+});
+test("правила 4: в долг проект забирает банк за полцены остатка; банкрот теряет проекты", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A");
+  const offer = r.projectOffers[0];
+  A.cash = 300000;
+  assert.ok(!E.buyProject(r, A.id, offer.id).error);
+  A.cash = -1000;
+  E.settleDebt(r, A);
+  assert.equal((A.projects || []).length, 0);
+  assert.ok(Math.abs(A.cash - (-1000 + Math.round(offer.cost * 0.5))) < 1, "за 50% вложения");
+  return r;
+});
+test("правила 4: плата держателям растёт по ходу партии; старые комнаты без роста", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A"), B = P(r, "B");
+  B.holdings.AAPL = 20;
+  r.companies.AAPL.price = 40000;
+  rollOnto(r, A, "AAPL");
+  const early = r.pendingRoll.fee.paid;
+  E.skipRoll(r, A.id); E.endTurn(r, A.id); E.rollDice(r, B.id); r.pendingRoll = null; E.endTurn(r, B.id);
+  r.eventCount = 20;
+  r.companies.AAPL.price = 40000;
+  rollOnto(r, A, "AAPL");
+  const late = r.pendingRoll.fee.paid;
+  assert.ok(Math.abs(late / early - (1 + 0.06 * 20)) < 0.03, `×2,2 к 20-му событию: ${late} / ${early}`);
+  const old = v2game(["A", "B"]); old.rulesV = 3; old.eventCount = 20;
+  assert.equal(E.feeGrowth(old), 1);
+  return [r, old];
+});
+test("правила 4: советник — плата при найме и на каждом событии, прогноз следующей новости", () => {
+  const r = v2game(["A", "B"]);
+  const A = P(r, "A");
+  r.deckData[r.deckOrder[r.deckPos]] = { type: "sector", sector: "Технологии", title: "Прорыв", percent: 20 };
+  fixRandom(0.1); // ниже точности 80% — прогноз верный
+  const a0 = A.cash;
+  assert.ok(!E.hireAdvisor(r, A.id).error);
+  assert.equal(A.cash, a0 - E.ADVISOR_FEE);
+  assert.ok(E.hireAdvisor(r, A.id).error, "второй раз не нанять");
+  let f = E.buildStatePayload(r, A.id).advisor.forecast;
+  assert.deepEqual([f.target, f.dir, f.big], ["Технологии", 1, true]);
+  assert.equal(E.buildStatePayload(r, P(r, "B").id).advisor.hired, false, "советник только свой");
+  A.advisor.roll = 0.95; // выше точности — советник ошибается в направлении
+  assert.equal(E.buildStatePayload(r, A.id).advisor.forecast.dir, -1);
+  E.marketEvent(r);
+  assert.equal(r.pstats[A.id].advisorOut, 2 * E.ADVISOR_FEE, "плата за следующее событие списана");
+  A.cash = 100;
+  E.marketEvent(r);
+  assert.equal(A.advisor, null, "нечем платить — ушёл");
+  assert.ok(r.log.some((e) => e.text === "Советник ушёл: нечем платить." && e.visibleTo && e.visibleTo[0] === A.id));
+  assert.ok(E.fireAdvisor(r, A.id).error, "увольнять некого");
+  return r;
+});
+test("правила 4: бот вкладывается в самый доходный проект, оставляя запас", () => {
+  const r = v2game(["Бот", "B"]);
+  const bot = P(r, "Бот"); bot.isBot = true;
+  r.projectOffers = [
+    { id: 901, type: "coffee", name: "Сеть кофеен", cost: 20000, income: 4000, events: 6, born: 0 },
+    { id: 902, type: "solar", name: "Солнечная ферма", cost: 60000, income: 15000, events: 6, born: 0 },
+    { id: 903, type: "datacenter", name: "Дата-центр", cost: 95000, income: 30000, events: 6, born: 0 },
+  ];
+  bot.cash = 100000;
+  bot.botTurnKey = `${r.eventCount}:${r.turn}`; bot.botTurnPlan = { project: true };
+  const st = E.botStep(r);
+  assert.equal(st.type, "buyProject");
+  assert.equal(bot.projects[0].id, 902, "дата-центр съел бы запас, из оставшихся ферма доходнее кофеен");
   return r;
 });
 
