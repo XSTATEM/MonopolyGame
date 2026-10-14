@@ -303,7 +303,6 @@ body.reduce-motion .menu-ticker-track{animation:none !important;}
 .menu-quick-icon{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(26,20,15,.14);}
 .menu-quick-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
 .menu-quick-text b{font-size:17px;font-weight:800;}
-.menu-quick-text span{font-size:13px;font-weight:600;opacity:.8;}
 /* Есть сохранённая партия: главная — «Продолжить», «Играть с ботами» — вторая. */
 /* Карточки в герое чуть прозрачные — сквозь них проступает цвет темы стола.
    rgba — запасной фон для WebView старше Chrome 111 без color-mix(): иначе там
@@ -318,7 +317,6 @@ body.reduce-motion .menu-ticker-track{animation:none !important;}
 .menu-mode.online .menu-mode-icon{background:var(--accent);color:var(--on-accent);}
 .menu-mode.offline .menu-mode-icon{background:var(--clay);color:var(--on-clay);}
 .menu-mode b{font-weight:800;}
-.menu-mode-sub{font-size:12.5px;font-weight:600;color:var(--text-2);}
 @media (max-width:359px){ .menu-modes{grid-template-columns:minmax(0,1fr);} }
 
 .menu-code-toggle{align-self:center;min-height:44px;margin-top:2px;padding:8px 12px;background:transparent;border:none;color:var(--accent);font-size:13.5px;
@@ -408,8 +406,6 @@ body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
 .account-modal-tabs button.active{background:var(--surface-2);color:var(--text);box-shadow:var(--shadow-1);}
 
 /* Экран «Онлайн»: действия, панели, поиск, фильтр, карточки комнат */
-.online-who{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text-2);margin:-2px 0 14px;}
-.online-who b{color:var(--text);}
 .online-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
 .online-action{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:96px;padding:14px;text-align:left;
   border-radius:var(--r-lg);background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);box-shadow:none;}
@@ -455,21 +451,9 @@ body.reduce-motion .menu-shell.menu-enter > *{animation:none !important;}
 .room-empty{flex-direction:column;align-items:center;gap:10px;text-align:center;padding:22px 12px;border:1px dashed var(--line-strong);
   border-radius:var(--r-md);color:var(--text-2);}
 .room-empty-icon{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--surface-3);}
-/* Сценарии рынка: карточки выбора (scenarioPickerHtml), метка в строке статуса, плашка в сводке события */
-.scn-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:8px;}
-.scn-card{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-height:84px;padding:10px 12px;text-align:left;
-  border-radius:var(--r-md);background:var(--surface-2);color:var(--text);border:1px solid var(--line-strong);box-shadow:none;font-weight:600;}
-.scn-card:hover{filter:none;border-color:var(--text-3);}
-.scn-card.on{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
-  background:color-mix(in srgb, var(--primary) 10%, var(--surface-2));}
-.scn-card.locked{background:var(--surface);}
-.scn-card.locked .scn-intro{opacity:.75;}
-.scn-head{display:flex;align-items:center;gap:6px;}
-.scn-head b{font-size:14px;line-height:1.2;flex:1 1 auto;min-width:0;}
+/* Сценарии рынка: год и замок в строке выбора (scenarioPickerHtml, .scn-row ниже), метка в строке статуса, плашка в сводке события */
 .scn-year{flex:none;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 6px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--text-2);}
-.scn-lock, .scn-check{flex:none;display:inline-flex;color:var(--text-3);}
-.scn-check{color:var(--primary);}
-.scn-intro{font-size:12px;line-height:1.35;color:var(--text-2);font-weight:500;}
+.scn-lock{flex:none;display:inline-flex;color:var(--text-3);}
 .scn-badge .hint-q{margin-left:4px;width:18px;height:18px;}
 .scn-badge .hint-q .ico{width:13px;height:13px;}
 .event-scenario{display:flex;flex-direction:column;gap:4px;padding:10px 12px;margin:0 0 12px;border-radius:var(--r-md);
@@ -1850,7 +1834,6 @@ body.reduce-motion .coach-ring.pulse{animation:none;}
 .online-quick-icon{width:40px;height:40px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--on-accent) 16%, transparent);}
 .online-quick-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
 .online-quick-text b{font-size:16px;}
-.online-quick-text span{font-size:12.5px;font-weight:500;opacity:.85;}
 .league-card{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 12px;margin:0 0 12px;border-radius:var(--r-md);
   background:var(--surface-2);color:var(--text);border:1px solid var(--line);text-align:left;}
 .league-card-icon{width:32px;height:32px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--warn-bg);color:var(--warn);}
@@ -1997,3 +1980,92 @@ button.rep-badge.ev-news-badge{min-height:28px;max-width:100%;padding:4px 10px;f
 .rules-profiles li{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45;color:var(--text-2);}
 .rules-profiles li > .ico{flex:none;margin-top:1px;color:var(--clay);}
 .rules-profiles b{color:var(--text);}
+
+/* ---------------------------------------------------------------------
+   Лист сделки (openTradeSheet): партнёр, «Продать / Купить», компания,
+   доля, цена и подсказка, согласится ли бот.
+   --------------------------------------------------------------------- */
+.trade-sheet{display:flex;flex-direction:column;gap:12px;}
+.trade-sheet .company-modal-head{margin-bottom:0;}
+.trade-sheet .seg.ts-seg{margin:0;}
+.trade-sheet select{width:100%;}
+.trade-sheet .trade-label{display:block;font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:6px;}
+.ts-partners{flex-wrap:wrap;}
+.ts-verdict{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--r-md);background:var(--surface-2);color:var(--text-2);font-size:13px;font-weight:700;line-height:1.35;}
+.ts-verdict.ok{background:var(--up-bg);color:var(--up);}
+.ts-verdict.no{background:var(--warn-bg);color:var(--warn);}
+.ts-verdict:empty{display:none;}
+.ts-submit{min-height:52px;font-size:15px;}
+.player-trade-btn{min-height:52px;margin:4px 0 10px;font-size:15px;}
+.kick-btn{margin-top:6px;}
+
+/* ---------------------------------------------------------------------
+   Карта активов (heatmapHtml): плитки по стоимости, цвет — изменение от
+   красного через тёмно-серый к зелёному. Позиции плиток — в процентах.
+   --------------------------------------------------------------------- */
+.view-seg{margin:0 0 12px;}
+.view-seg > button{display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.hm-card{padding:10px;}
+.heatmap{position:relative;width:100%;border-radius:14px;overflow:hidden;background:var(--surface-3);}
+.hm-tile{position:absolute;box-sizing:border-box;margin:0;min-height:0;padding:7px 8px;border:none;border-radius:0;
+  box-shadow:inset 0 0 0 1px var(--surface);color:#FFF7EE;text-align:left;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;overflow:hidden;cursor:pointer;}
+.hm-tile:hover{filter:brightness(1.12);}
+.hm-tile:focus-visible{outline:2px solid #FFF7EE;outline-offset:-3px;}
+.hm-tile.big{padding:10px 12px;gap:4px;}
+.hm-name{font-size:12px;font-weight:700;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hm-tile.big .hm-name{font-size:14px;}
+.hm-pct{font-family:var(--font-mono);font-size:12px;font-weight:700;opacity:.95;}
+.hm-tile.big .hm-pct{font-size:16px;}
+.hm-sub{font-family:var(--font-mono);font-size:11px;opacity:.8;margin-top:auto;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hm-legend{display:flex;align-items:center;gap:8px;margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-2);}
+.hm-legend i{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg, rgb(166,58,42), rgb(74,64,56), rgb(35,121,75));}
+.hm-card h3.hm-head{display:flex;align-items:center;gap:8px;margin:2px 4px 10px;}
+.hm-card h3.hm-head .mono{margin-left:auto;font-size:13px;color:var(--text-2);}
+.hm-card + .hm-legend{margin:-2px 2px 12px;}
+.menu-row-meta{flex:none;font-size:13px;font-weight:700;color:var(--text-3);}
+
+/* ---------------------------------------------------------------------
+   Экраны меню: «Назад» — стрелка в заголовке (вместо широкой кнопки внизу).
+   Новая партия: игроки строками, имя + «+» + «Бот», сценарии списком,
+   настройки и внешность игрока свёрнуты.
+   --------------------------------------------------------------------- */
+.join-box h1 .head-back{flex:none;width:44px;height:44px;min-height:44px;padding:0;margin:0 0 0 -10px;border:none;border-radius:var(--r-md);
+  background:transparent;color:var(--text);display:inline-flex;align-items:center;justify-content:center;}
+.join-box h1 .head-back:hover{background:var(--surface-3);filter:none;}
+.join-box h1 .head-back .ico{width:22px;height:22px;}
+#rulesScreen .join-box{padding-top:0;}
+#rulesScreen .join-box > h1{position:sticky;top:0;z-index:3;padding:20px 0 10px;margin:0 0 6px;background:var(--surface);}
+.setup-label, .join-box .setup-label{display:block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin:18px 0 8px;}
+.setup-add{display:flex;gap:8px;margin-top:8px;}
+.setup-add input{flex:1;min-width:0;}
+.setup-add button{flex:none;min-height:48px;}
+.setup-add .icon-only{width:48px;padding:0;}
+.setup-more{margin-top:10px;border-radius:var(--r-md);}
+.setup-more > summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 4px;cursor:pointer;list-style:none;
+  font-size:14px;font-weight:700;color:var(--text-2);}
+.setup-more > summary::-webkit-details-marker{display:none;}
+.setup-more > summary .chev{margin-left:auto;transition:transform .15s;}
+.setup-more[open] > summary .chev{transform:rotate(180deg);}
+.setup-more > .setup-more-body{padding:2px 4px 8px;}
+.scn-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface-2);overflow:hidden;}
+.scn-row{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px;border:none;border-radius:0;background:transparent;
+  color:var(--text);text-align:left;font-size:15px;font-weight:600;}
+.scn-row + .scn-row{border-top:1px solid var(--line);}
+.scn-row:hover{filter:none;background:var(--surface-3);}
+.scn-row .scn-dot{flex:none;width:20px;height:20px;border-radius:10px;box-sizing:border-box;border:2px solid var(--text-3);}
+.scn-row.on .scn-dot{border:6px solid var(--primary);}
+.scn-row.on{font-weight:800;}
+.scn-row .scn-title{flex:1;min-width:0;}
+.scn-row .scn-year{background:none;padding:0;color:var(--text-3);}
+.scn-row.locked{color:var(--text-2);}
+.league-card-meta{flex:none;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text-2);}
+/* Комната ожидания: код, игроки, настройки хоста свёрнуты, чат свёрнут */
+.lobby-code{align-items:center;flex-wrap:nowrap;}
+.lobby-code #lobbyRoomCode{font-size:30px;flex:1;min-width:0;}
+.lobby-code .icon-btn{flex:none;width:44px;height:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+.lobby-start{width:100%;margin-top:16px;}
+.lobby-wait{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:600;color:var(--text-2);}
+.lobby-chat-count{min-height:22px;padding:0 8px;font-size:12px;}
+.join-box .lobby-leave{display:flex;width:100%;justify-content:center;gap:6px;margin-top:10px;color:var(--down);border-color:transparent;}
+#lobbyPlayers .lobby-player-row:last-child{margin-bottom:0;}

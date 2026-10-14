@@ -1183,7 +1183,7 @@
   function renderMenuEntry(){
     const done = isDone();
     const sub = byId("tutorialCardSub");
-    if(sub) sub.textContent = done ? "Пройдено" : "Мини-партия · 3 минуты";
+    if(sub) sub.textContent = done ? "пройдено" : "3 мин";
     const offer = byId("tutorialOffer");
     if(!offer) return;
     if(offerSession === null){

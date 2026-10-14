@@ -450,7 +450,7 @@ function handleMessage(ws, raw) {
     case "sellBank": return run(conn, engine.sellBank(room, conn.playerId, msg.ticker, msg.pct));
     case "buyDirect": return run(conn, engine.buyDirect(room, conn.playerId, msg.ticker, msg.pct));
     case "decideBoard": return run(conn, engine.decideBoard(room, conn.playerId, msg.id, msg.option));
-    case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price, msg.wantTicker, msg.wantPct));
+    case "proposeTrade": return run(conn, engine.proposeTrade(room, conn.playerId, msg.to, msg.ticker, msg.pct, msg.price, msg.wantTicker, msg.wantPct, msg.kind));
     case "respondTrade": return run(conn, engine.respondTrade(room, conn.playerId, msg.id, msg.accept));
     case "declareBankruptcy": return run(conn, engine.declareBankruptcy(room, conn.playerId));
     case "newGame": return handleNewGame(conn);

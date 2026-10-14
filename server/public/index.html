@@ -57,7 +57,7 @@
     <!-- Разовое предложение новичку (без сохранённой партии): не модалка и не тост, фокус не забирает -->
     <div class="menu-continue tutorial-offer" id="tutorialOffer" role="region" aria-label="Предложение пройти обучение" hidden>
       <span class="menu-continue-icon"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></span>
-      <span class="menu-continue-text"><b>Впервые на бирже?</b><span>Обучение · 3 минуты</span></span>
+      <span class="menu-continue-text"><b>Обучение · 3 мин</b></span>
       <button type="button" class="small" id="btnTutorialOfferStart">Начать</button>
       <button type="button" class="ghost small tutorial-offer-close" id="btnTutorialOfferClose" aria-label="Скрыть предложение"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
@@ -68,17 +68,17 @@
       <!-- «Играть с ботами»: партия против двух ботов в один тап — тот же путь, что «Начать игру» в форме офлайн-партии -->
       <button type="button" class="menu-quick" id="btnQuickPlay">
         <span class="menu-quick-icon"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></span>
-        <span class="menu-quick-text"><b>Играть с ботами</b><span id="quickPlaySub">Вы и 2 бота</span></span>
+        <span class="menu-quick-text"><b>Играть с ботами</b></span>
         <svg class="ico" aria-hidden="true"><use href="#i-chev-right"/></svg>
       </button>
       <div class="menu-modes">
         <button type="button" class="menu-mode online" id="btnGoOnline">
           <span class="menu-mode-icon"><svg class="ico" aria-hidden="true"><use href="#i-globe"/></svg></span>
-          <b>Онлайн</b><span class="menu-mode-sub">С друзьями · рейтинг</span>
+          <b>Онлайн</b>
         </button>
         <button type="button" class="menu-mode offline" id="btnGoOffline">
           <span class="menu-mode-icon"><svg class="ico" aria-hidden="true"><use href="#i-device"/></svg></span>
-          <b>На одном устройстве</b><span class="menu-mode-sub">До 6 игроков и боты</span>
+          <b>На одном устройстве</b>
         </button>
       </div>
       <button type="button" class="menu-code-toggle" id="btnShowRoomCode" aria-expanded="false" aria-controls="menuRoomCodeRow">Есть код комнаты?</button>
@@ -93,13 +93,13 @@
     <!-- Магазин (shop.js): скрыт, пока магазин не настроен на сервере -->
     <button type="button" class="menu-row shop" id="btnGoShop" hidden>
       <span class="menu-row-icon"><svg class="ico" aria-hidden="true"><use href="#i-bag"/></svg></span>
-      <span class="menu-row-text"><b>Магазин</b><span id="shopEntrySub">Скины, очки и Премиум</span></span>
+      <span class="menu-row-text"><b>Магазин</b></span>
       <span class="chip" id="shopEntryBalance" hidden></span>
     </button>
     <!-- Интерактивное обучение (tutorial.js): учебная партия против двух ботов с подсказками -->
     <button type="button" class="menu-row tutorial" id="btnGoTutorial">
       <span class="menu-row-icon"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></span>
-      <span class="menu-row-text"><b>Обучение</b><span id="tutorialCardSub">Мини-партия · 3 минуты</span></span>
+      <span class="menu-row-text"><b>Обучение</b></span><span class="menu-row-meta" id="tutorialCardSub">3 мин</span>
       <svg class="ico" aria-hidden="true"><use href="#i-chev-right"/></svg>
     </button>
     <div class="menu-grid">
@@ -113,7 +113,7 @@
 
 <div class="center-screen" id="ratingScreen" style="display:none;">
   <div class="join-box" style="width:400px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-trophy"/></svg> Рейтинг</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromRating" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Рейтинг</h1>
     <div class="seg" role="tablist" aria-label="Таблица" id="ratingTabs">
       <button type="button" role="tab" data-tab="league" aria-selected="true">Лига недели</button>
       <button type="button" role="tab" data-tab="rating" aria-selected="false">За всё время</button>
@@ -124,13 +124,12 @@
       <div id="ratingList" class="rating-list"></div>
       <div class="muted" id="ratingEmpty" style="font-size:12px;display:none;text-align:center;padding:10px 0;">Пока никто не заработал очков.</div>
     </div>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromRating"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="profileScreen" style="display:none;">
   <div class="join-box" style="width:400px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-user"/></svg> Профиль</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromProfile" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Профиль</h1>
     <div id="profileGate">
       <p>Войдите в свой аккаунт, чтобы изменить профиль.</p>
       <button style="width:100%;" id="profileGateLoginBtn">Войти в аккаунт</button>
@@ -179,13 +178,12 @@
         </div>
       </details>
     </div>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromProfile"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="skinsScreen" style="display:none;">
   <div class="join-box" style="width:460px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-palette"/></svg> Скины</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromSkins" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Скины</h1>
     <div id="skinsGate">
       <p>Войдите в свой аккаунт, чтобы покупать и применять скины за очки.</p>
       <button style="width:100%;" id="skinsGateLoginBtn">Войти в аккаунт</button>
@@ -203,7 +201,6 @@
       <div id="skinsBoardSkins" class="skins-grid"></div>
       <div class="err" id="skinsErr"></div>
     </div>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromSkins"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
@@ -211,7 +208,7 @@
      настроек на сервере сюда не ведёт ни одна кнопка. -->
 <div class="center-screen" id="shopScreen" style="display:none;">
   <div class="join-box shop-box" style="width:480px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-bag"/></svg> Магазин</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromShop" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Магазин</h1>
     <div class="shop-note warn" id="shopMockBanner" hidden>Тестовый режим оплаты: деньги не списываются.</div>
     <div id="shopGate">
       <p id="shopGateText">Войдите в аккаунт: покупки привязываются к нему и доступны на всех устройствах.</p>
@@ -244,13 +241,12 @@
       <details class="tips" id="shopHistory" hidden><summary>История покупок</summary><div id="shopHistoryList"></div></details>
       <p class="shop-legal muted" id="shopLegal"></p>
     </div>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromShop"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="settingsScreen" style="display:none;">
   <div class="join-box">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-sliders"/></svg> Настройки <button type="button" class="hint-q" data-hint-key="settings" data-hint="Настройки хранятся на этом устройстве и не влияют на других игроков." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></h1>
+    <h1><button type="button" class="head-back" id="btnBackFromSettings" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Настройки <button type="button" class="hint-q" data-hint-key="settings" data-hint="Настройки хранятся на этом устройстве и не влияют на других игроков." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></h1>
     <label class="setting-row" for="settingReduceMotion">
       <span><b>Сократить анимации</b><button type="button" class="hint-q" data-hint-key="set-motion" data-hint="Без пульсации клеток, всплывающих сумм, конфетти и прокрутки." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></span>
       <input type="checkbox" id="settingReduceMotion">
@@ -267,13 +263,12 @@
     <button class="secondary" style="width:100%;margin-top:16px;" id="settingsClearLogin">Забыть сохранённый ник</button>
     <!-- AdMob (сборка для Google Play): изменить согласие на рекламу — только там, где этого требует Google (UMP: ЕЭЗ, Великобритания) -->
     <button class="secondary" style="width:100%;margin-top:16px;" id="btnAdsPrivacy" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-sliders"/></svg> Настройки рекламы (конфиденциальность)</button>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromSettings"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="rulesScreen" style="display:none;">
   <div class="join-box" style="width:480px;max-height:86vh;overflow-y:auto;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-book"/></svg> Правила</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromRules" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Правила</h1>
     <!-- Скрыта, когда правила открыты из идущей партии (openRulesFromGame) -->
     <button type="button" class="secondary" id="btnRulesTutorial" style="width:100%;margin:0 0 12px;"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-play"/></svg> Пройти интерактивное обучение</button>
     <details class="tips" open>
@@ -324,7 +319,7 @@
     </details>
     <details class="tips">
       <summary>Продажа и сделки</summary>
-      <div class="muted rules-p">В свой ход, до или после броска, можно продать до 25% пакета банку или предложить игроку сделку: деньги и/или его акции взамен. Банк при покупке у вас берёт комиссию 15%, у сделки с игроком комиссии нет. Всё это — во вкладке «Портфель». Купить долю можно и вне броска: раз в ход до 3% любой компании с наценкой 50% — в карточке компании. Боты тоже торгуют и предлагают сделки друг другу.</div>
+      <div class="muted rules-p">В свой ход, до или после броска, можно продать до 25% пакета банку (вкладка «Портфель», комиссия 15%) или заключить сделку с игроком без комиссии. Сделку открывает кнопка со стрелками рядом с «Бросить кубики» или карточка соперника: продать свои акции или купить его, доля и цена. Бот отвечает сразу, а отказывая, называет свою цену: свои акции он продаёт от рынка +10%, контрольный пакет — от +60%. Купить долю можно и вне броска: раз в ход до 3% любой компании с наценкой 50% — в карточке компании. Боты тоже торгуют и предлагают сделки друг другу.</div>
     </details>
     <details class="tips">
       <summary>Недвижимость</summary>
@@ -354,13 +349,12 @@
       <summary>Очки рейтинга и скины</summary>
       <div class="muted rules-p">Победа в онлайн-партии приносит очки рейтинга — если сыграно не меньше 40 ходов. На них в разделе «Скины» покупаются аватары и темы стола — они сохраняются в аккаунте.</div>
     </details>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromRules"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="onlineScreen" style="display:none;">
   <div class="join-box online-box" style="width:440px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-globe"/></svg> Онлайн</h1>
+    <h1><button type="button" class="head-back" id="btnBackFromOnline" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Онлайн</h1>
 
     <div id="onlineGate">
       <p>Войдите, чтобы играть онлайн. <button type="button" class="hint-q" data-hint-key="online-gate" data-hint="Аккаунт — ваш ник и пароль. Прогресс, очки и скины сохраняются между сессиями и устройствами." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></p>
@@ -369,18 +363,17 @@
     </div>
 
     <div id="onlineContent" style="display:none;">
-      <div class="online-who"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-user"/></svg> <span>Вы — <b id="onlineWhoName"></b></span></div>
       <button type="button" class="online-quick" id="btnOnlineQuick">
         <span class="online-quick-icon"><svg class="ico" aria-hidden="true"><use href="#i-bolt"/></svg></span>
-        <span class="online-quick-text"><b>Быстрая игра</b><span>Сразу за стол — свободные места займут боты</span></span>
+        <span class="online-quick-text"><b>Быстрая игра</b></span>
         <svg class="ico ico-sm" aria-hidden="true"><use href="#i-chev-right"/></svg>
       </button>
       <button type="button" class="league-card" id="onlineLeagueCard" onclick="openLeague()" hidden></button>
       <div class="online-actions">
         <button type="button" class="online-action" id="btnOnlineCreate" aria-expanded="false" aria-controls="onlineCreatePanel">
-          <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span><b>Создать комнату</b><span>Позовите друзей по коду</span></button>
+          <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span><b>Создать комнату</b></button>
         <button type="button" class="online-action" id="btnOnlineByCode" aria-expanded="false" aria-controls="onlineCodePanel">
-          <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg></span><b>По коду</b><span>Войти к друзьям</span></button>
+          <span class="online-action-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow-right"/></svg></span><b>Войти по коду</b></button>
       </div>
       <form class="online-panel" id="onlineCreatePanel" hidden>
         <label for="joinRoom">Код комнаты <span class="muted">· необязательно</span></label>
@@ -410,97 +403,102 @@
       <div class="room-empty" id="roomListEmpty" style="display:none;">
         <span class="room-empty-icon"><svg class="ico" aria-hidden="true"><use href="#i-users"/></svg></span>
         <b id="roomEmptyTitle">Открытых комнат нет</b>
-        <button type="button" class="secondary small" id="btnRoomEmptyCreate"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-plus"/></svg> Создать комнату</button>
       </div>
 
       <div class="join-status" id="joinStatus" hidden><span>Подключение к комнате…</span><button class="small secondary" type="button" id="btnCancelJoin">Отмена</button></div>
       <div class="err" id="joinErr"></div>
     </div>
-
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnBackFromOnline"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="offlineSetup" style="display:none;">
   <div class="join-box">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-device"/></svg> Новая партия <button type="button" class="hint-q" data-hint-key="offline" data-hint="Игра на одном устройстве: передавайте его по кругу или играйте против ботов. От 2 до 6 участников." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></h1>
+    <h1><button type="button" class="head-back" id="btnBackFromOffline" aria-label="Назад в меню"><svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg></button> Новая партия</h1>
+    <span class="setup-label">Игроки</span>
     <div id="offlinePlayersBox"></div>
-    <div class="row-inline" style="margin-top:6px;">
-      <input id="offlineNewName" placeholder="Имя игрока" maxlength="20" style="flex:1;">
+    <div class="setup-add">
+      <input id="offlineNewName" placeholder="Имя игрока" maxlength="20" aria-label="Имя игрока" enterkeyhint="done">
+      <button type="button" class="secondary icon-only" id="btnAddOfflinePlayer" aria-label="Добавить игрока"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
+      <button type="button" class="secondary" id="btnAddOfflineBot"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-bot"/></svg> Бот</button>
     </div>
-    <label style="margin-top:6px;">Пол</label>
-    <select id="offlineNewGender">
-      <option value="">Не указывать</option>
-      <option value="male">Мужской</option>
-      <option value="female">Женский</option>
-      <option value="nonbinary">Небинарный</option>
-      <option value="other">Другое</option>
-    </select>
-    <input id="offlineNewGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
-    <label>Аватар</label>
-    <div class="avatar-picker" id="offlineAvatarPicker"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-      <button class="secondary" id="btnAddOfflinePlayer"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-plus"/></svg> Игрок</button>
-      <button class="secondary" id="btnAddOfflineBot"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-bot"/></svg> Бот</button>
-    </div>
+    <!-- Внешность нового игрока — по желанию, поэтому свёрнута -->
+    <details class="setup-more" id="offlineLooks">
+      <summary><svg class="ico ico-sm" aria-hidden="true"><use href="#i-user"/></svg> Аватар и пол<svg class="ico ico-sm chev" aria-hidden="true"><use href="#i-chev-down"/></svg></summary>
+      <div class="setup-more-body">
+        <div class="avatar-picker" id="offlineAvatarPicker"></div>
+        <label for="offlineNewGender">Пол</label>
+        <select id="offlineNewGender">
+          <option value="">Не указывать</option>
+          <option value="male">Мужской</option>
+          <option value="female">Женский</option>
+          <option value="nonbinary">Небинарный</option>
+          <option value="other">Другое</option>
+        </select>
+        <input id="offlineNewGenderOther" placeholder="Свой вариант" maxlength="24" style="display:none;margin-top:6px;">
+      </div>
+    </details>
     <div id="offlineBotLevelBox" hidden></div>
     <div class="err" id="offlineErr"></div>
-    <div class="influence-group" style="margin:22px 0 8px;">Сценарий <button type="button" class="hint-q" data-hint-key="scn-offline" data-hint="Сценарий меняет стартовые цены и подкидывает исторические новости по ходу партии. Длительность задаёт сценарий: 40 ходов у каждого, затем побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></div>
+    <span class="setup-label">Сценарий <button type="button" class="hint-q" data-hint-key="scn-offline" data-hint="Сценарий меняет стартовые цены и подкидывает исторические новости по ходу партии. Длительность задаёт сценарий: 40 ходов у каждого, затем побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></span>
     <div id="offlineScenarioBox"></div>
-    <div class="influence-group" style="margin:22px 0 4px;">Правила партии</div>
-    <div class="settings-grid">
-      <div>
-        <label>Стартовый капитал</label>
-        <input type="number" id="offlineStartingCash" value="100000" min="10000" step="10000" style="width:100%;">
-      </div>
-      <div>
-        <label>Зарплата за ход</label>
-        <input type="number" id="offlineTurnSalary" value="450" min="0" step="50" style="width:100%;">
-      </div>
-      <div>
-        <label>Событие каждые N ходов</label>
-        <input type="number" id="offlineEventInterval" value="4" min="1" max="10" style="width:100%;">
-      </div>
-      <div>
-        <label>Плата держателям A/B/C, % <button type="button" class="hint-q" data-hint-key="offline-fee" data-hint="Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
-        <input type="text" id="offlineForcedPayment" value="60/45/30" placeholder="60/45/30" style="width:100%;">
-      </div>
-    </div>
     <!-- Значения — свои ходы у каждого (settings.maxTurnsPerPlayer), не раунды: раунды движок
          считает при старте по числу игроков (applyGameLength). id прежний — его читает «Играть с ботами». -->
-    <label for="offlineMaxRounds">Длительность партии <button type="button" class="hint-q" id="offlineLengthHint" data-hint-key="offline-length" data-hint="До последнего неразорившегося — обычно около 100 ходов у каждого. Если за 150 ходов победителя нет, побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
+    <label class="setup-label" for="offlineMaxRounds">Длительность <button type="button" class="hint-q" id="offlineLengthHint" data-hint-key="offline-length" data-hint="До последнего неразорившегося — обычно около 100 ходов у каждого. Если за 150 ходов победителя нет, побеждает самый богатый." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
     <select id="offlineMaxRounds">
-      <option value="40">Короткая · 40 ходов у каждого</option>
-      <option value="70">Средняя · 70 ходов у каждого</option>
-      <option value="150" selected>До банкротства · ≈100 ходов у каждого</option>
-      <option value="0">Без лимита · только до банкротства</option>
+      <option value="40">40 ходов</option>
+      <option value="70">70 ходов</option>
+      <option value="150" selected>До банкротства · ≈100 ходов</option>
+      <option value="0">Без лимита</option>
     </select>
+    <details class="setup-more">
+      <summary><svg class="ico ico-sm" aria-hidden="true"><use href="#i-sliders"/></svg> Настройки партии<svg class="ico ico-sm chev" aria-hidden="true"><use href="#i-chev-down"/></svg></summary>
+      <div class="setup-more-body settings-grid">
+        <div>
+          <label for="offlineStartingCash">Стартовый капитал</label>
+          <input type="number" id="offlineStartingCash" value="100000" min="10000" step="10000" style="width:100%;">
+        </div>
+        <div>
+          <label for="offlineTurnSalary">Зарплата за ход</label>
+          <input type="number" id="offlineTurnSalary" value="450" min="0" step="50" style="width:100%;">
+        </div>
+        <div>
+          <label for="offlineEventInterval">Событие каждые N ходов</label>
+          <input type="number" id="offlineEventInterval" value="4" min="1" max="10" style="width:100%;">
+        </div>
+        <div>
+          <label for="offlineForcedPayment">Плата A/B/C, % <button type="button" class="hint-q" data-hint-key="offline-fee" data-hint="Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button></label>
+          <input type="text" id="offlineForcedPayment" value="60/45/30" placeholder="60/45/30" style="width:100%;">
+        </div>
+      </div>
+    </details>
     <button style="width:100%;margin-top:16px;" id="btnStartOffline">Начать игру</button>
-    <button class="secondary" style="width:100%;margin-top:8px;" id="btnBackFromOffline"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg> Назад в меню</button>
   </div>
 </div>
 
 <div class="center-screen" id="lobbyScreen" style="display:none;">
   <div class="join-box" style="width:420px;">
-    <h1><svg class="ico ico-lg" aria-hidden="true"><use href="#i-clock"/></svg> Комната ожидания</h1>
+    <h1>Комната</h1>
+    <!-- Код — крупно, рядом только «копировать» и «пригласить» значками -->
     <div class="lobby-code">
-      <span class="eyebrow">Код комнаты</span>
-      <b id="lobbyRoomCode" class="mono"></b>
-      <button type="button" class="secondary small" id="btnCopyRoomCode"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-copy"/></svg> Копировать</button>
-      <button type="button" class="secondary small" id="btnShareRoomCode" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-share"/></svg> Пригласить</button>
-      <button type="button" class="hint-q" data-hint-key="lobby" data-hint="Передайте код друзьям: «Онлайн» → «По коду» или «Есть код комнаты?» в меню. Когда все соберутся, партию начинает хост." aria-label="Подсказка" aria-expanded="false"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+      <b id="lobbyRoomCode" class="mono" aria-label="Код комнаты"></b>
+      <button type="button" class="secondary icon-btn" id="btnCopyRoomCode" aria-label="Копировать код" title="Копировать код"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg></button>
+      <button type="button" class="secondary icon-btn" id="btnShareRoomCode" aria-label="Пригласить" title="Пригласить" hidden><svg class="ico" aria-hidden="true"><use href="#i-share"/></svg></button>
     </div>
     <div class="quick-banner" id="quickBanner" role="status" hidden></div>
-    <label>Игроки</label>
-    <div id="lobbyPlayers" style="margin-bottom:6px;"></div>
-    <div id="lobbyStartArea" style="margin-bottom:14px;"></div>
-    <label>Чат комнаты</label>
-    <div class="lobby-chat-log" id="lobbyChatLog"></div>
-    <div class="row-inline" style="margin-top:8px;">
-      <input id="lobbyChatInput" placeholder="Написать в чат…" maxlength="300" style="flex:1;">
-      <button class="small" id="btnLobbyChatSend">Отправить</button>
-    </div>
-    <button class="secondary" style="width:100%;margin-top:16px;" id="btnLeaveLobby"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-logout"/></svg> Покинуть комнату</button>
+    <span class="setup-label" id="lobbyPlayersLabel">Игроки</span>
+    <div id="lobbyPlayers"></div>
+    <div id="lobbyStartArea"></div>
+    <details class="setup-more" id="lobbyChat">
+      <summary><svg class="ico ico-sm" aria-hidden="true"><use href="#i-chat"/></svg> Чат <span class="chip lobby-chat-count" id="lobbyChatCount" hidden></span><svg class="ico ico-sm chev" aria-hidden="true"><use href="#i-chev-down"/></svg></summary>
+      <div class="setup-more-body">
+        <div class="lobby-chat-log" id="lobbyChatLog"></div>
+        <div class="row-inline" style="margin-top:8px;">
+          <input id="lobbyChatInput" placeholder="Сообщение" maxlength="300" style="flex:1;">
+          <button class="small" id="btnLobbyChatSend">Отправить</button>
+        </div>
+      </div>
+    </details>
+    <button type="button" class="ghost lobby-leave" id="btnLeaveLobby"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-logout"/></svg> Покинуть</button>
   </div>
 </div>
 
@@ -511,6 +509,7 @@
   <button class="secondary" type="button" onclick="openRulesFromGame(); closeGameMenu();"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-book"/></svg> Правила</button>
   <button class="secondary debug-only" type="button" onclick="send({type:'forceEvent'}); closeGameMenu();"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Провести событие сейчас</button>
   <button class="danger" type="button" id="btnNewGame"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Новая партия</button>
+  <button class="secondary" type="button" id="btnBankrupt"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-x-circle"/></svg> Объявить банкротство</button>
   <button class="secondary" type="button" id="btnExitToMenu"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-logout"/></svg> Выйти в меню</button>
 </div>
 
@@ -543,7 +542,12 @@
         </div>
       </div>
       <div class="market-player-bar" id="marketPlayerBar" style="display:none;"></div>
-      <div class="table-scroll">
+      <div class="seg view-seg" role="tablist" aria-label="Вид" id="marketViewSeg">
+        <button type="button" role="tab" data-view="list" onclick="setMarketView('list')"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-feed"/></svg> Список</button>
+        <button type="button" role="tab" data-view="map" onclick="setMarketView('map')"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-grid"/></svg> Карта</button>
+      </div>
+      <div id="marketHeatmap" hidden></div>
+      <div class="table-scroll" id="marketTableWrap">
       <table id="marketTable">
         <thead><tr><th>Компания</th><th>Сектор</th><th>Цена</th><th title="▲ рост · ▼ падение · — без изменений">Δ</th><th class="col-spark" title="История цены с начала сессии">График</th><th title="Насколько резко может двигаться цена компании">Волатильность</th><th>В руках игроков</th></tr></thead>
         <tbody id="marketBody"></tbody>
@@ -556,11 +560,6 @@
     <section>
       <h2><svg class="ico" aria-hidden="true"><use href="#i-wallet"/></svg> Портфель</h2>
       <div id="capitalBody"></div>
-    </section>
-    <section>
-      <div class="influence-group">Игроки за столом</div>
-      <div id="playersList"></div>
-      <button class="small ghost" type="button" id="btnBankrupt" style="margin-top:6px;">Объявить своё банкротство</button>
     </section>
   </div>
 
@@ -589,6 +588,9 @@
   </nav>
 </main>
 
+<div class="company-modal-overlay" id="tradeSheetOverlay" onclick="if(event.target===this) closeTradeSheet();">
+  <div class="company-modal trade-sheet" id="tradeSheetCard" role="dialog" aria-modal="true" aria-label="Сделка" tabindex="-1"></div>
+</div>
 <div class="company-modal-overlay" id="companyModalOverlay" onclick="if(event.target===this) closeCompanyModal();">
   <div class="company-modal" id="companyModalCard" role="dialog" aria-modal="true" aria-label="Карточка" tabindex="-1"></div>
 </div>
@@ -810,6 +812,7 @@ function onPctSlider(el){
   if(amtOut) amtOut.textContent = fmt(unit*pct);
   const buyLbl = document.getElementById(el.id + "_btn");
   if(buyLbl) buyLbl.textContent = `${buyLbl.dataset.verb || "Купить"} ${pct}%`;
+  if(el.id === "tsPct") onTradeSheetPct();
 }
 function pctSliderVal(id){ const el = document.getElementById(id); return el ? (parseInt(el.value, 10) || 1) : 1; }
 
@@ -927,7 +930,8 @@ function resetRulesReturn(){
 }
 function setRulesBackLabel(text){
   const btn = document.getElementById("btnBackFromRules");
-  btn.innerHTML = `${ico("arrow-left","ico-sm")} ${text}`;
+  btn.setAttribute("aria-label", text);
+  btn.title = text;
 }
 function pluralRu(n, one, few, many){
   const m10 = n % 10, m100 = n % 100;
@@ -968,7 +972,6 @@ function renderOnlineGate(){
     return;
   }
   gate.style.display = "none"; content.style.display = "block";
-  document.getElementById("onlineWhoName").textContent = accountUser.username;
   renderLeagueCard();
   maybeShowLeagueAward();
   document.getElementById("joinErr").textContent = "";
@@ -1008,10 +1011,8 @@ function quickPlay(){
   if(mode !== "offline" && document.getElementById("offlineErr").textContent) showOnly("offlineSetup");
 }
 document.getElementById("btnQuickPlay").onclick = quickPlay;
-// Подпись «Играть с ботами» — длительность из формы офлайн-партии (селект только
-// читаем). Название пресета («Средняя», «Быстрая»…) отбрасываем: рядом с
-// названием кнопки оно путало («Быстрая игра · Средняя»), остаётся длительность
-// («≈100 ходов у каждого»).
+// «Играть с ботами»: без подписи под кнопкой (лишний текст), длительность из
+// формы офлайн-партии — только во всплывающей подсказке (title).
 // Есть сохранённая партия — главное действие «Продолжить», а эта кнопка вторая.
 function renderQuickPlay(hasSave){
   const btn = document.getElementById("btnQuickPlay");
@@ -1020,7 +1021,7 @@ function renderQuickPlay(hasSave){
   const sel = document.getElementById("offlineMaxRounds");
   const opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
   const len = opt ? opt.textContent.trim().replace(/^[^·]*·\s*/, "") : "";
-  document.getElementById("quickPlaySub").textContent = "Вы и 2 бота" + (len ? " · " + len : "");
+  btn.title = len ? "Вы и 2 бота · " + len : "Вы и 2 бота";
 }
 
 // Вход в комнату по коду прямо из меню. Не вошли в аккаунт — сначала вход, а
@@ -1953,6 +1954,14 @@ function renderRoomList(){
   const el = document.getElementById("roomList");
   const empty = document.getElementById("roomListEmpty");
   if(!el || !empty) return;
+  // Поиск и фильтр нужны, только когда комнат много.
+  const many = roomListData.length > 5;
+  document.querySelector("#onlineScreen .room-search").hidden = !many;
+  document.getElementById("roomFilter").hidden = !many;
+  if(!many && (roomListFilter !== "all" || document.getElementById("roomSearch").value)){
+    document.getElementById("roomSearch").value = ""; roomListFilter = "all";
+    document.querySelectorAll("#roomFilter [data-filter]").forEach(x=>{ const on = x.dataset.filter === "all"; x.classList.toggle("active", on); x.setAttribute("aria-checked", String(on)); });
+  }
   const q = (document.getElementById("roomSearch").value || "").trim().toLowerCase();
   // Сначала комнаты, куда можно сесть (ожидание), затем идущие — по числу людей в сети.
   const rank = (r)=> r.phase === "lobby" ? 0 : r.phase === "ended" ? 2 : 1;
@@ -1998,7 +2007,7 @@ document.getElementById("roomFilter").addEventListener("click", (e)=>{
   renderRoomList();
 });
 document.getElementById("btnRefreshRooms").onclick = ()=> refreshRoomList(true);
-// «Создать комнату» и «По коду» — раскрывающиеся панели, открыта одна.
+// «Создать комнату» и «Войти по коду» — раскрывающиеся панели, открыта одна.
 function toggleOnlinePanel(which, force){
   const panels = { create: ["btnOnlineCreate", "onlineCreatePanel", "joinRoom"], code: ["btnOnlineByCode", "onlineCodePanel", "onlineJoinCode"] };
   Object.entries(panels).forEach(([k, [btnId, panelId, inputId]])=>{
@@ -2008,15 +2017,9 @@ function toggleOnlinePanel(which, force){
     document.getElementById(btnId).classList.toggle("open", open);
     if(open && k === which) setTimeout(()=> document.getElementById(inputId).focus({ preventScroll: true }), 0);
   });
-  // Панель создания уже открыта — кнопка «Создать комнату» в пустом списке лишняя.
-  document.getElementById("btnRoomEmptyCreate").hidden = !document.getElementById("onlineCreatePanel").hidden;
 }
 document.getElementById("btnOnlineCreate").onclick = ()=> toggleOnlinePanel("create");
 document.getElementById("btnOnlineByCode").onclick = ()=> toggleOnlinePanel("code");
-document.getElementById("btnRoomEmptyCreate").onclick = ()=>{
-  toggleOnlinePanel("create", true);
-  document.getElementById("onlineCreatePanel").scrollIntoView({ block: "nearest" });
-};
 document.getElementById("onlineCodePanel").addEventListener("submit", (e)=>{
   e.preventDefault();
   const code = document.getElementById("onlineJoinCode").value.trim().toUpperCase();
@@ -2299,9 +2302,9 @@ function renderOfflinePlayersBox(){
   const box = document.getElementById("offlinePlayersBox");
   box.innerHTML = offlinePlayerNames.map((p,i)=>`<div class="offline-chip">
       <span class="seat" style="background:${SEAT_COLORS[i % SEAT_COLORS.length]}">${p.isBot ? ico("bot","ico-sm") : (avatarIconHtml(p.avatar) || escapeHtml((p.name.charAt(0)||"?").toUpperCase()))}</span>
-      <span class="chip-name">${escapeHtml(p.name)}${p.isBot?' <span class="muted" style="font-weight:600;">· бот</span>':""}</span>
-      <button type="button" aria-label="Убрать ${escapeHtml(p.name)}" onclick="removeOfflinePlayer(${i})">${ico("trash","ico-sm")}</button>
-    </div>`).join("") || `<div class="sheet-note" style="padding:6px 2px;">Добавьте игроков или ботов</div>`;
+      <span class="chip-name">${escapeHtml(p.name)}</span>
+      <button type="button" aria-label="Убрать ${escapeHtml(p.name)}" onclick="removeOfflinePlayer(${i})">${ico("x","ico-sm")}</button>
+    </div>`).join("");
   const lvl = document.getElementById("offlineBotLevelBox");
   const hasBots = offlinePlayerNames.some(p=> p.isBot);
   if(lvl){ lvl.hidden = !hasBots; lvl.innerHTML = hasBots ? botLevelHtml() : ""; }
@@ -2313,8 +2316,8 @@ function botLevelHtml(){
   const locked = paidFeaturesLocked();
   if(offlineBotLevel === "strong" && locked) offlineBotLevel = "";
   const strong = offlineBotLevel === "strong";
-  return `<div class="influence-group" style="margin:16px 0 8px;">Боты ${hintBtn("bot-level", "Сильные боты покупают на все свободные деньги и не упускают города. Против трёх обычных ботов сильный выигрывает почти вдвое чаще." + (window.Shop && Shop.enabled() ? " Входят в подписку «Трейдер»." : ""))}</div>
-    <div class="seg" role="radiogroup" aria-label="Сила ботов">
+  return `<span class="setup-label">Боты ${hintBtn("bot-level", "Сильные боты покупают на все свободные деньги и не упускают города. Против трёх обычных ботов сильный выигрывает почти вдвое чаще." + (window.Shop && Shop.enabled() ? " Входят в подписку «Трейдер»." : ""))}</span>
+    <div class="seg" role="radiogroup" aria-label="Сила ботов" style="margin-bottom:0;">
       <button type="button" role="radio" aria-checked="${!strong}" aria-selected="${!strong}" onclick="pickBotLevel('')">Обычные</button>
       <button type="button" role="radio" aria-checked="${strong}" aria-selected="${strong}" onclick="pickBotLevel('strong')"${locked ? ' aria-label="Сильные — в подписке «Трейдер»"' : ""}>${locked ? ico("lock", "ico-sm") + " " : ""}Сильные</button>
     </div>`;
@@ -2647,7 +2650,7 @@ function localDispatch(obj){
     case "sellBank": result = GameEngine.sellBank(localRoom, viewAs, obj.ticker, obj.pct); break;
     case "buyDirect": result = GameEngine.buyDirect(localRoom, viewAs, obj.ticker, obj.pct); break;
     case "decideBoard": result = GameEngine.decideBoard(localRoom, viewAs, obj.id, obj.option); break;
-    case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price, obj.wantTicker, obj.wantPct); break;
+    case "proposeTrade": result = GameEngine.proposeTrade(localRoom, viewAs, obj.to, obj.ticker, obj.pct, obj.price, obj.wantTicker, obj.wantPct, obj.kind); break;
     case "respondTrade": result = GameEngine.respondTrade(localRoom, viewAs, obj.id, obj.accept); break;
     case "declareBankruptcy": result = GameEngine.declareBankruptcy(localRoom, viewAs); break;
     case "newGame": {
@@ -2885,8 +2888,28 @@ function detectNotifications(prev, msg){
       // Оплата — как в tradeOffersHtml: деньги и/или встречная доля (бартер), иначе бесплатно.
       const pay = [t.price>0 ? fmt(t.price) : "", t.wantTicker ? `${t.wantPct}% ${t.wantTicker}` : ""].filter(Boolean).join(" + ") || "бесплатно";
       showToast({ kind:"good", icon:"swap", title:"Новое предложение сделки", key:"trade-"+t.id,
-        text:`${fromP?fromP.name:"Игрок"} предлагает вам ${t.pct}% ${t.ticker} за ${pay}.`,
-        onClick: ()=> openTab("capital") });
+        text: t.kind === "buy" ? `${fromP?fromP.name:"Игрок"} хочет купить у вас ${t.pct}% ${t.ticker} за ${fmt(t.price)}.`
+          : `${fromP?fromP.name:"Игрок"} предлагает вам ${t.pct}% ${t.ticker} за ${pay}.`,
+        onClick: ()=> openTab("turn") });
+    }
+  });
+  // Ответ на моё предложение: моя сделка ушла из ожидающих — ищем запись ленты.
+  const myPrev = (prev.pendingTrades||[]).filter(t=> t.status === "pending" && t.fromId === msg.you);
+  const nowIds = new Set((msg.pendingTrades||[]).map(t=> t.id));
+  const me = msg.players.find(p=> p.id === msg.you);
+  myPrev.filter(t=> !nowIds.has(t.id)).forEach(t=>{
+    const to = msg.players.find(p=> p.id === t.toId);
+    if(!to || !me) return;
+    // Ответ — самая свежая запись об этой паре и компании: отказ или сделка.
+    const lines = (msg.log||[]).slice(-12).map(e=> String(e.text||"")).reverse();
+    const reply = lines.find(x=> x.startsWith(`${to.name} отклонил предложение ${me.name} по ${t.ticker}`)
+      || (x.startsWith("Сделка:") && x.includes(to.name) && x.includes(me.name) && x.includes(t.ticker)));
+    if(!reply) return;
+    if(!reply.startsWith("Сделка:")){
+      const why = reply.split(": ").slice(1).join(": ").replace(/\.$/, "");
+      showToast({ kind:"warn", icon:"x-circle", title:`${to.name} отказался`, text: why ? why.charAt(0).toUpperCase() + why.slice(1) + "." : `Сделка по ${t.ticker} не состоялась.` });
+    } else {
+      showToast({ kind:"good", icon:"check", title:`${to.name} согласился`, text: t.kind === "buy" ? `Вы купили ${t.pct}% ${t.ticker} за ${fmt(t.price)}.` : `Вы продали ${t.pct}% ${t.ticker}.` });
     }
   });
   // Сделку уже приняли, отклонили или отозвали — её тост больше не нужен.
@@ -3303,12 +3326,14 @@ function renderLobby(s){
   const playersHtml = s.players.map(p=>{
     const isHost = p.id === s.hostPlayerId;
     const isYou = p.id === s.you;
+    // «В сети» — норма, отмечаем только тех, кто отключился.
     return `<div class="lobby-player-row${isYou?" you":""}">
-      <span style="display:flex;align-items:center;gap:8px;">${escapeHtml(p.name)}${isYou?' <span class="muted">(вы)</span>':""}${isHost?' <span class="badge control">хост</span>':""}</span>
-      <span class="badge ${p.connected?"online":"offline"}">${p.connected?"в сети":"офлайн"}</span>
+      <span style="display:flex;align-items:center;gap:8px;">${escapeHtml(p.name)}${isHost?' <span class="badge control">хост</span>':""}</span>
+      ${p.connected || p.isBot ? "" : `<span class="badge offline">не в сети</span>`}
     </div>`;
   }).join("");
-  document.getElementById("lobbyPlayers").innerHTML = playersHtml || `<div class="muted" style="font-size:12px;">Пока никого нет.</div>`;
+  document.getElementById("lobbyPlayers").innerHTML = playersHtml;
+  document.getElementById("lobbyPlayersLabel").textContent = `Игроки · ${s.players.length}`;
 
   const startArea = document.getElementById("lobbyStartArea");
   // Кто не в сети к старту, в партию не попадёт (engine.startGame) — считаем только тех, кто в сети.
@@ -3334,34 +3359,37 @@ function renderLobby(s){
     const lenHint = document.getElementById("lobbyLengthHint");
     if(lenHint) lenHint.setAttribute("data-hint", escapeHtml(len.hint));
     const enough = onlineCount >= 2, btn = document.getElementById("btnStartLobby");
-    btn.disabled = !enough; btn.textContent = enough ? "Начать игру" : "Нужно минимум 2 игрока в сети";
+    btn.disabled = !enough; btn.textContent = enough ? "Начать игру" : "Нужно минимум 2 игрока";
     renderLobbyScenarios(st);
   } else if(s.hostPlayerId === s.you){
     const enough = onlineCount >= 2;
     startArea.innerHTML = `
-      <div class="influence-group" style="margin:0 0 8px;">Сценарий</div>
+      <span class="setup-label">Сценарий</span>
       <div id="lobbyScenarioBox"></div>
-      <div class="settings-grid" style="margin-top:12px;">
-        <div>
-          <label>Стартовый капитал</label>
-          <input type="number" id="lobbyStartingCash" value="${stCash}" min="10000" step="10000" style="width:100%;">
+      <label class="setup-label" for="lobbyMaxRounds">Длительность ${hintBtn("lobby-length", escapeHtml(len.hint)).replace('class="hint-q"', 'class="hint-q" id="lobbyLengthHint"')}</label>
+      <select id="lobbyMaxRounds" data-opts="${escapeHtml(len.options.map(o=>o.v).join(","))}">${lobbyLengthOptionsHtml(len)}</select>
+      <details class="setup-more">
+        <summary>${ico("sliders","ico-sm")} Настройки партии${ico("chev-down","ico-sm chev")}</summary>
+        <div class="setup-more-body settings-grid">
+          <div>
+            <label for="lobbyStartingCash">Стартовый капитал</label>
+            <input type="number" id="lobbyStartingCash" value="${stCash}" min="10000" step="10000" style="width:100%;">
+          </div>
+          <div>
+            <label for="lobbyTurnSalary">Зарплата за ход</label>
+            <input type="number" id="lobbyTurnSalary" value="${stSalary}" min="0" step="50" style="width:100%;">
+          </div>
+          <div>
+            <label for="lobbyEventInterval">Событие каждые N ходов</label>
+            <input type="number" id="lobbyEventInterval" value="${stInterval}" min="1" max="10" style="width:100%;">
+          </div>
+          <div>
+            <label for="lobbyForcedPayment">Плата A/B/C, % ${hintBtn("lobby-fee", `Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ.`)}</label>
+            <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="60/45/30" style="width:100%;">
+          </div>
         </div>
-        <div>
-          <label>Зарплата за ход</label>
-          <input type="number" id="lobbyTurnSalary" value="${stSalary}" min="0" step="50" style="width:100%;">
-        </div>
-        <div>
-          <label>Событие каждые N ходов</label>
-          <input type="number" id="lobbyEventInterval" value="${stInterval}" min="1" max="10" style="width:100%;">
-        </div>
-        <div>
-          <label>Плата держателям A/B/C, % ${hintBtn("lobby-fee", `Плата держателям — базовая доля цены компании (класс A, B и C), которую платит держателям тот, кто попал на её клетку (своя доля снижает плату). Плата растёт быстрее доли держателей: чем больше компании раскуплено, тем дороже отказ.`)}</label>
-          <input type="text" id="lobbyForcedPayment" value="${stForced}" placeholder="60/45/30" style="width:100%;">
-        </div>
-      </div>
-      <label for="lobbyMaxRounds">Длительность партии ${hintBtn("lobby-length", escapeHtml(len.hint)).replace('class="hint-q"', 'class="hint-q" id="lobbyLengthHint"')}</label>
-      <select id="lobbyMaxRounds" data-opts="${escapeHtml(len.options.map(o=>o.v).join(","))}" style="margin-bottom:10px;">${lobbyLengthOptionsHtml(len)}</select>
-      <button style="width:100%;" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"Начать игру":"Нужно минимум 2 игрока в сети"}</button>`;
+      </details>
+      <button class="lobby-start" id="btnStartLobby" ${enough?"":"disabled"}>${enough?"Начать игру":"Нужно минимум 2 игрока"}</button>`;
     document.getElementById("btnStartLobby").onclick = ()=> send({type:"startGame"});
     // «t150» — свои ходы у каждого (updateRoomSettings), «r30» — лимит в раундах
     // (прежний сервер или старая комната, setMaxRounds).
@@ -3392,11 +3420,15 @@ function renderLobby(s){
     document.getElementById("lobbyForcedPayment").onchange = sendSettings;
   } else {
     const gsc = st.scenario ? GameEngine.scenarioById(st.scenario) : null;
-    startArea.innerHTML = `<div class="muted" style="font-size:12.5px;">${gsc ? `Сценарий «${escapeHtml(gsc.title)}» · ` : ""}${escapeHtml(len.label)}<br>Ждите, пока хост начнёт игру…</div>`;
+    const lenOpt = len.options.find(o=> o.v === len.value);
+    startArea.innerHTML = `<div class="lobby-wait">${ico("clock","ico-sm")}<span>${escapeHtml(gsc ? gsc.title : "Классика")} · ${escapeHtml(lenOpt ? lenOpt.l : len.label)} · ждём хоста</span></div>`;
   }
 
   const chatLog = document.getElementById("lobbyChatLog");
-  chatLog.innerHTML = (s.chat||[]).map(m=>`<div class="log-entry"><b>${escapeHtml(m.name)}:</b> ${escapeHtml(m.text)}</div>`).join("") || `<div class="muted" style="font-size:12px;">Сообщений пока нет.</div>`;
+  chatLog.innerHTML = (s.chat||[]).map(m=>`<div class="log-entry"><b>${escapeHtml(m.name)}:</b> ${escapeHtml(m.text)}</div>`).join("");
+  chatLog.hidden = !(s.chat||[]).length;
+  const chatCount = document.getElementById("lobbyChatCount");
+  if(chatCount){ chatCount.hidden = !(s.chat||[]).length; chatCount.textContent = String((s.chat||[]).length); }
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
@@ -3418,12 +3450,12 @@ function scenarioLocked(sc){
 }
 function scenarioPickerHtml(selected, action){
   const list = [{ id: "", title: "Классика", year: "", intro: "Обычная партия: свои правила и длительность.", free: true }].concat(GameEngine.SCENARIOS || []);
-  return `<div class="scn-grid" role="radiogroup" aria-label="Сценарий">${list.map(sc=>{
+  // Строки «название · год»; описание сценария — во всплывающей подсказке.
+  return `<div class="scn-list" role="radiogroup" aria-label="Сценарий">${list.map(sc=>{
     const on = (selected || "") === sc.id;
     const locked = scenarioLocked(sc);
-    return `<button type="button" class="scn-card${on?" on":""}${locked?" locked":""}" role="radio" aria-checked="${on}" data-scenario="${sc.id}" onclick="${action}('${sc.id}')"${locked?` aria-label="${escapeHtml(sc.title)} — нужно купить"`:""}>
-      <span class="scn-head"><b>${escapeHtml(sc.title)}</b>${sc.year?`<span class="scn-year">${sc.year}</span>`:""}${locked?`<span class="scn-lock">${ico("lock","ico-sm")}</span>`:on?`<span class="scn-check">${ico("check","ico-sm")}</span>`:""}</span>
-      <span class="scn-intro">${escapeHtml(sc.intro)}</span>
+    return `<button type="button" class="scn-row${on?" on":""}${locked?" locked":""}" role="radio" aria-checked="${on}" data-scenario="${sc.id}" title="${escapeHtml(sc.intro || "")}" onclick="${action}('${sc.id}')"${locked?` aria-label="${escapeHtml(sc.title)} — нужно купить"`:""}>
+      <span class="scn-dot" aria-hidden="true"></span><span class="scn-title">${escapeHtml(sc.title)}</span>${locked?`<span class="scn-lock">${ico("lock","ico-sm")}</span>`:""}${sc.year && !String(sc.title).includes(String(sc.year))?`<span class="scn-year">${sc.year}</span>`:""}
     </button>`;
   }).join("")}</div>`;
 }
@@ -3470,10 +3502,10 @@ function refreshScenarioPickers(){
 }
 
 const GAME_LENGTH_PRESETS = [
-  { turns: 40, label: "Короткая · 40 ходов у каждого" },
-  { turns: 70, label: "Средняя · 70 ходов у каждого" },
-  { turns: 150, label: "До банкротства · ≈100 ходов у каждого" },
-  { turns: 0, label: "Без лимита · только до банкротства" },
+  { turns: 40, label: "40 ходов" },
+  { turns: 70, label: "70 ходов" },
+  { turns: 150, label: "До банкротства · ≈100 ходов" },
+  { turns: 0, label: "Без лимита" },
 ];
 function defaultGameTurns(){
   return (window.GameEngine && GameEngine.DEFAULT_MAX_TURNS_PER_PLAYER) || 150;
@@ -3535,17 +3567,11 @@ document.getElementById("btnCopyRoomCode").onclick = async ()=>{
 };
 document.getElementById("btnShareRoomCode").onclick = ()=>{
   const code = document.getElementById("lobbyRoomCode").textContent;
-  navigator.share({ title: "Trade Monopoly", text: `Заходи играть в Trade Monopoly: «Онлайн» → «По коду» → ${code}` }).catch(()=>{});
+  navigator.share({ title: "Trade Monopoly", text: `Заходи играть в Trade Monopoly: «Онлайн» → «Войти по коду» → ${code}` }).catch(()=>{});
 };
+// Ошибка в лобби — тостом: чат свёрнут, и строка в нём осталась бы незамеченной.
 function flashLobbyError(text){
-  const chatLog = document.getElementById("lobbyChatLog");
-  if(!chatLog) return;
-  const div = document.createElement("div");
-  div.className = "log-entry";
-  div.style.borderLeft = "3px solid var(--red)";
-  div.textContent = text;
-  chatLog.appendChild(div);
-  chatLog.scrollTop = chatLog.scrollHeight;
+  showToast({ kind: "warn", icon: "alert", title: text, duration: 4000 });
 }
 function sendLobbyChat(){
   const el = document.getElementById("lobbyChatInput");
@@ -3570,6 +3596,7 @@ document.getElementById("btnNewGame").onclick = ()=>{
   if(confirm("Начать новую партию? Все данные текущей партии будут потеряны.")) send({type:"newGame"});
 };
 document.getElementById("btnBankrupt").onclick = ()=>{
+  closeGameMenu();
   if(confirm("Объявить своё банкротство? Все ваши акции вернутся в банк.")) send({type:"declareBankruptcy"});
 };
 
@@ -3617,6 +3644,8 @@ function switchTab(name){
     const last = document.getElementById("log").lastElementChild;
     if(last) last.scrollIntoView({block:"end", behavior:"auto"});
   }
+  // Карта активов раскладывается под ширину видимой панели — пересчитать.
+  if(willOpen && latest) refreshHeatmaps();
   closeGameMenu();
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.onclick = ()=> switchTab(b.dataset.tab));
@@ -3674,10 +3703,126 @@ function sparklineSvg(ticker, currentPrice, delta){
   return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+
+// ---------------------------------------------------------------------
+// Карта активов (холст Claude Design «Trade Monopoly — меньше текста, карта
+// активов, сделки»): плитки по стоимости — раскладка squarified treemap —
+// и цвет от красного через серый к зелёному по изменению. На плитке ещё
+// стрелка и число: цвет не единственный признак (скилл dataviz — красный и
+// зелёный путают при дальтонизме). Нажатие — карточка компании или города.
+// ---------------------------------------------------------------------
+function squarifyLayout(items, W, H){
+  const out = [];
+  const list = items.filter(it=> it.value > 0).sort((a,b)=> b.value - a.value);
+  const total = list.reduce((a,it)=> a + it.value, 0);
+  if(!list.length || !(total > 0)) return out;
+  const k = W * H / total;
+  let rest = list.map(it=> ({ v: it.value * k, it }));
+  let x = 0, y = 0, w = W, h = H;
+  const worst = (row, side)=>{
+    const sum = row.reduce((a,r)=> a + r.v, 0), mx = Math.max(...row.map(r=> r.v)), mn = Math.min(...row.map(r=> r.v));
+    return Math.max(side * side * mx / (sum * sum), (sum * sum) / (side * side * mn));
+  };
+  while(rest.length){
+    const side = Math.min(w, h);
+    let row = [rest[0]], i = 1;
+    while(i < rest.length && worst(row.concat([rest[i]]), side) <= worst(row, side)){ row.push(rest[i]); i++; }
+    rest = rest.slice(row.length);
+    const sum = row.reduce((a,r)=> a + r.v, 0);
+    if(w >= h){
+      const cw = sum / h; let cy = y;
+      row.forEach(r=>{ const ch = r.v / cw; out.push({ x, y: cy, w: cw, h: ch, it: r.it }); cy += ch; });
+      x += cw; w -= cw;
+    } else {
+      const rh = sum / w; let cx = x;
+      row.forEach(r=>{ const cw = r.v / rh; out.push({ x: cx, y, w: cw, h: rh, it: r.it }); cx += cw; });
+      y += rh; h -= rh;
+    }
+  }
+  return out;
+}
+const HEAT_LOSS = [166,58,42], HEAT_NEU = [74,64,56], HEAT_GAIN = [35,121,75], HEAT_SPAN = 30;
+function heatColor(pct){
+  const t = Math.max(-1, Math.min(1, (pct || 0) / HEAT_SPAN));
+  const to = t >= 0 ? HEAT_GAIN : HEAT_LOSS, a = Math.abs(t);
+  return `rgb(${HEAT_NEU.map((v,i)=> Math.round(v + (to[i] - v) * a)).join(",")})`;
+}
+function heatPctText(pct){
+  if(Math.abs(pct) < 0.05) return "— 0%";
+  return `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct).toFixed(1).replace(".", ",")}%`;
+}
+// items: {value, label, pct, sub, open} — open: код для onclick. width —
+// ширина контейнера (раскладка считается под его пропорции); 0 — по окну.
+function heatmapHtml(items, height, width, legend){
+  const W = width > 0 ? width : Math.max(260, Math.min(680, (window.innerWidth || 390) - 32)), H = height;
+  const tiles = squarifyLayout(items, W, H);
+  if(!tiles.length) return `<div class="sheet-note">Пока пусто</div>`;
+  const pc = (v, of)=> (v / of * 100).toFixed(3) + "%";
+  const cells = tiles.map(t=>{
+    const it = t.it, pw = t.w, ph = t.h;
+    const big = pw > 96 && ph > 70;
+    let inner = "";
+    if(pw >= 52 && ph >= 28) inner += `<span class="hm-name">${escapeHtml(it.label)}</span>`;
+    if(pw >= 60 && ph >= 46) inner += `<span class="hm-pct">${heatPctText(it.pct)}</span>`;
+    if(big && it.sub) inner += `<span class="hm-sub">${escapeHtml(it.sub)}</span>`;
+    return `<button type="button" class="hm-tile${big ? " big" : ""}" style="left:${pc(t.x, W)};top:${pc(t.y, H)};width:${pc(t.w, W)};height:${pc(t.h, H)};background:${heatColor(it.pct)}"
+      title="${escapeHtml(`${it.label}: ${heatPctText(it.pct)}`)}" aria-label="${escapeHtml(`${it.label}: ${heatPctText(it.pct)}${it.sub ? ", " + it.sub : ""}`)}" onclick="${it.open}">${inner}</button>`;
+  }).join("");
+  return `<div class="heatmap" style="height:${H}px">${cells}</div>` + (legend === false ? "" : heatLegendHtml());
+}
+function heatLegendHtml(){
+  return `<div class="hm-legend" aria-hidden="true"><span>▼ ${HEAT_SPAN}%</span><i></i><span>▲ ${HEAT_SPAN}%</span></div>`;
+}
+let marketView = (()=>{ try { return localStorage.getItem("tm_market_view") || "list"; } catch(e){ return "list"; } })();
+let assetsView = (()=>{ try { return localStorage.getItem("tm_assets_view") || "map"; } catch(e){ return "map"; } })();
+function setMarketView(v){ marketView = v; try { localStorage.setItem("tm_market_view", v); } catch(e){} if(latest) renderMarketTable(latest); }
+function setAssetsView(v){ assetsView = v; try { localStorage.setItem("tm_assets_view", v); } catch(e){} if(latest) renderCapital(latest); }
+function refreshHeatmaps(){
+  if(activeTab === "market" && marketView === "map") renderMarketTable(latest);
+  if(activeTab === "capital" && assetsView === "map") renderCapital(latest);
+}
+let heatResizeTimer = null;
+window.addEventListener("resize", ()=>{ clearTimeout(heatResizeTimer); heatResizeTimer = setTimeout(()=>{ if(latest) refreshHeatmaps(); }, 200); });
+function viewSegHtml(cur, fn){
+  return `<div class="seg view-seg" role="tablist" aria-label="Вид">
+    <button type="button" role="tab" aria-selected="${cur === "map"}" onclick="${fn}('map')">${ico("grid","ico-sm")} Карта</button>
+    <button type="button" role="tab" aria-selected="${cur === "list"}" onclick="${fn}('list')">${ico("feed","ico-sm")} Список</button>
+  </div>`;
+}
+// Мои активы плитками: акции — по доходности пакета, города — по рыночному
+// фактору. Две карты: город стоит в десятки раз дороже пакета акций, и на
+// общей карте акции сжались бы в неразличимые полоски.
+function myAssetsHeatmapHtml(s, me){
+  const items = [], cityItems = [];
+  Object.entries(me.holdings || {}).forEach(([t, pct])=>{
+    if(!(pct > 0)) return;
+    const c = s.companies.find(x=> x.ticker === t);
+    if(!c) return;
+    const pnl = me.holdingsPnl && me.holdingsPnl[t];
+    items.push({ value: c.price * pct / 100, label: c.name, pct: pnl ? pnl.pnlPct : 0, sub: `${pct}% · ${fmt(c.price * pct / 100)}`, open: `openCompanyModal('${t}')` });
+  });
+  (me.properties || []).forEach(re=>{
+    const full = (s.realEstate || []).find(r=> r.id === re.id);
+    if(!full) return;
+    cityItems.push({ value: full.price, label: re.name, pct: ((full.factor || 1) - 1) * 100, sub: fmt(full.price), open: `openRealEstateModal('${re.id}')` });
+  });
+  const box = document.getElementById("capitalBody");
+  const W = box && box.clientWidth ? box.clientWidth - 22 : 0;
+  const sum = list=> list.reduce((a, it)=> a + it.value, 0);
+  const card = (icon, title, list, h)=> `<div class="mini-card hm-card">
+      <h3 class="hm-head">${ico(icon,"ico-sm")} ${title}<span class="mono">${fmt(sum(list))}</span></h3>
+      ${heatmapHtml(list, h, W, false)}
+    </div>`;
+  return (items.length ? card("chart", "Акции", items, items.length > 2 ? 300 : 180) : "")
+    + (cityItems.length ? card("home", "Города", cityItems, cityItems.length > 3 ? 240 : 150) : "")
+    + heatLegendHtml();
+}
 function renderMarketTable(s){
   const body = document.getElementById("marketBody");
   if(!body) return;
   body.innerHTML = "";
+  const mapBox = document.getElementById("marketHeatmap"), tableWrap = document.getElementById("marketTableWrap");
+  document.querySelectorAll("#marketViewSeg [data-view]").forEach(b=> b.setAttribute("aria-selected", String(b.dataset.view === marketView)));
   const me = s.players.find(p=>p.id===you);
   const filterPlayer = marketOwnFilter.startsWith("p") ? s.players.find(p=>p.id===parseInt(marketOwnFilter.slice(1))) : null;
   const rows = (s.companies||[]).filter(c=>{
@@ -3688,6 +3833,16 @@ function renderMarketTable(s){
     if(filterPlayer && !(filterPlayer.holdings && filterPlayer.holdings[c.ticker] > 0)) return false;
     return true;
   });
+  // Карта рынка: плитка — цена компании, цвет — изменение за партию.
+  if(mapBox && tableWrap){
+    mapBox.hidden = marketView !== "map";
+    tableWrap.hidden = marketView === "map";
+    if(marketView === "map"){
+      mapBox.innerHTML = rows.length ? heatmapHtml(rows.map(c=> ({ value: c.price, label: c.name, pct: c.startPrice ? (c.price / c.startPrice - 1) * 100 : 0, sub: fmt(c.price), open: `openCompanyModal('${c.ticker}')` })), 460, mapBox.clientWidth)
+        : `<div class="sheet-note">Нет компаний под выбранные фильтры</div>`;
+      return;
+    }
+  }
   if(rows.length === 0){
     const emptyMsg = (filterPlayer && filterPlayer.holdingsHidden)
       ? `Портфель ${escapeHtml(filterPlayer.name)} скрыт — проведите шпионаж во вкладке «Влияние», чтобы увидеть его акции.`
@@ -3755,7 +3910,6 @@ function revealLeftLabel(s, p, capital){
   return capital ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 
-// Узкая инлайн-полоса под фильтрами: показывается только когда активен
 // Правила 2 (engine.js, measureCooldownLeft): меры бесплатны, каждая раз в
 // s.measureCooldown событий; в прежних — за деньги. Подпись и блокировка кнопки.
 function measureBtn(s, key, verb, cost){
@@ -3765,6 +3919,7 @@ function measureBtn(s, key, verb, cost){
     ? { label: `${verb} · через ${left} ${pluralRu(left, "событие", "события", "событий")}`, disabled: "disabled" }
     : { label: `${verb} · бесплатно`, disabled: "" };
 }
+// Узкая инлайн-полоса под фильтрами: показывается только когда активен
 // чип-фильтр по игроку — статус портфеля (скрыт/раскрыт) + кнопка шпионажа.
 function renderMarketPlayerBar(s){
   const bar = document.getElementById("marketPlayerBar");
@@ -3896,43 +4051,6 @@ function render(){
   renderMarketPlayerChips(s);
   renderMarketTable(s);
   renderMarketPlayerBar(s);
-
-  // players
-  const playersList = document.getElementById("playersList");
-  playersList.innerHTML = "";
-  s.players.forEach(p=>{
-    const div = document.createElement("div");
-    div.className = "player-card" + (p.bankrupt?" bankrupt":"") + (p.id===you?" you":"") + (p.id===s.currentPlayerId && s.phase==="roll" ?" turn":"");
-    const isSelf = p.id === you;
-    const revealedBySpy = !isSelf && !p.holdingsHidden && !p.bankrupt;
-    // Выбывший (банкрот или исключённый) активов не имеет, и шпионить за ним
-    // нельзя — «нужен шпионаж» звал бы к действию, которое движок отвергнет.
-    const holdingsStr = p.bankrupt
-      ? `<span class="muted">выбыл — активов нет</span>`
-      : p.holdingsHidden
-      ? `<span class="muted">${ico("lock","ico-sm")} активы скрыты — нужен шпионаж</span>`
-      : (Object.entries(p.holdings).filter(([,v])=>v>0).map(([t,v])=>`<span>${t} ${v}%</span>`).join("") || `<span class="muted">нет акций</span>`)
-        + ((p.properties||[]).map(re=>`<span>${escapeHtml(re.name)}${re.level>0?` · ур. ${re.level}`:""}</span>`).join(""));
-    const gLabel = genderLabel(p);
-    const rep = reputationLabel(p.reputation);
-    // Партия с лимитом: место по капиталу и отрыв (см. standingOf).
-    const st = s.phase === "roll" ? standingOf(s, p.id) : null;
-    div.innerHTML = `
-      <div class="player-head">
-        <b style="display:flex;align-items:center;gap:10px;"><span class="pchip-av" style="--seat:${seatColor(s,p.id)};width:30px;height:30px;font-size:13px;">${avatarInner(p)}</span>${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':""}${p.bankrupt?` <span class="muted">· ${p.kicked?"исключён":"банкрот"}</span>`:""}</b>
-        <span class="net">${fmt(p.netWorth)}</span>
-      </div>
-      <div class="muted" style="font-size:13px;">Наличные <span class="mono ${p.cash<0?'down':''}" style="color:var(--text);">${fmt(p.cash)}</span> ${p.connected===false && !p.isBot?'<span class="badge offline">не в сети</span>':""} ${p.points?`<span class="badge points-badge">${p.points} очк.</span>`:""} ${gLabel?`· ${escapeHtml(gLabel)}`:""}</div>
-      <div class="rep-badge-row">
-        ${st?`<span class="rep-badge${st.place===1?" rep-high":""}">${ico("trophy","ico-sm")} ${st.place}-е место · ${escapeHtml(standingGapText(st))}</span>`:""}
-        <span class="rep-badge ${rep.cls}">${ico("star","ico-sm")} ${p.reputation}</span>
-        ${p.loanPrincipal?`<span class="rep-badge loan">${ico("bank","ico-sm")} ${fmt(p.loanPrincipal)}</span>`:""}
-        ${revealedBySpy?`<span class="rep-badge spy">${ico("eye","ico-sm")} ${revealLeftLabel(s, p)}</span>`:""}
-      </div>
-      <div class="holdings">${holdingsStr}</div>
-    `;
-    playersList.appendChild(div);
-  });
 
   // log
   const log = document.getElementById("log");
@@ -4212,9 +4330,9 @@ function computeAvatarsHtml(s){
     const isTurn = p.id === s.currentPlayerId && s.phase === "roll" && !p.bankrupt;
     const isYou = p.id === you;
     const reaction = (s.reactions||[]).filter(r=>r.playerId===p.id && reactionAge(r, now) < REACTION_MS).pop();
+    // Ярлык «бот» не ставим: у бота и так значок робота вместо аватара.
     const tag = isTurn ? `<span class="pchip-tag turn">ход</span>`
-      : isYou ? `<span class="pchip-tag you">вы</span>`
-      : p.isBot ? `<span class="pchip-tag bot">бот</span>` : "";
+      : isYou ? `<span class="pchip-tag you">вы</span>` : "";
     const cls = "pchip" + (isTurn?" turn":"") + (p.bankrupt?" bankrupt":"") + (p.connected===false && !p.isBot ? " offline" : "");
     const sub = p.bankrupt ? "выбыл" : (p.connected===false && !p.isBot ? "не в сети" : fmtShort(p.netWorth));
     const place = places[p.id];
@@ -4485,14 +4603,8 @@ function renderCapital(s){
   if(!me){ el.innerHTML = `<div class="muted">Загрузка…</div>`; return; }
   const assets = myAssetsValue(s, me);
   const rep = reputationLabel(me.reputation);
-  const rankSorted = s.players.slice().sort((a,b)=>b.netWorth-a.netWorth);
-  const rank = rankSorted.findIndex(p=>p.id===me.id) + 1;
-  // Партия с лимитом: место среди оставшихся (как решит движок) и отрыв.
-  const st = s.phase === "roll" ? standingOf(s, me.id) : null;
-  const rankText = st ? `место ${st.place} из ${st.total} · ${standingGapText(st)}` : `место ${rank} из ${s.players.length}`;
   const subtabs = [
-    {id:"stocks", label:"Акции"},
-    {id:"estate", label:"Недвижимость"},
+    {id:"stocks", label:"Активы"},
     {id:"loan", label:"Кредит"},
     {id:"stats", label:"Итоги"},
   ];
@@ -4502,22 +4614,26 @@ function renderCapital(s){
   let bodyHtml;
   if(capitalSubTab === "loan") bodyHtml = loanSectionHtml(s, me);
   else if(capitalSubTab === "stats") bodyHtml = statsSectionHtml(s, me);
-  else if(capitalSubTab === "estate") bodyHtml = myAssetsSectionHtml(s, me);
-  else bodyHtml = stocksListHtml(s);
+  else {
+    // Активы: карта плитками или список — акции и города вместе.
+    const hasAny = Object.values(me.holdings || {}).some(v=> v > 0) || (me.properties || []).length > 0;
+    bodyHtml = !hasAny ? `<div class="mini-card"><div class="sheet-note">Пока нет активов — купите долю, когда выпадет компания.</div></div>`
+      : viewSegHtml(assetsView, "setAssetsView") + (assetsView === "map"
+        ? myAssetsHeatmapHtml(s, me)
+        : stocksListHtml(s) + ((me.properties || []).length ? myAssetsSectionHtml(s, me) : ""));
+  }
   const total = Math.max(1, Math.abs(me.cash) + assets);
   el.innerHTML = `
     <div class="mini-card">
-      <div class="eyebrow">${escapeHtml(me.name)} · ${escapeHtml(rankText)}</div>
-      <div class="mono" style="font-size:30px;margin:4px 0 10px;" data-num="net-big">${fmt(me.netWorth)}</div>
+      <div class="mono" style="font-size:30px;margin:0 0 10px;" data-num="net-big">${fmt(me.netWorth)}</div>
       <div class="own-bar" aria-hidden="true"><i style="width:${Math.max(0,me.cash)/total*100}%;background:var(--primary)"></i><i style="width:${assets/total*100}%;background:var(--accent)"></i></div>
       <div class="own-legend" style="margin-bottom:4px;"><span><i style="background:var(--primary)"></i>Наличные ${fmt(me.cash)}</span><span><i style="background:var(--accent)"></i>Активы ${fmt(assets)}</span>${me.loanPrincipal?`<span><i style="background:var(--down)"></i>Долг ${fmt(me.loanPrincipal)}</span>`:""}</div>
-      <div class="rep-badge-row"><span class="rep-badge ${rep.cls}">${ico("star","ico-sm")} Репутация ${me.reputation} · ${rep.text.toLowerCase()}</span><span class="rep-badge">${ico("percent","ico-sm")} Комиссия банка ${((s.bankFeePct||0)*100).toFixed(1).replace(".", ",")}%</span></div>
+      <div class="rep-badge-row"><span class="rep-badge ${rep.cls}">${ico("star","ico-sm")} Репутация ${me.reputation} · комиссия ${((s.bankFeePct||0)*100).toFixed(1).replace(".", ",")}%</span></div>
     </div>
     ${tradeOffersHtml(s)}
     ${subtabsHtml}
     ${bodyHtml}
   `;
-  if(expandedTicker) updateTradeSummary(expandedTicker);
 }
 
 // Вкладка «Влияние» (бывшая «Контроль»): расследование против вас, спецдействия
@@ -4602,7 +4718,7 @@ function renderControlPanel(s){
   const firstDiscreditCost = firstDiscreditTarget != null ? (discreditCosts[firstDiscreditTarget]||0) : 0;
   const noTargets = otherPlayers.length===0 ? "disabled" : "";
 
-  if(s.rulesV >= 2) html += `<div class="influence-note">${ico("clock")}<span>Меры бесплатны, каждая — раз в ${s.measureCooldown || 3} ${pluralRu(s.measureCooldown || 3, "событие", "события", "событий")}. PR-кампания и шорт — за деньги.</span></div>`;
+  // Что мера бесплатна или когда снова доступна, пишет сама кнопка (measureBtn).
   // --- Контрольный пакет ---
   html += `<div class="influence-group">${ico("crown","ico-sm")} Контрольный пакет${myControlled.length?` · ${myControlled.map(c=>`${escapeHtml(c.name)} ${me.holdings[c.ticker]}%`).join(", ")}`:""}</div>`;
   if(myControlled.length === 0){
@@ -4799,7 +4915,8 @@ function statusRowHtml(s){
   const roundHtml = s.maxRounds
     ? `Раунд ${Math.min(round, s.maxRounds)} <span>/ ${s.maxRounds}</span>`
     : `Раунд ${round}`;
-  const roomText = s.tutorial ? "Обучение" : mode === "online" ? `Комната ${escapeHtml(roomCode)}` : "Офлайн";
+  // Код комнаты — только онлайн (его диктуют друзьям); «Офлайн» и «Обучение» ничего не сообщали.
+  const roomText = mode === "online" && !s.tutorial ? `Комната ${escapeHtml(roomCode)}` : "";
   const extras = [];
   const scn = s.settings && s.settings.scenario ? GameEngine.scenarioById(s.settings.scenario) : null;
   if(scn) extras.push(`<span class="rep-badge scn-badge">${ico("news","ico-sm")} ${escapeHtml(scn.title)}${hintBtn("scenario", `<b>${escapeHtml(scn.title)}</b> (${scn.year}). ${escapeHtml(scn.intro)} Цель: ${escapeHtml(scn.goal)}`)}</span>`);
@@ -4817,30 +4934,34 @@ function statusRowHtml(s){
   const left = roundsLeftOf(s);
   if(left === 1) extras.unshift(`<span class="rep-badge rep-crit g-final">${ico("flag","ico-sm")} Последний раунд — после события подведём итоги</span>`);
   else if(left != null && left <= FINAL_ROUNDS) extras.unshift(`<span class="rep-badge rep-mid g-final">${ico("flag","ico-sm")} Финал: осталось ${left} ${pluralRu(left, "раунд", "раунда", "раундов")}</span>`);
-  // Лимит партии в своих ходах: «Раунд X / Y» мало что говорит игроку, который
-  // считает свои ходы, — рядом «≈N ваших ходов до лимита» (ходы стола до
-  // последнего события, поделённые на оставшихся). На последнем раунде хватает
-  // «Итоги через N ходов». В хот-сите с несколькими людьми и у выбывшего — «у каждого».
-  let ownLeftHtml = "";
+  // Лимит партии в своих ходах: «≈N ваших ходов до лимита» (ходы стола до
+  // последнего события, поделённые на оставшихся) — во всплывающей подсказке
+  // у «Раунд X / Y», в строке он был лишним текстом. В хот-сите с несколькими
+  // людьми и у выбывшего — «у каждого».
+  let ownLeftTitle = "";
   if(left != null && left > 1){
     const active = Math.max(1, (s.players || []).filter(p=> !p.bankrupt).length);
     const own = Math.max(1, Math.round(((left - 1) * interval + turnsLeft) / active));
     const meP = (s.players || []).find(p=> p.id === s.you);
     const hotSeat = mode === "offline" && (s.players || []).filter(p=> !p.isBot && !p.bankrupt).length > 1;
     const whose = !meP || meP.bankrupt || hotSeat ? `${pluralRu(own, "ход", "хода", "ходов")} у каждого` : pluralRu(own, "ваш ход", "ваших хода", "ваших ходов");
-    ownLeftHtml = `<span class="sep">·</span><span title="Примерно столько своих ходов осталось до лимита партии: после него побеждает самый богатый">≈${own} ${whose} до лимита</span>`;
+    ownLeftTitle = `≈${own} ${whose} до лимита партии, потом побеждает самый богатый`;
   }
+  const roomPart = roomText ? `<span class="sep">·</span><span>${roomText}</span>` : "";
   const sub = s.phase === "ended"
-    ? `<span>Партия окончена</span><span class="sep">·</span><span>${roomText}</span>`
-    : `<span class="g-dot" aria-hidden="true"></span><span>${left === 1 ? "Итоги" : "Событие"} через ${turnsLeft} ${turnsWord}</span>${ownLeftHtml}<span class="sep">·</span><span>${roomText}</span>`;
-  // В обучении «Смотреть как» нет: вид бота раскрыл бы его портфель и сбил шаги тренера.
-  const viewAsHtml = (mode==="offline" && localRoom && !s.tutorial) ? `<div class="g-viewas"><label class="pill"><span class="g-viewas-label">Смотреть как</span>
+    ? `<span>Партия окончена</span>${roomPart}`
+    : `<span class="g-dot" aria-hidden="true"></span><span>${left === 1 ? "итоги" : "событие"} через ${turnsLeft} ${turnsWord}</span>${roomPart}`;
+  // «Смотреть как» — только в хот-сите (два и больше человек за устройством):
+  // с одним человеком и ботами вид бота лишь раскрыл бы его портфель. В обучении
+  // его нет по той же причине (и чтобы не сбить шаги тренера).
+  const humansHere = mode === "offline" && localRoom ? localRoom.players.filter(p=> !p.isBot).length : 0;
+  const viewAsHtml = (mode==="offline" && localRoom && !s.tutorial && humansHere > 1) ? `<div class="g-viewas"><label class="pill"><span class="g-viewas-label">Смотреть как</span>
       <select onchange="onViewAsChange(this)" aria-label="Смотреть как игрок">
         ${localRoom.players.map(p=>`<option value="${p.id}" ${p.id===viewAs?"selected":""}>${escapeHtml(p.name)}</option>`).join("")}
       </select></label></div>` : "";
   return `<div class="g-top">
       <div class="g-top-main">
-        <div class="g-round">${roundHtml}</div>
+        <div class="g-round"${ownLeftTitle ? ` title="${escapeHtml(ownLeftTitle)}"` : ""}>${roundHtml}</div>
         <div class="g-sub">${sub}</div>
         ${extras.length ? `<div class="cap-meta">${extras.join("")}</div>` : ""}
         ${viewAsHtml}
@@ -4867,14 +4988,18 @@ function capSummaryHtml(s){
   if(!me) return "";
   const assets = myAssetsValue(s, me);
   const rep = reputationLabel(me.reputation);
+  // Репутацию на столе показываем, только когда она низкая и дорого обходится.
+  const lowRep = rep.cls === "rep-low" || rep.cls === "rep-crit";
   // От $1 000 000 полная сумма не помещается в ячейку полосы (телефон, левая
   // колонка десктопа, ландшафт) — показываем $1,2M, точную сумму — в подсказке.
   const csVal = (v)=> Math.abs(v) >= 1e6 ? `<span title="${fmt(v)}">${fmtShort(v)}</span>` : fmt(v);
   // Партия с лимитом: место по капиталу и отрыв — до 1-го места или, у лидера,
   // от 2-го. В финальных раундах строка подсвечена.
-  const st = s.phase === "roll" ? standingOf(s, me.id) : null;
+  // Место и отрыв — только в финальных раундах, когда от них зависит игра;
+  // остальное время это лишняя строка (место видно в «Итогах» портфеля).
   const left = roundsLeftOf(s);
-  const standHtml = st ? `<div class="cap-standing${left != null && left <= FINAL_ROUNDS ? " final" : ""}" title="Место по капиталу среди оставшихся в игре. В партии с лимитом раундов побеждает самый богатый.">
+  const st = s.phase === "roll" && left != null && left <= FINAL_ROUNDS ? standingOf(s, me.id) : null;
+  const standHtml = st ? `<div class="cap-standing final" title="Место по капиталу среди оставшихся в игре. В партии с лимитом раундов побеждает самый богатый.">
       <span class="cap-standing-place">${ico("trophy","ico-sm")} <b>${st.place}-е место</b> из ${st.total}</span>
       <span class="cap-standing-gap${st.place === 1 && st.gap >= 1 ? " up" : ""}">${escapeHtml(standingGapText(st))}</span>
     </div>` : "";
@@ -4884,137 +5009,40 @@ function capSummaryHtml(s){
       <div><span class="cs-label">Капитал</span><span class="cs-val" data-num="net">${csVal(me.netWorth)}</span></div>
     </div>
     ${standHtml}
-    <div class="rep-badge-row">
-      <span class="rep-badge ${rep.cls}" title="Репутация влияет на комиссию банка и условия кредита">${ico("star","ico-sm")} Репутация ${me.reputation} · ${rep.text.toLowerCase()}</span>
+    ${lowRep || me.loanPrincipal ? `<div class="rep-badge-row">
+      ${lowRep ? `<span class="rep-badge ${rep.cls}" title="Репутация влияет на комиссию банка и условия кредита">${ico("star","ico-sm")} Репутация ${me.reputation} · ${rep.text.toLowerCase()}</span>` : ""}
       ${me.loanPrincipal ? `<span class="rep-badge loan">${ico("bank","ico-sm")} Долг ${fmt(me.loanPrincipal)}</span>` : ""}
-    </div>`;
+    </div>` : ""}`;
 }
 
 function toggleStock(t){ expandedTicker = (expandedTicker===t) ? null : t; render(); }
 
-// Действия с пакетом в «Портфеле»: переключатель «Банку / Игроку».
-// Банку — доля и кнопка с суммой. Игроку — кому (чипы), доля, цена (по умолчанию
-// рыночная стоимость доли, быстрые кнопки −10% / по рынку / +10%) и по желанию
-// встречные акции. Выбор режима, получателя и обмена живёт в tradeUi —
-// панель пересобирается на каждом состоянии, а значения полей восстанавливает
-// withPreservedInputs по id.
-const tradeUi = { mode: {}, to: {}, want: {} };
-// Ключ — игрок и компания: на одном устройстве у каждого свой режим и получатель.
-const tradeKey = (t)=> `${you}:${t}`;
+// Действия с пакетом в «Портфеле»: продать банку или открыть лист сделки.
 function stockActionsHtml(s, c, v){
-  // Продажа и обмен доступны только ходящему игроку в любой момент его хода
+  // Продажа и сделки доступны только ходящему игроку в любой момент его хода
   // (до или после броска), чтобы не было сумбура от одновременных действий.
   if(s.currentPlayerId !== you){
     return `<div class="stock-actions"><div class="sheet-note">${ico("lock","ico-sm")} Продажа и сделки — в ваш ход</div></div>`;
   }
-  // Заморозка цен продажу и сделки не запрещает (движок их принимает): она лишь
-  // фиксирует цену, поэтому продажа банку в это время цену не роняет.
+  // Банку — ползунок и кнопка с суммой (комиссия уже вычтена). Игроку —
+  // лист сделки (openTradeSheet): там же цена и ответ бота.
   const t = c.ticker;
   const others = s.players.filter(p=>p.id!==you && !p.bankrupt);
-  const mode = others.length && tradeUi.mode[tradeKey(t)] === "player" ? "player" : "bank";
   const maxPct = Math.min(25, v);
   const startPct = Math.min(10, maxPct);
-  const seg = `<div class="seg" role="tablist" aria-label="Кому продать">
-      <button type="button" role="tab" aria-selected="${mode==="bank"}" onclick="setTradeMode('${t}','bank')">${ico("bank","ico-sm")} Банку</button>
-      <button type="button" role="tab" aria-selected="${mode==="player"}" ${others.length?"":"disabled"} onclick="setTradeMode('${t}','player')">${ico("users","ico-sm")} Игроку</button>
-    </div>`;
-  if(mode === "bank"){
-    // Правила 2: банк берёт комиссию (engine.js, SELL_BANK_COMMISSION) — сумма на ползунке уже за её вычетом.
-    const comm = (s.sellCommissionPct || 0) / 100;
-    const commText = comm ? ` Банк берёт комиссию ${s.sellCommissionPct}% — игроку сделкой обычно выгоднее.` : "";
-    const hint = hintBtn("sell-bank", (s.frozen
-      ? "Цены заморожены: до следующего события продажа банку цену не снижает."
-      : "Банк платит текущую цену. Продажа снижает цену компании на 2% за каждые 10%.") + commText);
-    return `<div class="stock-actions">${seg}
-      ${pctSliderHtml("sellSlider_"+t, maxPct, startPct, c.price/100 * (1 - comm), comm ? `Доля · комиссия ${s.sellCommissionPct}%` : "Доля", hint)}
-      <button type="button" class="secondary block" onclick="doSellStock('${t}', pctSliderVal('sellSlider_${t}'))"><span id="sellSlider_${t}_btn" data-verb="Продать">Продать ${startPct}%</span></button>
-    </div>`;
-  }
-  if(!others.some(p=>p.id===tradeUi.to[tradeKey(t)])) tradeUi.to[tradeKey(t)] = others[0].id;
-  const toChips = others.map(p=>`<button type="button" class="chip${p.id===tradeUi.to[tradeKey(t)]?" active":""}" role="radio" aria-checked="${p.id===tradeUi.to[tradeKey(t)]}" data-trade-to="${p.id}" onclick="setTradeTo('${t}',${p.id})">${escapeHtml(p.name)}</button>`).join("");
-  const wantOpen = !!tradeUi.want[tradeKey(t)];
-  const wantCompanies = s.companies.filter(x=>x.ticker!==t && !x.merged);
-  const wantOpts = wantCompanies.map(x=>`<option value="${x.ticker}">${escapeHtml(x.name)} · ${fmt(x.price)}</option>`).join("");
-  const firstWant = wantCompanies[0];
-  return `<div class="stock-actions">${seg}
-    <div class="trade-field"><span class="trade-label" id="tradeToLbl_${t}">Кому</span>
-      <div class="chip-row" role="radiogroup" aria-labelledby="tradeToLbl_${t}">${toChips}</div></div>
-    ${pctSliderHtml("tradePct_"+t, maxPct, startPct, c.price/100, "Отдаёте")}
-    <div class="trade-field"><label class="trade-label" for="tradePrice_${t}">Цена, $</label>
-      <div class="trade-price">
-        <input id="tradePrice_${t}" type="number" inputmode="numeric" min="0" step="100" value="${Math.round(c.price*startPct/100)}" data-auto="1" oninput="if(event.isTrusted) this.dataset.auto='';updateTradeSummary('${t}')">
-        <div class="chip-row tight">
-          <button type="button" class="chip" onclick="tradeQuickPrice('${t}',0.9)">−10%</button>
-          <button type="button" class="chip" onclick="tradeQuickPrice('${t}',1)">рынок</button>
-          <button type="button" class="chip" onclick="tradeQuickPrice('${t}',1.1)">+10%</button>
-        </div>
-      </div></div>
-    <button type="button" class="trade-want-toggle" aria-expanded="${wantOpen}" onclick="toggleTradeWant('${t}')">${ico(wantOpen?"minus":"plus","ico-sm")} Акции взамен${wantOpen?"":" · необязательно"}</button>
-    <div class="trade-want" id="tradeWantBox_${t}" ${wantOpen?"":"hidden"}>
-      <select id="tradeWantTicker_${t}" aria-label="Акции взамен" onchange="onTradeWantTickerChange('${t}')">${wantOpts}</select>
-      ${pctSliderHtml("tradeWantPct_"+t, 25, 5, firstWant ? firstWant.price/100 : 0, "Доля взамен")}
+  const comm = (s.sellCommissionPct || 0) / 100;
+  const hint = hintBtn("sell-bank", (s.frozen
+    ? "Цены заморожены: до следующего события продажа банку цену не снижает."
+    : "Банк платит текущую цену. Продажа снижает цену компании на 2% за каждые 10%.")
+    + (comm ? ` Банк берёт комиссию ${s.sellCommissionPct}% — игроку обычно выгоднее.` : ""));
+  return `<div class="stock-actions">
+    ${pctSliderHtml("sellSlider_"+t, maxPct, startPct, c.price/100 * (1 - comm), comm ? `Банку · комиссия ${s.sellCommissionPct}%` : "Банку", hint)}
+    <div class="sheet-actions">
+      <button type="button" class="secondary" onclick="doSellStock('${t}', pctSliderVal('sellSlider_${t}'))"><span id="sellSlider_${t}_btn" data-verb="Продать">Продать ${startPct}%</span></button>
+      ${others.length ? `<button type="button" onclick="openTradeSheet(null,{kind:'sell',ticker:'${t}'})">${ico("swap","ico-sm")} Игроку</button>` : ""}
     </div>
-    <div class="trade-summary" id="tradeSum_${t}" aria-live="polite"></div>
-    <button type="button" class="block" onclick="doProposeStockTrade('${t}')">${ico("swap","ico-sm")} Предложить сделку</button>
   </div>`;
 }
-function setTradeMode(t, m){ tradeUi.mode[tradeKey(t)] = m; render(); }
-function setTradeTo(t, id){
-  tradeUi.to[tradeKey(t)] = id;
-  // Раскрыта всегда одна строка акции — её чипы и переключаем.
-  document.querySelectorAll(".stock-actions [data-trade-to]").forEach(b=>{
-    const on = +b.dataset.tradeTo === id;
-    b.classList.toggle("active", on); b.setAttribute("aria-checked", String(on));
-  });
-}
-function toggleTradeWant(t){ tradeUi.want[tradeKey(t)] = !tradeUi.want[tradeKey(t)]; render(); }
-// Рыночная стоимость отдаваемой доли — от неё быстрые кнопки цены и итог.
-function tradeMarketValue(t){
-  const c = latest && latest.companies.find(x=>x.ticker===t);
-  return c ? c.price * pctSliderVal("tradePct_"+t) / 100 : 0;
-}
-function tradeQuickPrice(t, k){
-  const inp = document.getElementById("tradePrice_"+t);
-  if(!inp) return;
-  // «рынок» — точная рыночная стоимость доли, ±10% — с округлением до $100.
-  inp.value = k === 1 ? Math.round(tradeMarketValue(t)) : (Math.round(tradeMarketValue(t) * k / 100) * 100 || Math.round(tradeMarketValue(t) * k));
-  inp.dataset.auto = k === 1 ? "1" : "";
-  updateTradeSummary(t);
-}
-// Итог под формой: что получаете и сколько это относительно рынка.
-function updateTradeSummary(t){
-  const out = document.getElementById("tradeSum_"+t);
-  if(!out || !latest) return;
-  const market = tradeMarketValue(t);
-  const price = Math.max(0, Number((document.getElementById("tradePrice_"+t)||{}).value) || 0);
-  let want = 0, wantTxt = "";
-  if(tradeUi.want[tradeKey(t)]){
-    const sel = document.getElementById("tradeWantTicker_"+t);
-    const wc = sel && latest.companies.find(x=>x.ticker===sel.value);
-    const wp = pctSliderVal("tradeWantPct_"+t);
-    if(wc){ want = wc.price * wp / 100; wantTxt = ` + ${wp}% ${wc.ticker}`; }
-  }
-  const get = price + want, diff = get - market;
-  const rel = Math.abs(diff) < 1 ? `<span class="muted">по рынку</span>`
-    : `<span class="${diff>0?"up":"down"}">${diff>0?"+":"−"}${fmt(Math.abs(diff))} к рынку</span>`;
-  out.innerHTML = price === 0 && !want
-    ? `<span class="down">${ico("alert","ico-sm")} Бесплатно — укажите цену</span>`
-    : `Получите <b>${fmt(price)}${wantTxt}</b> · ${rel}`;
-}
-// Слайдер доли меняет и «авто»-цену (пока её не правили руками), и итог.
-document.addEventListener("input", (e)=>{
-  const el = e.target;
-  if(!el || !el.id) return;
-  let m = /^tradePct_(.+)$/.exec(el.id);
-  if(m){
-    const inp = document.getElementById("tradePrice_"+m[1]);
-    if(inp && inp.dataset.auto === "1") inp.value = Math.round(tradeMarketValue(m[1]));
-    updateTradeSummary(m[1]);
-    return;
-  }
-  m = /^tradeWantPct_(.+)$/.exec(el.id);
-  if(m) updateTradeSummary(m[1]);
-});
 function onDiscreditTargetChange(){
   const sel = document.getElementById("discreditTarget");
   const btn = document.getElementById("discreditBtn");
@@ -5036,16 +5064,6 @@ function onPrTargetChange(){
   const c = latest.companies.find(x=>x.ticker===sel.value);
   btn.textContent = `Провести · ${fmt(c ? c.price*0.05 : 0)}`;
 }
-function onTradeWantTickerChange(ticker){
-  const sel = document.getElementById(`tradeWantTicker_${ticker}`);
-  const slider = document.getElementById(`tradeWantPct_${ticker}`);
-  if(!sel || !slider || !latest) return;
-  const wc = latest.companies.find(x=>x.ticker===sel.value);
-  slider.dataset.unit = wc ? (wc.price/100) : 0;
-  onPctSlider(slider);
-  updateTradeSummary(ticker);
-}
-
 function stocksListHtml(s){
   const me = s.players.find(p=>p.id===you);
   if(!me) return "";
@@ -5437,7 +5455,7 @@ function renderQuickBanner(s){
   quickStartAt = Date.now() + s.quickStartIn;
   const tick = ()=>{
     const left = Math.max(0, Math.ceil((quickStartAt - Date.now()) / 1000));
-    box.innerHTML = `${ico("bolt","ico-sm")}<span><b>Быстрая игра.</b> ${left > 0 ? `Старт через <b class="mono">${left}</b> с` : "Начинаем…"} — свободные места займут боты.</span>`;
+    box.innerHTML = `${ico("bolt","ico-sm")}<span>${left > 0 ? `Старт через <b class="mono">${left}</b> с · дальше с ботами` : "Начинаем…"}</span>`;
   };
   tick();
   if(!quickTimer) quickTimer = setInterval(()=>{ if(document.getElementById("lobbyScreen").style.display === "none"){ clearInterval(quickTimer); quickTimer = null; return; } tick(); }, 1000);
@@ -5557,8 +5575,10 @@ function renderLeagueCard(){
   card.hidden = !L;
   if(!L) return;
   card.innerHTML = `<span class="league-card-icon">${ico("trophy")}</span>
-    <span class="league-card-text"><b>Лига недели</b><span>${L.points} ${pluralRu(L.points, "очко", "очка", "очков")} · билеты сегодня: ${L.tickets.free} из 3${L.tickets.extra ? ` + ${L.tickets.extra}` : ""}</span></span>
+    <span class="league-card-text"><b>Лига недели</b></span>
+    <span class="league-card-meta">${L.points} ${pluralRu(L.points, "очко", "очка", "очков")}</span>
     ${ico("chev-right","ico-sm")}`;
+  card.title = `Билеты сегодня: ${L.tickets.free} из 3${L.tickets.extra ? ` + ${L.tickets.extra}` : ""}`;
 }
 function openLeague(){ showOnly("ratingScreen"); setRatingTab("league"); }
 function goQuickPlay(){
@@ -5754,7 +5774,7 @@ function rollPopupHtml(s){
     ${dice("Выпала компания")}
     <div class="sheet-head">
       ${logoHtml(roll.ticker,48)}
-      <div class="sheet-head-main"><div class="sheet-title">${escapeHtml(c.name)}</div><div class="sheet-sub">${c.ticker} · ${escapeHtml(c.sector)} · волатильность ${String(c.volLabel||"").toLowerCase()}</div></div>
+      <div class="sheet-head-main"><div class="sheet-title">${escapeHtml(c.name)}</div><div class="sheet-sub">${c.ticker} · ${escapeHtml(c.sector)}</div></div>
       <div class="sheet-price"><b>${fmt(c.price)}</b>${deltaPill(c.price, c.prevPrice)}</div>
     </div>
     ${barHtml}
@@ -5779,6 +5799,24 @@ function tradeOffersHtml(s){
   if(incoming.length){
     html += `<div class="mini-card"><h3>${ico("swap","ico-sm")} Предложения вам</h3>` + incoming.map(t=>{
       const from = s.players.find(p=>p.id===t.fromId);
+      if(t.kind === "buy"){
+        // Вас просят продать: получаете деньги, отдаёте акции.
+        const value = priceOf(t.ticker) * t.pct / 100;
+        const d = t.price - value;
+        const lack = !me || (me.holdings[t.ticker]||0) < t.pct;
+        return `<div class="trade-offer trade-card" data-trade-id="${t.id}">
+          <div class="trade-card-from">${ico("user","ico-sm")} <b>${escapeHtml(from?from.name:"?")}</b> хочет купить</div>
+          <div class="trade-swap">
+            <div><span class="eyebrow">Получаете</span><b>${fmt(t.price)}</b></div>
+            <span class="trade-swap-ico">${ico("swap")}</span>
+            <div><span class="eyebrow">Отдаёте</span><b>${t.pct}% ${t.ticker}</b><span class="muted">≈ ${fmt(value)}</span></div>
+          </div>
+          <div class="trade-verdict ${Math.abs(d)<1?"":d>0?"up":"down"}">${Math.abs(d)<1 ? "по рынку" : `${d>0?"выше рынка на ":"ниже рынка на "}${fmt(Math.abs(d))}`}${lack?` · <span class="down">у вас нет ${t.pct}%</span>`:""}</div>
+          <div class="sheet-actions">
+            <button type="button" class="secondary" onclick="send({type:'respondTrade',id:${t.id},accept:false})">Отклонить</button>
+            <button type="button" ${lack?"disabled":""} onclick="send({type:'respondTrade',id:${t.id},accept:true})">Продать</button>
+          </div></div>`;
+      }
       const got = priceOf(t.ticker) * t.pct / 100;
       const pay = t.price + (t.wantTicker ? priceOf(t.wantTicker) * t.wantPct / 100 : 0);
       const diff = got - pay;
@@ -5802,7 +5840,7 @@ function tradeOffersHtml(s){
   if(outgoing.length){
     html += `<div class="mini-card"><h3>${ico("clock","ico-sm")} Ждут ответа</h3>` + outgoing.map(t=>{
       const to = s.players.find(p=>p.id===t.toId);
-      return `<div class="trade-out"><b>${escapeHtml(to?to.name:"?")}</b><span>${t.pct}% ${t.ticker} → <span class="mono">${payDesc(t)}</span></span></div>`;
+      return `<div class="trade-out"><b>${escapeHtml(to?to.name:"?")}</b><span>${t.kind === "buy" ? `купить ${t.pct}% ${t.ticker} за <span class="mono">${fmt(t.price)}</span>` : `${t.pct}% ${t.ticker} → <span class="mono">${payDesc(t)}</span>`}</span></div>`;
     }).join("") + `</div>`;
   }
   return html;
@@ -5992,7 +6030,7 @@ function renderStage(s){
     // второй тап двойного нажатия на «Купить» попал бы в только что появившуюся
     // «Завершить ход». Поэтому сразу после смены лист → док нажатие коротко игнорируем.
     if(s.rolledThisTurn && hadRollSheet) dockArmedAt = performance.now() + 450;
-    const side = `<button type="button" class="dock-side" onclick="switchTab('capital')" aria-label="Продать или обменять акции" title="Продать или обменять акции">${ico("swap","ico-lg")}</button>`;
+    const side = `<button type="button" class="dock-side" onclick="openTradeSheet(null)" aria-label="Сделка с игроком" title="Сделка с игроком">${ico("swap","ico-lg")}</button>`;
     cornerAction.innerHTML = `<div class="dock">${s.rolledThisTurn
       ? `<button type="button" class="dock-main end" onclick="doEndTurn(this)">${ico("check","ico-lg")} Завершить ход</button>`
       : `<button type="button" class="dock-main roll-btn" onclick="doRoll(this)">${ico("dice","ico-lg")} Бросить кубики</button>`}${side}</div>`;
@@ -6009,23 +6047,168 @@ function renderStage(s){
 function doSellStock(ticker, pct){
   send({type:"sellBank", ticker, pct});
 }
-function doProposeStockTrade(ticker){
-  const to = tradeUi.to[tradeKey(ticker)];
-  if(!to) return;
-  const wantSel = tradeUi.want[tradeKey(ticker)] ? document.getElementById(`tradeWantTicker_${ticker}`) : null;
-  const wantTicker = (wantSel && wantSel.value) || undefined;
-  const price = Math.max(0, parseFloat(document.getElementById(`tradePrice_${ticker}`).value)||0);
-  // Пустая цена без встречных акций — подарок; переспрашиваем, а не отдаём молча.
-  if(price === 0 && !wantTicker){ flashError("Укажите цену — иначе доля уйдёт бесплатно."); return; }
-  send({
-    type:"proposeTrade",
-    to,
-    ticker,
-    pct: pctSliderVal(`tradePct_${ticker}`),
-    price,
-    wantTicker,
-    wantPct: wantTicker ? pctSliderVal(`tradeWantPct_${ticker}`) : undefined,
-  });
+
+
+// ---------------------------------------------------------------------
+// Сделка с соперником или ботом — отдельный лист (холст Claude Design
+// «Trade Monopoly — меньше текста, карта активов, сделки», «Сделка с ботом»).
+// «Продать» — свои акции за деньги (по желанию и за его акции), «Купить» —
+// попросить продать его акции (engine.js proposeTrade, kind "buy"). Боту
+// подсказываем заранее, согласится ли он: продаёт от рынка +10%
+// (BOT_SELL_MARKUP), покупает не дороже рынка. Ответ бота приходит сразу,
+// с причиной отказа (тост по записи ленты).
+// ---------------------------------------------------------------------
+const tradeSheet = { to: null, kind: "sell", ticker: null, wantOpen: false };
+function tradeOpponents(s){ return (s.players||[]).filter(p=> p.id !== you && !p.bankrupt); }
+function openTradeSheet(toId, opts){
+  if(!latest) return;
+  const opp = tradeOpponents(latest);
+  if(!opp.length){ flashError("Сделки — только с другими игроками."); return; }
+  opts = opts || {};
+  if(typeof closeCompanyModal === "function" && openModalPlayerId) closeCompanyModal();
+  tradeSheet.to = opp.some(p=> p.id === toId) ? toId : opp[0].id;
+  const me = latest.players.find(p=> p.id === you);
+  const mineAny = me && Object.keys(me.holdings||{}).some(t=> (me.holdings[t]||0) > 0);
+  tradeSheet.kind = opts.kind || (mineAny ? "sell" : "buy");
+  tradeSheet.ticker = opts.ticker || null;
+  tradeSheet.wantOpen = false;
+  document.getElementById("tradeSheetOverlay").style.display = "flex";
+  renderTradeSheet();
+  modalFocusIn("tradeSheetOverlay", "tradeSheetCard");
+}
+function closeTradeSheet(){
+  const ov = document.getElementById("tradeSheetOverlay");
+  if(ov) ov.style.display = "none";
+  modalFocusOut("tradeSheetOverlay");
+}
+function tradeSheetOpen(){ const ov = document.getElementById("tradeSheetOverlay"); return !!ov && ov.style.display === "flex"; }
+function setTradeSheet(patch){ Object.assign(tradeSheet, patch); renderTradeSheet(); }
+// Компании для выбора: продать — свои пакеты; купить — все, сначала те,
+// где у партнёра видна доля (свой портфель или раскрыт шпионажем).
+function tradeSheetCompanies(s, me, partner){
+  const live = (s.companies||[]).filter(c=> !c.merged);
+  if(tradeSheet.kind === "sell") return live.filter(c=> (me.holdings[c.ticker]||0) >= 1);
+  const theirs = (t)=> partner && !partner.holdingsHidden ? (partner.holdings[t]||0) : 0;
+  return live.slice().sort((a,b)=> theirs(b.ticker) - theirs(a.ticker));
+}
+function renderTradeSheet(){
+  const card = document.getElementById("tradeSheetCard");
+  if(!card || !latest) return;
+  const s = latest;
+  const me = s.players.find(p=> p.id === you);
+  const opp = tradeOpponents(s);
+  const partner = opp.find(p=> p.id === tradeSheet.to) || opp[0];
+  if(!me || !partner){ closeTradeSheet(); return; }
+  tradeSheet.to = partner.id;
+  const myTurn = s.currentPlayerId === you && s.phase === "roll";
+  const list = tradeSheetCompanies(s, me, partner);
+  if(!list.some(c=> c.ticker === tradeSheet.ticker)) tradeSheet.ticker = list.length ? list[0].ticker : null;
+  const c = list.find(x=> x.ticker === tradeSheet.ticker);
+  const sell = tradeSheet.kind === "sell";
+  const theirs = (t)=> !partner.holdingsHidden ? (partner.holdings[t]||0) : null;
+  const opt = (x)=> {
+    const extra = sell ? `у вас ${me.holdings[x.ticker]}%` : (theirs(x.ticker) ? `у ${partner.name} ${theirs(x.ticker)}%` : fmt(x.price));
+    return `<option value="${x.ticker}"${x.ticker===tradeSheet.ticker?" selected":""}>${escapeHtml(x.name)} · ${escapeHtml(extra)}</option>`;
+  };
+  const chips = opp.length > 1 ? `<div class="chip-row ts-partners" role="radiogroup" aria-label="С кем">${opp.map(p=>`<button type="button" class="chip${p.id===partner.id?" active":""}" role="radio" aria-checked="${p.id===partner.id}" onclick="setTradeSheet({to:${p.id}})">${escapeHtml(p.name)}</button>`).join("")}</div>` : "";
+  let body;
+  if(!c){
+    body = `<div class="sheet-note">${sell ? "У вас нет акций — можно купить у соперника." : "Компаний для сделки нет."}</div>`;
+  } else {
+    const maxPct = sell ? Math.min(25, me.holdings[c.ticker]||0) : Math.min(25, theirs(c.ticker) || 25);
+    const startPct = Math.min(10, maxPct);
+    const market = c.price * startPct / 100;
+    const start = Math.round(sell ? market : market * (partner.isBot ? (GameEngine.BOT_SELL_MARKUP || 1.1) : 1));
+    const quick = sell ? [["−10%",0.9],["рынок",1],["+10%",1.1]] : [["рынок",1],["+10%",1.1],["+20%",1.2]];
+    const wantCos = (s.companies||[]).filter(x=> x.ticker !== c.ticker && !x.merged);
+    body = `
+      <label class="trade-label" for="tsTicker">Компания</label>
+      <select id="tsTicker" onchange="setTradeSheet({ticker:this.value})">${list.map(opt).join("")}</select>
+      ${pctSliderHtml("tsPct", maxPct, startPct, c.price/100, "Доля")}
+      <div class="trade-field"><label class="trade-label" for="tsPrice">${sell ? "Цена продажи, $" : "Цена покупки, $"}</label>
+        <div class="trade-price">
+          <input id="tsPrice" type="number" inputmode="numeric" min="0" step="100" value="${start}" data-auto="1" oninput="if(event.isTrusted) this.dataset.auto='';updateTradeSheetSummary()">
+          <div class="chip-row tight">${quick.map(([l,k])=>`<button type="button" class="chip" onclick="tradeSheetQuick(${k})">${l}</button>`).join("")}</div>
+        </div></div>
+      ${sell ? `<button type="button" class="trade-want-toggle" aria-expanded="${tradeSheet.wantOpen}" onclick="setTradeSheet({wantOpen:${!tradeSheet.wantOpen}})">${ico(tradeSheet.wantOpen?"minus":"plus","ico-sm")} Его акции взамен</button>
+      <div class="trade-want" ${tradeSheet.wantOpen?"":"hidden"}>
+        <select id="tsWantTicker" aria-label="Акции взамен" onchange="updateTradeSheetSummary()">${wantCos.map(x=>`<option value="${x.ticker}">${escapeHtml(x.name)} · ${fmt(x.price)}</option>`).join("")}</select>
+        ${pctSliderHtml("tsWantPct", 25, 5, wantCos[0] ? wantCos[0].price/100 : 0, "Доля взамен")}
+      </div>` : ""}
+      <div class="ts-verdict" id="tsVerdict" aria-live="polite"></div>`;
+  }
+  card.innerHTML = `
+    <div class="company-modal-head">
+      <span class="pchip-av" style="--seat:${seatColor(s, partner.id)};width:44px;height:44px;">${avatarInner(partner)}</span>
+      <div style="min-width:0;"><h2>Сделка с ${escapeHtml(partner.name)}</h2><div class="muted mono">наличные ${fmt(partner.cash)}</div></div>
+      <button class="company-modal-close" type="button" aria-label="Закрыть" onclick="closeTradeSheet()">${ico("x")}</button>
+    </div>
+    ${chips}
+    <div class="seg ts-seg" role="tablist" aria-label="Что сделать">
+      <button type="button" role="tab" aria-selected="${sell}" onclick="setTradeSheet({kind:'sell'})">Продать</button>
+      <button type="button" role="tab" aria-selected="${!sell}" onclick="setTradeSheet({kind:'buy'})">Купить</button>
+    </div>
+    ${body}
+    ${myTurn ? "" : `<div class="sheet-note">${ico("lock","ico-sm")} Предложить можно в свой ход</div>`}
+    <button type="button" class="block ts-submit" id="tsSubmit" ${c && myTurn ? "" : "disabled"} onclick="doProposeTradeSheet()">${ico("swap","ico-sm")} <span id="tsSubmitLbl">Предложить</span></button>
+  `;
+  updateTradeSheetSummary();
+}
+function tradeSheetMarket(){
+  const c = latest && latest.companies.find(x=> x.ticker === tradeSheet.ticker);
+  return c ? c.price * pctSliderVal("tsPct") / 100 : 0;
+}
+function tradeSheetQuick(k){
+  const inp = document.getElementById("tsPrice");
+  if(!inp) return;
+  inp.value = Math.max(1, Math.round(tradeSheetMarket() * k / 100) * 100 || Math.round(tradeSheetMarket() * k));
+  inp.dataset.auto = k === (tradeSheet.kind === "sell" ? 1 : (GameEngine.BOT_SELL_MARKUP || 1.1)) ? "1" : "";
+  updateTradeSheetSummary();
+}
+function onTradeSheetPct(){
+  // Цена «по умолчанию» идёт за долей; введённую вручную не трогаем.
+  const inp = document.getElementById("tsPrice");
+  const partner = latest && latest.players.find(p=> p.id === tradeSheet.to);
+  if(inp && inp.dataset.auto === "1") inp.value = Math.round(tradeSheetMarket() * (tradeSheet.kind === "sell" ? 1 : (partner && partner.isBot ? (GameEngine.BOT_SELL_MARKUP || 1.1) : 1)));
+  updateTradeSheetSummary();
+}
+// Итог и подсказка: у бота известно правило — говорим, согласится ли он.
+function updateTradeSheetSummary(){
+  const out = document.getElementById("tsVerdict");
+  const lbl = document.getElementById("tsSubmitLbl");
+  if(!latest) return;
+  const price = Math.max(0, Number((document.getElementById("tsPrice")||{}).value) || 0);
+  if(lbl) lbl.textContent = price > 0 ? `Предложить · ${fmt(price)}` : "Предложить";
+  if(!out) return;
+  const partner = latest.players.find(p=> p.id === tradeSheet.to);
+  const market = tradeSheetMarket();
+  let want = 0;
+  if(tradeSheet.kind === "sell" && tradeSheet.wantOpen){
+    const wt = (document.getElementById("tsWantTicker")||{}).value;
+    const wc = wt && latest.companies.find(x=> x.ticker === wt);
+    if(wc) want = wc.price * pctSliderVal("tsWantPct") / 100;
+  }
+  const diff = market ? Math.round(((price + want) / market - 1) * 100) : 0;
+  const vsMarket = Math.abs(diff) < 1 ? "по рынку" : `${diff > 0 ? "выше" : "ниже"} рынка на ${Math.abs(diff)}%`;
+  let cls = "", text = vsMarket;
+  if(partner && partner.isBot){
+    const sell = tradeSheet.kind === "sell";
+    const ok = sell ? price + want <= market * 1.0001 : price >= market * (GameEngine.BOT_SELL_MARKUP || 1.1) * 0.9999;
+    cls = ok ? "ok" : "no";
+    text = ok ? `Бот согласится: ${vsMarket}` : sell ? `Бот не заплатит больше рынка (${vsMarket})` : `Бот продаёт от рынка +10% (${vsMarket})`;
+  }
+  out.className = "ts-verdict " + cls;
+  out.innerHTML = `${ico(cls === "ok" ? "check" : cls === "no" ? "alert" : "info","ico-sm")}<span>${text}</span>`;
+}
+function doProposeTradeSheet(){
+  if(!latest || !tradeSheet.ticker) return;
+  const price = Math.max(0, Math.round(Number((document.getElementById("tsPrice")||{}).value) || 0));
+  const sell = tradeSheet.kind === "sell";
+  const wantTicker = sell && tradeSheet.wantOpen ? (document.getElementById("tsWantTicker")||{}).value : undefined;
+  if(price === 0 && !wantTicker){ flashError(sell ? "Укажите цену — иначе доля уйдёт бесплатно." : "Укажите цену покупки."); return; }
+  send({ type: "proposeTrade", kind: tradeSheet.kind, to: tradeSheet.to, ticker: tradeSheet.ticker, pct: pctSliderVal("tsPct"), price,
+    wantTicker, wantPct: wantTicker ? pctSliderVal("tsWantPct") : undefined });
+  closeTradeSheet();
 }
 
 // ---------------------------------------------------------------------
@@ -6090,7 +6273,7 @@ function refreshOpenModal(){
 // поле перерисовывается на каждое состояние, поэтому элемент ищем и по позиции.
 let modalReturnFocus = {};
 function anyModalOpen(){
-  return ["companyModalOverlay","marketEventOverlay","analysisOverlay"].some(id=>{ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== "none"; });
+  return ["companyModalOverlay","marketEventOverlay","analysisOverlay","tradeSheetOverlay"].some(id=>{ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== "none"; });
 }
 function syncModalInert(){
   const main = document.querySelector("#app > main");
@@ -6158,6 +6341,8 @@ function refreshPlayerModal(){
         <div class="cap-mini"><span>Репутация</span><b class="${rep.cls}">${p.reputation}</b></div>
         <div class="cap-mini"><span>Портфель</span><b>${p.holdingsHidden?"скрыт":"раскрыт"}</b></div>
       </div>`;
+    const tradeBtn = !s.tutorial && s.phase === "roll" && !iAmOut
+      ? `<button type="button" class="block player-trade-btn" onclick="openTradeSheet(${p.id})">${ico("swap","ico-sm")} Сделка</button>` : "";
     if(!active){
       // Новое голосование не должно молча заменять чужое. Игрока в сети
       // исключают минимум двумя голосами «за» (большинство остальных людей в
@@ -6167,24 +6352,22 @@ function refreshPlayerModal(){
       const solo = !!p.soloKickable;
       const voters = s.players.filter(x=>x.connected !== false && !x.bankrupt && !x.isBot && x.id !== p.id).length;
       let startHtml;
+      // Нельзя исключить — не объясняем строкой текста, просто нет кнопки.
       // Обучение: исключение сбило бы сценарий тренера (localDispatch тоже откажет).
       const kickNote = (t, hint)=> `<div class="sheet-note kick-note">${t}${hint ? hintBtn("kick", hint) : ""}</div>`;
-      if(s.tutorial) startHtml = kickNote("В обучении исключать нельзя");
+      if(s.tutorial || iAmOut || s.phase !== "roll") startHtml = "";
       else if(kv) startHtml = kickNote(`Идёт голосование за «${escapeHtml(kv.targetName)}»`);
-      else if(iAmOut) startHtml = kickNote("Вы выбыли — без голоса");
-      else if(s.phase !== "roll") startHtml = "";
-      else if(solo) startHtml = kickNote(p.isBot ? "Бота исключают одним голосом" : "Не в сети — можно исключить",
-          `Исключить можно одним вашим голосом: активы вернутся банку, ${p.isBot ? "бот" : "игрок"} в партию не вернётся.`)
-        + `<button type="button" class="danger block" onclick="if(confirm('Исключить игрока сразу? Его активы вернутся банку.')) send({type:'startKickVote', target:${p.id}});">${ico("vote","ico-sm")} Исключить</button>`;
+      else if(solo) startHtml = `<button type="button" class="ghost small kick-btn" title="Одним вашим голосом: активы вернутся банку" onclick="if(confirm('Исключить сразу? Активы вернутся банку.')) send({type:'startKickVote', target:${p.id}});">${ico("vote","ico-sm")} Исключить</button>`;
       // На одном устройстве правило онлайна («нужны два голоса в сети») лишнее:
       // при двух людях за столом просто не показываем ничего.
       else if(voters < 2 && mode === "offline") startHtml = "";
       else if(voters < 2) startHtml = p.connected === false
         ? kickNote("Только что отключился", "Возможно, игрок обновляет страницу. Если он не вернётся в течение минуты, исключить его сможете и вы один.")
-        : kickNote("Исключить нельзя: голосовать некому", "Игрока в сети исключают минимум двумя голосами «за». Если он отключится дольше чем на минуту, исключить его сможете и вы один.");
+        : "";
       else startHtml = `<button type="button" class="danger block" onclick="send({type:'startKickVote', target:${p.id}});">${ico("vote","ico-sm")} Начать голосование</button>`
         + kickNote("", "Если игрок мешает партии (например, не ходит). Нужно больше половины голосов остальных игроков в сети, но не меньше двух.");
       bodyHtml = `${info}
+        ${tradeBtn}
         ${startHtml}`;
     } else {
       const canCancel = kickVoteCanCancel(s, kv);
@@ -6200,7 +6383,7 @@ function refreshPlayerModal(){
   card.innerHTML = `
     <div class="company-modal-head">
       <span class="pchip-av" style="--seat:${seatColor(s,p.id)};width:48px;height:48px;font-size:19px;">${avatarInner(p)}</span>
-      <div><h2>${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':''}</h2><div class="muted">${p.isBot?"Бот":"Игрок"}${p.connected===false && !p.isBot?" · не в сети":""}</div></div>
+      <div><h2>${escapeHtml(p.name)}${p.id===you?' <span class="muted">(вы)</span>':''}</h2>${p.connected===false && !p.isBot?'<div class="muted">не в сети</div>':""}</div>
       <button class="company-modal-close" type="button" aria-label="Закрыть" onclick="closeCompanyModal();">${ico("x")}</button>
     </div>
     ${bodyHtml}
@@ -6444,6 +6627,12 @@ function refreshCompanyModal(){
         </div>`;
       }
     }
+  }
+  // Акции у соперников — купить можно сделкой (лист сделки, «Купить»).
+  const othersPct = Math.round((c.owned || 0) - myHolding);
+  if(othersPct >= 1 && s.currentPlayerId === you && !s.tutorial && s.players.some(p=> p.id !== you && !p.bankrupt)){
+    const seller = controller && controller.id !== you ? controller.id : null;
+    actionsHtml += `<button type="button" class="secondary block" onclick="closeCompanyModal();openTradeSheet(${seller === null ? "null" : seller},{kind:'buy',ticker:'${c.ticker}'})">${ico("swap","ico-sm")} Купить у игрока · у соперников ${othersPct}%</button>`;
   }
   // Заморозка цен продажу не запрещает (движок её принимает) — см. stockActionsHtml.
   if(myHolding > 0 && s.currentPlayerId === you){
