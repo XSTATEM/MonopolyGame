@@ -102,7 +102,7 @@
   //  - Продажа банку — с комиссией SELL_BANK_COMMISSION.
   //  - Боты торгуют между собой (BOT_TRADE_CHANCE на ход).
   // ---------------------------------------------------------------------
-  const RULES_VERSION = 3;
+  const RULES_VERSION = 4;
   const LANDING_FEE_DISCOUNT_PER_PCT = 0.10;
   const LANDING_FEE_MULT = 0.75;
   const FEE_CURVE_N_EXP_V2 = 0;
@@ -150,6 +150,48 @@
   const COMPANY_RELIST_PCT = 0.6;
   const BOARD_DECISION_CHANCE = 0.35;
   function rulesV3(room) { return !!room && (room.rulesV || 1) >= 3; }
+  // ---------------------------------------------------------------------
+  // Правила 4 (rulesV >= 4): к концу партии капиталы расходятся сильнее —
+  // кто-то с миллионом, кто-то у нуля.
+  //  - Инвестпроекты: на каждом событии банк выставляет PROJECT_NEW_PER_EVENT
+  //    предложений. Кто первым вложится, тот каждое событие получает
+  //    гарантированный доход income, пока не выйдет срок events (всего
+  //    ×PROJECT_RETURN от вложенного). Невыкупленное предложение снимается через
+  //    PROJECT_OFFER_LIFE событий. Проекты дорожают по ходу партии
+  //    (PROJECT_COST_GROWTH за событие). В капитале проект стоит остаток
+  //    вложения (cost × left / events); при долге банк забирает его за
+  //    PROJECT_FIRE_SALE от этого.
+  //  - Плата держателям и цена выкупа растут: × (1 + FEE_GROWTH_PER_EVENT × событие).
+  //    Начало спокойное, к концу отказ от покупок обходится дорого.
+  //  - Советник: ADVISOR_FEE за событие (первое — при найме). Прогноз следующей
+  //    новости — куда и в какую сторону, верен с вероятностью ADVISOR_ACCURACY;
+  //    подсказки по рискам — в клиенте.
+  // ---------------------------------------------------------------------
+  const PROJECT_TYPES = [
+    { id: "coffee", name: "Сеть кофеен", base: 18000 },
+    { id: "bakery", name: "Пекарни", base: 22000 },
+    { id: "carwash", name: "Автомойки", base: 28000 },
+    { id: "fitness", name: "Фитнес-клубы", base: 36000 },
+    { id: "warehouse", name: "Склад у порта", base: 45000 },
+    { id: "solar", name: "Солнечная ферма", base: 60000 },
+    { id: "clinic", name: "Частная клиника", base: 75000 },
+    { id: "datacenter", name: "Дата-центр", base: 95000 },
+  ];
+  const PROJECT_NEW_PER_EVENT = 2;
+  const PROJECT_OFFER_LIFE = 2;
+  const PROJECT_MAX_OFFERS = 4;
+  const PROJECT_COST_GROWTH = 0.05;
+  const PROJECT_RETURN = [1.2, 1.5];
+  const PROJECT_TERMS = [5, 6, 8];
+  const PROJECT_FIRE_SALE = 0.5;
+  const FEE_GROWTH_PER_EVENT = 0.06;
+  const ADVISOR_FEE = 1500;
+  const ADVISOR_ACCURACY = 0.8;
+  // Боты: запас наличных после вложения в проект и шанс вложиться за ход.
+  const BOT_PROJECT_RESERVE = 25000;
+  const BOT_PROJECT_CHANCE = 0.5;
+  function rulesV4(room) { return !!room && (room.rulesV || 1) >= 4; }
+  function feeGrowth(room) { return rulesV4(room) ? 1 + FEE_GROWTH_PER_EVENT * (room.eventCount || 0) : 1; }
   function profileOf(c) { return COMPANY_PROFILES[(c && c.profile) || "stable"] || COMPANY_PROFILES.stable; }
   // Длительность партии по умолчанию — в своих ходах на игрока (решение владельца,
   // 2026-10-11: «до банкротства», ≈100 своих ходов у каждого). Это страховочный
@@ -686,7 +728,7 @@
     });
     const realEstate = {};
     CITIES.forEach((ct) => { realEstate[ct.id] = { ownerId: null, level: 0, factor: 1 }; });
-    return {
+    const room = {
       code,
       companies,
       realEstate,
@@ -741,6 +783,8 @@
       decisions: [], // правила 3: решения совета директоров {id, playerId, ticker, kind, ...}
       nextDecisionId: 1,
       lastEvent: null, // правила 3: разобранное последнее событие для карточки события
+      projectOffers: [], // правила 4: инвестпроекты банка {id, type, name, cost, income, events, born}
+      nextProjectId: 1,
       createdAt: Date.now(),
       kickVote: null, // {targetId, initiatorId, startedAt, voters:{playerId:true}}
       reactions: [], // {id, playerId, emoji, ts} — короткоживущие реакции за столом, чистятся по TTL на клиенте
@@ -762,6 +806,8 @@
         maxTurnsPerPlayer: DEFAULT_MAX_TURNS_PER_PLAYER,
       },
     };
+    refreshProjectOffers(room); // правила 4: первые предложения — уже к началу партии
+    return room;
   }
 
   // visibleTo (необязательно) — список id игроков, которым эта запись видна в ленте.
@@ -863,7 +909,7 @@
   // (setForcedPrice), цены бота (botStep) и подсказки клиенту
   // (pendingRollMeta.fairPrice) — плата за отказ и цена выкупа идут по одной кривой.
   function forcedFairPrice(room, ticker, heldPct) {
-    return room.companies[ticker].price * getForcedPaymentPct(room, companyByTicker(ticker).tier) * holdersFeeFactor(room, heldPct);
+    return room.companies[ticker].price * getForcedPaymentPct(room, companyByTicker(ticker).tier) * holdersFeeFactor(room, heldPct) * feeGrowth(room);
   }
   function controlledTickers(room, playerId) {
     return COMPANIES.filter((c) => (room.players.find((p) => p.id === playerId)?.holdings[c.ticker] || 0) > 50).map((c) => c.ticker);
@@ -876,7 +922,12 @@
       if (re && re.ownerId === p.id) v += realEstatePrice(room, ct.id);
     });
     if (p.loan) v -= p.loan.principal;
+    v += projectsValue(p);
     return v;
+  }
+  // Правила 4: проект в капитале — остаток вложения (линейно по сроку).
+  function projectsValue(p) {
+    return (p.projects || []).reduce((a, x) => a + x.cost * (x.left / x.events), 0);
   }
   // Стоимость платных «мер» контроля привязана к капиталу игрока (netWorth), а не
   // к фиксированной сумме — иначе одна и та же цена в начале и в конце партии
@@ -1163,6 +1214,13 @@
         addLog(room, `${player.name}: принудительная продажа ${pct}% ${ticker} банку за ${fmt(proceeds)} для покрытия долга.`, "forced-sell");
       }
     }
+    // Правила 4: проекты банк забирает за PROJECT_FIRE_SALE от остатка вложения.
+    while (player.cash < 0 && (player.projects || []).length) {
+      const x = player.projects.shift();
+      const proceeds = Math.round(x.cost * (x.left / x.events) * PROJECT_FIRE_SALE);
+      player.cash += proceeds;
+      addLog(room, `${player.name}: проект «${x.name}» продан банку за ${fmt(proceeds)} для покрытия долга.`, "forced-sell");
+    }
     if (player.cash < 0) {
       CITIES.forEach((ct) => {
         if (player.cash >= 0) return;
@@ -1177,6 +1235,8 @@
     }
     if (player.cash < 0) {
       player.holdings = {};
+      player.projects = [];
+      player.advisor = null;
       player.bankrupt = true;
       player.loan = null;
       // Как в declareBankruptcy: банкрот не должен принимать «подарочные» сделки —
@@ -1429,6 +1489,7 @@
     processLoans(room);
     processRealEstate(room);
     processReputationRecovery(room);
+    processProjects(room);
 
     if (room.deckPos >= room.deckOrder.length) {
       room.deckOrder = shuffle(room.deckOrder);
@@ -1500,6 +1561,8 @@
     if (ev) ev.dividends = divPaid || {};
     if (v3) offerBoardDecisions(room, ev);
     if (ev) room.lastEvent = ev;
+    processAdvisors(room);
+    refreshProjectOffers(room);
     room.turn = 1;
     recordNetWorths(room);
   }
@@ -2796,6 +2859,142 @@
   function directBuyUsed(room, p) {
     return !!(room.directBuyKeys && room.directBuyKeys[p.id] === `${room.eventCount}:${room.turn}:${p.id}`);
   }
+  // ---------------------------------------------------------------------
+  // Правила 4: инвестпроекты и советник
+  // ---------------------------------------------------------------------
+  function makeProjectOffer(room) {
+    const taken = new Set((room.projectOffers || []).map((o) => o.type));
+    const pool = PROJECT_TYPES.filter((t) => !taken.has(t.id));
+    const t = (pool.length ? pool : PROJECT_TYPES)[Math.floor(Math.random() * (pool.length || PROJECT_TYPES.length))];
+    const scale = (1 + PROJECT_COST_GROWTH * (room.eventCount || 0)) * (0.9 + Math.random() * 0.2);
+    const cost = Math.max(1000, Math.round((t.base * scale) / 1000) * 1000);
+    const events = PROJECT_TERMS[Math.floor(Math.random() * PROJECT_TERMS.length)];
+    const mult = PROJECT_RETURN[0] + Math.random() * (PROJECT_RETURN[1] - PROJECT_RETURN[0]);
+    const income = Math.max(100, Math.round((cost * mult) / events / 100) * 100);
+    return { id: room.nextProjectId++, type: t.id, name: t.name, cost, income, events, born: room.eventCount || 0 };
+  }
+  // На событии: старые предложения снимаются, банк выставляет новые.
+  function refreshProjectOffers(room) {
+    if (!rulesV4(room) || room.tutorial) return;
+    if (!Array.isArray(room.projectOffers)) room.projectOffers = [];
+    if (!room.nextProjectId) room.nextProjectId = 1;
+    const now = room.eventCount || 0;
+    room.projectOffers = room.projectOffers.filter((o) => now - o.born < PROJECT_OFFER_LIFE);
+    for (let i = 0; i < PROJECT_NEW_PER_EVENT && room.projectOffers.length < PROJECT_MAX_OFFERS; i++) room.projectOffers.push(makeProjectOffer(room));
+  }
+  function buyProject(room, playerId, offerId) {
+    if (!rulesV4(room)) return { error: "Инвестпроекты есть только в новых партиях." };
+    const err = requireOwnTurn(room, playerId);
+    if (err) return { error: err };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    const offer = (room.projectOffers || []).find((o) => o.id === Number(offerId));
+    if (!offer) return { error: "Этот проект уже забрали." };
+    if (p.cash < offer.cost) return { error: `Не хватает наличных: нужно ${fmt(offer.cost)}.` };
+    p.cash -= offer.cost;
+    room.projectOffers = room.projectOffers.filter((o) => o !== offer);
+    if (!Array.isArray(p.projects)) p.projects = [];
+    p.projects.push({ id: offer.id, type: offer.type, name: offer.name, cost: offer.cost, income: offer.income, events: offer.events, left: offer.events });
+    stat(room, p.id, "projectOut", offer.cost);
+    jr(room, p.id, "project", { name: offer.name, cost: offer.cost, income: offer.income, events: offer.events });
+    addLog(room, `${p.name}: проект «${offer.name}» за ${fmt(offer.cost)} — ${fmt(offer.income)} за событие, ${offer.events} ${plural(offer.events, "событие", "события", "событий").replace(/^\d+ /, "")}.`, "project");
+    return { ok: true };
+  }
+  // На событии: доход по проектам, закончившиеся снимаются.
+  function processProjects(room) {
+    if (!rulesV4(room)) return;
+    activePlayers(room).forEach((p) => {
+      if (!(p.projects || []).length) return;
+      let sum = 0;
+      const done = [];
+      p.projects.forEach((x) => { p.cash += x.income; sum += x.income; x.left -= 1; if (x.left <= 0) done.push(x); });
+      p.projects = p.projects.filter((x) => x.left > 0);
+      stat(room, p.id, "projectIn", sum);
+      addLog(room, `Проекты: вам +${fmt(sum)}.`, "project", [p.id]);
+      done.forEach((x) => addLog(room, `Проект «${x.name}» завершён: всего ${fmt(x.income * x.events)} на вложенные ${fmt(x.cost)}.`, "project", [p.id]));
+    });
+  }
+  // Советник: найм сразу берёт плату за первое событие (иначе прогноз
+  // доставался бы даром — нанять и уволить до события).
+  function hireAdvisor(room, playerId) {
+    if (!rulesV4(room)) return { error: "Советник есть только в новых партиях." };
+    if (!room || room.phase !== "roll") return { error: "Сейчас недоступно." };
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.bankrupt) return { error: "Недоступно." };
+    if (p.advisor) return { error: "Советник уже работает на вас." };
+    if (p.cash < ADVISOR_FEE) return { error: `Не хватает наличных: нужно ${fmt(ADVISOR_FEE)}.` };
+    p.cash -= ADVISOR_FEE;
+    p.advisor = { since: room.eventCount || 0, roll: Math.random() };
+    stat(room, p.id, "advisorOut", ADVISOR_FEE);
+    addLog(room, `Советник нанят: ${fmt(ADVISOR_FEE)} за событие.`, "advisor", [p.id]);
+    return { ok: true };
+  }
+  function fireAdvisor(room, playerId) {
+    const p = room && room.players.find((x) => x.id === playerId);
+    if (!p || !p.advisor) return { error: "Советника нет." };
+    p.advisor = null;
+    addLog(room, "Советник уволен.", "advisor", [p.id]);
+    return { ok: true };
+  }
+  // На событии: плата советнику за следующее событие и новый прогноз. Нечем
+  // платить — советник уходит.
+  function processAdvisors(room) {
+    if (!rulesV4(room)) return;
+    activePlayers(room).forEach((p) => {
+      if (!p.advisor) return;
+      if (p.cash < ADVISOR_FEE) {
+        p.advisor = null;
+        addLog(room, "Советник ушёл: нечем платить.", "advisor", [p.id]);
+        return;
+      }
+      p.cash -= ADVISOR_FEE;
+      stat(room, p.id, "advisorOut", ADVISOR_FEE);
+      p.advisor.roll = Math.random();
+    });
+  }
+  // Прогноз следующей новости колоды: о ком она и в какую сторону. С
+  // вероятностью 1 − ADVISOR_ACCURACY советник ошибается в направлении.
+  function advisorForecast(room, p) {
+    if (!p || !p.advisor) return null;
+    if (room.deckPos >= room.deckOrder.length) return { target: "", dir: 0, kind: "reshuffle" };
+    const card = room.deckData[room.deckOrder[room.deckPos]];
+    if (!card) return null;
+    if (card.type === "special") return { target: card.title, dir: 0, kind: "special" };
+    let dir = card.percent > 0 ? 1 : card.percent < 0 ? -1 : 0;
+    if (p.advisor.roll >= ADVISOR_ACCURACY) dir = -dir;
+    const target = card.type === "global" ? "весь рынок" : card.type === "sector" ? card.sector
+      : card.ticker ? (companyByTicker(card.ticker) || {}).name || card.ticker : "одна из компаний";
+    return { target, dir, kind: card.type, big: Math.abs(card.percent || 0) >= 15 };
+  }
+  // Самая дорогая обязательная плата, если сейчас попасть на чужую компанию
+  // (правила 2+): для предупреждения «не хватит на плату». Доля чужих
+  // держателей публична (owned − своя), у контролёра — цена бота (×1,5 от справедливой).
+  function worstLandingFee(room, p) {
+    if (!rulesV2(room) || !p) return null;
+    let worst = null;
+    liveCompanies(room).forEach((c) => {
+      const others = room.players.filter((o) => !o.bankrupt && o.id !== p.id && (o.holdings[c.ticker] || 0) > 0);
+      if (!others.length) return;
+      const disc = landingFeeDiscount(p, c.ticker);
+      if (disc <= 0) return;
+      const totalPct = others.reduce((a, o) => a + o.holdings[c.ticker], 0);
+      const ctrl = others.length === 1 && others[0].holdings[c.ticker] > 50;
+      const amount = ctrl ? forcedFairPrice(room, c.ticker, totalPct) * 1.5 * disc : refuseRollAmount(room, c.ticker, totalPct) * disc * LANDING_FEE_MULT;
+      if (!worst || amount > worst.amount) worst = { amount: Math.round(amount), ticker: c.ticker };
+    });
+    return worst;
+  }
+  // Бот вкладывается в самый доходный проект, если после него остаётся запас.
+  function botBuyProject(room, bot) {
+    if (!rulesV4(room)) return null;
+    const reserve = isStrongBot(room, bot) ? STRONG_BOT_RESERVE : BOT_PROJECT_RESERVE;
+    const best = (room.projectOffers || [])
+      .filter((o) => bot.cash - o.cost >= reserve)
+      .sort((a, b) => (b.income * b.events) / b.cost - (a.income * a.events) / a.cost)[0];
+    if (!best) return null;
+    return { acted: true, type: "buyProject", result: buyProject(room, bot.id, best.id) };
+  }
+
   function buyDirect(room, playerId, ticker, pctRaw) {
     if (!rulesV2(room)) return { error: "Покупка вне броска есть только в новых партиях." };
     const err = requireOwnTurn(room, playerId);
@@ -3191,9 +3390,15 @@
       const turnKey = `${room.eventCount}:${room.turn}`;
       if (cur.botTurnKey !== turnKey) {
         cur.botTurnKey = turnKey;
-        cur.botTurnPlan = { direct: Math.random() < (isStrongBot(room, cur) ? 0.6 : 0.3), trade: Math.random() < BOT_TRADE_CHANCE };
+        cur.botTurnPlan = { direct: Math.random() < (isStrongBot(room, cur) ? 0.6 : 0.3), trade: Math.random() < BOT_TRADE_CHANCE,
+          project: rulesV4(room) && Math.random() < (isStrongBot(room, cur) ? 0.9 : BOT_PROJECT_CHANCE) };
       }
       const plan = cur.botTurnPlan || {};
+      if (plan.project) {
+        plan.project = false;
+        const a = botBuyProject(room, cur);
+        if (a) return a;
+      }
       if (plan.direct) {
         plan.direct = false;
         const a = botDirectBuy(room, cur);
@@ -3504,6 +3709,8 @@
     const wasCurrent = currentPlayerId(room) === p.id;
     p.holdings = {};
     p.costBasis = {};
+    p.projects = [];
+    p.advisor = null;
     CITIES.forEach((ct) => {
       const re = room.realEstate[ct.id];
       if (re && re.ownerId === p.id) { re.ownerId = null; re.level = 0; }
@@ -3858,7 +4065,7 @@
     const c = room.companies[ticker];
     const tier = companyByTicker(ticker).tier;
     const squeezeMult = c.fullyOwned ? 3 : (c.squeezedOut ? 2 : 1);
-    return c.price * getForcedPaymentPct(room, tier) * holdersFeeFactor(room, totalPct) * (room.dividendMultiplier || 1) * squeezeMult * (TIER_DIVIDEND_MULT[tier] || 1.0);
+    return c.price * getForcedPaymentPct(room, tier) * holdersFeeFactor(room, totalPct) * (room.dividendMultiplier || 1) * squeezeMult * (TIER_DIVIDEND_MULT[tier] || 1.0) * feeGrowth(room);
   }
 
   // Единоличный контролёр компании на клетке броска: единственный держатель
@@ -4221,6 +4428,12 @@
       myMeasureCooldowns: me && rulesV2(room) ? Object.fromEntries(["negativeInfo", "insider", "espionage", "discredit", "personalPr", "investigate"].map((k) => [k, measureCooldownLeft(room, me, k)])) : null,
       measureCooldown: rulesV2(room) ? MEASURE_COOLDOWN : 0,
       directBuy: me && rulesV2(room) ? { used: directBuyUsed(room, me), maxPct: DIRECT_BUY_MAX_PCT, markupPct: Math.round(DIRECT_BUY_MARKUP * 100) } : null,
+      // Правила 4: предложения проектов (у всех одни), советник — только свой,
+      // рост платы держателям (×, для подсказки и предупреждений).
+      projectOffers: rulesV4(room) && !room.tutorial ? (room.projectOffers || []).map((o) => ({ id: o.id, type: o.type, name: o.name, cost: o.cost, income: o.income, events: o.events, expiresIn: Math.max(1, PROJECT_OFFER_LIFE - ((room.eventCount || 0) - o.born)) })) : null,
+      advisor: me && rulesV4(room) && !room.tutorial ? { hired: !!me.advisor, fee: ADVISOR_FEE, accuracyPct: Math.round(ADVISOR_ACCURACY * 100), forecast: advisorForecast(room, me) } : null,
+      feeGrowth: Math.round(feeGrowth(room) * 100) / 100,
+      worstFee: me && !room.tutorial ? worstLandingFee(room, me) : null,
       sellCommissionPct: rulesV2(room) ? Math.round(SELL_BANK_COMMISSION * 100) : 0,
       holderDividendPct: rulesV2(room) ? HOLDER_DIVIDEND_PCT * 100 : 0,
       landingFeeDiscountPct: rulesV2(room) ? Math.round(LANDING_FEE_DISCOUNT_PER_PCT * 100) : 0,
@@ -4298,6 +4511,8 @@
           soloKickable: !!p.isBot || offlineLongEnough(p),
           netWorth: netWorth(room, p),
           reputation: p.reputation == null ? REPUTATION_START : p.reputation,
+          // Правила 4: проекты не скрываются — вложения в банк видны всем.
+          projects: (p.projects || []).map((x) => ({ id: x.id, type: x.type, name: x.name, cost: x.cost, income: x.income, events: x.events, left: x.left })),
           loanPrincipal: p.loan ? Math.round(p.loan.principal) : 0,
           holdings: revealed ? p.holdings : {},
           holdingsPnl,
@@ -4322,6 +4537,7 @@
     settleDebt, checkEndGame, resolveShorts, marketEvent, afterRollAction, endTurn,
     addPlayer, setConnected, leaveLobby, newGameKeepPlayers, startGame, updateRoomSettings, setMaxRounds, deleteRoom, sendChatMessage,
     rollDice, buyFromRoll, dividendFromRoll, skipRoll, buyBank, sellBank, proposeTrade, respondTrade, botSellDecision, BOT_SELL_MARKUP, BOT_SELL_CONTROL_MARKUP,
+    buyProject, hireAdvisor, fireAdvisor, advisorForecast, worstLandingFee, refreshProjectOffers, rulesV4, feeGrowth, projectsValue, PROJECT_TYPES, ADVISOR_FEE, ADVISOR_ACCURACY, FEE_GROWTH_PER_EVENT,
     setForcedPrice, payForcedPrice, forcedPriceCap, forcedFairPrice, holdersFeeFactor, botStep, botBuyPct, buyDirect, directBuyCost, prCampaignCost, rulesV2, measureCooldownLeft, HOLDER_DIVIDEND_PCT,
     ctrlNegativeInfo, ctrlPrCampaign, ctrlInsiderPeek, ctrlInsiderResolve, ctrlSqueezeOut, ctrlShort, ctrlPublicIPO, ctrlMergeCompanies,
     declareBankruptcy, forceEvent,
